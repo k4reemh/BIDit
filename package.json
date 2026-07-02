@@ -1,0 +1,28 @@
+{
+  "name": "bidit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "BIDit — live auction marketplace for trading cards, layered on Pump.fun streams, settled in USDC.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "npm -w @bidit/backend run test",
+    "demo": "npm -w @bidit/backend run demo",
+    "dev": "npm -w @bidit/backend run dev",
+    "devnet:e2e": "npm -w @bidit/backend run devnet:e2e",
+    "prisma:generate": "npm -w @bidit/backend run prisma:generate",
+    "typecheck": "npm -w @bidit/shared run typecheck && npm -w @bidit/backend run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "fast-check": "^4.8.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.9"
+  }
+}

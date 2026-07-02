@@ -1,0 +1,24 @@
+/** Internal messaging between the UI (content script + popup) and the background
+ *  service worker. Distinct from the server wire protocol (@bidit/shared). */
+import type { ServerMessage } from '@bidit/shared';
+
+export const PORT_NAME = 'bidit';
+
+/** UI -> service worker. */
+export type UiToSw =
+  | { cmd: 'HELLO'; coin: string } // content script announces the coin on its page
+  | { cmd: 'BID'; auctionId: string; amount: string; nonce: string }
+  | { cmd: 'GIVEAWAY_ENTER'; giveawayId: string } // viewer taps Enter on a giveaway
+  | { cmd: 'LOGIN'; handle: string } // popup (dev login)
+  | { cmd: 'SET_SESSION'; token: string; handle: string; userId: string } // popup (wallet sign-in)
+  | { cmd: 'LOGOUT' }
+  | { cmd: 'DEPOSIT'; amount: string } // popup (dev)
+  | { cmd: 'LINK_COIN'; coin: string } // panel/popup (dev): seed an auction here
+  | { cmd: 'PING' }; // keep the service worker alive
+
+/** Service worker -> UI. */
+export type SwToUi =
+  | { evt: 'STATUS'; connected: boolean; handle: string | null }
+  | { evt: 'ROOM'; coin: string; room: string | null; sellerHandle?: string }
+  | { evt: 'SERVER'; message: ServerMessage } // authoritative server message, passed through
+  | { evt: 'PONG' };

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BIDit — Admin</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif; background: #0b0e14; color: #e6e9ef; }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 22px; }
+      h1 { font-size: 20px; margin: 0; } h1 b { color: #3b82f6; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #8b94a7; margin: 0 0 10px; }
+      .muted { color: #8b94a7; font-size: 13px; }
+      .card { background: #151a23; border: 1px solid #232a36; border-radius: 12px; padding: 16px; margin-top: 14px; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      input { background: #0b0e14; border: 1px solid #2a3340; color: #e6e9ef; border-radius: 8px; padding: 8px 11px; font-size: 14px; }
+      button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      button.secondary { background: #2a3340; }
+      table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid #1b2230; font-size: 13px; }
+      th { color: #8b94a7; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+      .badge { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+      .ok { background: #10331f; color: #34d399; } .no { background: #3a2417; color: #fbbf24; }
+      .right { text-align: right; }
+      .hidden { display: none; }
+      .total { font-weight: 800; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="row" style="justify-content:space-between">
+        <h1><b>BID</b>it · Admin</h1>
+        <div class="muted" id="who">not signed in</div>
+      </div>
+
+      <div class="card" id="loginCard">
+        <h2>Sign in (admin)</h2>
+        <div class="row">
+          <input id="handle" value="admin" />
+          <button id="loginBtn">Sign in</button>
+        </div>
+        <div class="muted" style="margin-top:8px">The dev server seeds an <b>admin</b> account.</div>
+      </div>
+
+      <div id="app" class="hidden">
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <h2 style="margin:0">Sellers</h2>
+            <button class="secondary" id="refreshBtn">Refresh</button>
+          </div>
+          <table id="sellers"><tbody></tbody></table>
+        </div>
+
+        <div class="card">
+          <h2>Ledger audit</h2>
+          <table id="audit"><tbody></tbody></table>
+          <div class="row" style="justify-content:space-between; margin-top:10px">
+            <div>System total (must be $0): <b id="sysTotal">—</b></div>
+            <div>Buyback pending: <b id="buyback">—</b></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Orders</h2>
+          <table id="orders"><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let session = null;
+
+      async function api(path, opts = {}) {
+        const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+        if (session) headers.authorization = `Bearer ${session.token}`;
+        const r = await fetch(path, { ...opts, headers });
+        return r.json();
+      }
+
+      $('loginBtn').onclick = async () => {
+        const s = await api('/auth/dev-login', { method: 'POST', body: JSON.stringify({ handle: $('handle').value.trim() || 'admin' }) });
+        if (s.role !== 'admin') { alert('not an admin account'); return; }
+        session = s;
+        $('who').textContent = `${s.handle} · ${s.role}`;
+        $('loginCard').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        refresh();
+      };
+      $('refreshBtn').onclick = refresh;
+
+      async function refresh() { await Promise.all([loadSellers(), loadAudit(), loadOrders()]); }
+
+      async function loadSellers() {
+        const sellers = await api('/admin/sellers');
+        const tb = $('sellers').querySelector('tbody');
+        tb.innerHTML = '<tr><th>Handle</th><th>Coin</th><th>Verified</th><th></th></tr>';
+        for (const s of sellers) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${s.handle}</td><td class="muted">${s.pumpCoinAddress || '—'}</td><td><span class="badge ${s.verified ? 'ok' : 'no'}">${s.verified ? 'yes' : 'no'}</span></td>`;
+          const td = document.createElement('td'); td.className = 'right';
+          if (!s.verified) {
+            const b = document.createElement('button'); b.textContent = 'Verify';
+            b.onclick = async () => { await api('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId: s.userId }) }); refresh(); };
+            td.append(b);
+          }
+          tr.append(td); tb.append(tr);
+        }
+      }
+
+      async function loadAudit() {
+        const a = await api('/admin/audit');
+        const tb = $('audit').querySelector('tbody');
+        tb.innerHTML = '<tr><th>Account</th><th>Kind</th><th class="right">Balance</th></tr>';
+        for (const row of a.accounts) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${row.handle || row.id}</td><td class="muted">${row.kind}</td><td class="right">$${row.balance}</td>`;
+          tb.append(tr);
+        }
+        $('sysTotal').textContent = '$' + a.systemTotal;
+        $('buyback').textContent = '$' + a.buybackPending;
+      }
+
+      async function loadOrders() {
+        const orders = await api('/admin/orders');
+        const tb = $('orders').querySelector('tbody');
+        tb.innerHTML = '<tr><th>Item</th><th>Amount</th><th>Status</th><th></th></tr>';
+        if (!orders.length) { tb.innerHTML += '<tr><td class="muted" colspan="4">No orders yet.</td></tr>'; return; }
+        for (const o of orders) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${o.buyer} ← ${o.seller}</td><td>$${o.amount}</td><td><span class="badge ${o.status === 'RELEASED' ? 'ok' : 'no'}">${o.status}</span></td>`;
+          const td = document.createElement('td'); td.className = 'right';
+          const act = (label, action) => { const b = document.createElement('button'); b.textContent = label; b.className = 'secondary'; b.style.marginLeft = '4px';
+            b.onclick = async () => { const r = await api('/admin/order/action', { method: 'POST', body: JSON.stringify({ orderId: o.id, action }) }); if (r.error) alert(r.error); refresh(); }; return b; };
+          if (o.status === 'DISPUTE_WINDOW') { td.append(act('release', 'release'), act('dispute', 'dispute')); }
+          if (o.status === 'DISPUTED') { td.append(act('refund', 'refund'), act('release', 'release-disputed')); }
+          tr.append(td); tb.append(tr);
+        }
+      }
+    </script>
+  </body>
+</html>

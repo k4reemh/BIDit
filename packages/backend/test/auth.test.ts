@@ -1,0 +1,70 @@
+import { describe, it, expect } from 'vitest';
+import nacl from 'tweetnacl';
+import bs58 from 'bs58';
+import {
+  issueSession,
+  verifySession,
+  parseBearer,
+  buildLoginChallenge,
+  verifyWalletSignature,
+} from '../src/auth.js';
+
+describe('session tokens', () => {
+  it('round-trips a userId', () => {
+    const token = issueSession('user_abc');
+    expect(verifySession(token)).toBe('user_abc');
+  });
+
+  it('rejects a tampered token', () => {
+    const token = issueSession('user_abc');
+    const tampered = token.slice(0, -2) + (token.endsWith('aa') ? 'bb' : 'aa');
+    expect(verifySession(tampered)).toBeNull();
+  });
+
+  it('rejects an expired token and garbage', () => {
+    const expired = issueSession('user_abc', -1000);
+    expect(verifySession(expired)).toBeNull();
+    expect(verifySession('not-a-token')).toBeNull();
+    expect(verifySession(null)).toBeNull();
+  });
+
+  it('parses a Bearer header', () => {
+    expect(parseBearer('Bearer abc.def')).toBe('abc.def');
+    expect(parseBearer('Basic xyz')).toBeNull();
+    expect(parseBearer(undefined)).toBeNull();
+  });
+});
+
+describe('wallet-signature login', () => {
+  it('verifies a genuine ed25519 signature of the challenge', () => {
+    const kp = nacl.sign.keyPair();
+    const address = bs58.encode(kp.publicKey);
+    const message = buildLoginChallenge(address);
+    const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+    expect(verifyWalletSignature(address, signature)).toBe(true);
+  });
+
+  it('rejects a wrong signature and is single-use (nonce consumed)', () => {
+    const kp = nacl.sign.keyPair();
+    const address = bs58.encode(kp.publicKey);
+    const message = buildLoginChallenge(address);
+    const goodSig = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
+
+    // A signature from a different key must fail.
+    const other = nacl.sign.keyPair();
+    const badSig = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), other.secretKey));
+    expect(verifyWalletSignature(address, badSig)).toBe(false);
+
+    // The genuine one works once...
+    expect(verifyWalletSignature(address, goodSig)).toBe(true);
+    // ...but not twice (nonce consumed).
+    expect(verifyWalletSignature(address, goodSig)).toBe(false);
+  });
+
+  it('rejects a wallet with no outstanding challenge', () => {
+    const kp = nacl.sign.keyPair();
+    const address = bs58.encode(kp.publicKey);
+    const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode('x'), kp.secretKey));
+    expect(verifyWalletSignature(address, signature)).toBe(false);
+  });
+});

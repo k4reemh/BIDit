@@ -1,0 +1,340 @@
+// BIDit data model — Chunk 1.
+//
+// Enum member names MUST stay identical to packages/shared/src/enums.ts.
+// test/enums.drift.test.ts fails the build if they drift.
+//
+// All money is BigInt micro-units (USDC, 6 decimals). Account holds NO balance
+// column — balance is always derived from append-only LedgerEntry rows.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  buyer
+  seller
+  admin
+}
+
+enum AccountKind {
+  USER
+  PLATFORM
+  EXTERNAL
+  ESCROW
+}
+
+enum LedgerType {
+  DEPOSIT
+  WITHDRAWAL
+  BID_HOLD
+  BID_HOLD_RELEASE
+  PURCHASE_DEBIT
+  PAYOUT_CREDIT
+  PLATFORM_FEE
+  REFUND
+  ESCROW_LOCK
+  ESCROW_RELEASE
+}
+
+enum LedgerRefType {
+  DEPOSIT
+  WITHDRAWAL
+  ORDER
+  AUCTION
+  BID
+  ADJUSTMENT
+  TRANSFER
+  EXTERNAL
+}
+
+enum ListingStatus {
+  DRAFT
+  QUEUED
+  LIVE
+  SOLD
+  UNSOLD
+  CANCELED
+}
+
+enum AuctionStatus {
+  PENDING
+  RUNNING
+  SETTLING
+  CLOSED
+  CANCELED
+}
+
+enum BidStatus {
+  ACTIVE
+  OUTBID
+  WON
+  LOST
+  VOID
+}
+
+enum OrderStatus {
+  PENDING_SETTLEMENT
+  LOCKED
+  SHIPPED
+  DELIVERED
+  DISPUTE_WINDOW
+  DISPUTED
+  RELEASED
+  REFUNDED
+  CANCELED
+}
+
+enum HoldStatus {
+  ACTIVE
+  RELEASED
+  CAPTURED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  handle        String   @unique
+  email         String?  @unique
+  passwordHash  String?
+  displayName   String?
+  avatarUrl     String?
+  bio           String?
+  shippingAddress Json?
+  interests     String[] @default([])
+  onboarded     Boolean  @default(false)
+  walletAddress String?  @unique
+  role          Role     @default(buyer)
+  createdAt     DateTime @default(now())
+
+  account       Account?
+  sellerProfile SellerProfile?
+  listings      Listing[]
+  bids          Bid[]
+  ordersBought  Order[]      @relation("BuyerOrders")
+  ordersSold    Order[]      @relation("SellerOrders")
+  withdrawals   Withdrawal[]
+}
+
+model SellerProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  verified            Boolean  @default(false)
+  pumpCoinAddress     String?
+  payoutWalletAddress String?
+  createdAt           DateTime @default(now())
+}
+
+/// One per user (USER kind), plus two singleton system accounts (PLATFORM,
+/// EXTERNAL) with fixed ids and null userId.
+model Account {
+  id             String      @id @default(cuid())
+  kind           AccountKind @default(USER)
+  userId         String?     @unique
+  user           User?       @relation(fields: [userId], references: [id])
+  depositAddress String?     @unique
+  createdAt      DateTime    @default(now())
+
+  ledgerEntries LedgerEntry[]
+  holds         Hold[]
+
+  @@index([kind])
+}
+
+/// On-chain withdrawal record (USDC sent from treasury to a user's address).
+model Withdrawal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  toAddress String
+  amount    BigInt
+  status    String   @default("PENDING") // PENDING | CONFIRMED | FAILED
+  txSig     String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+}
+
+/// Public record of a $BID buyback funded by the 5% platform fee pool.
+model Buyback {
+  id        String   @id @default(cuid())
+  amount    BigInt // USDC micro-units spent buying $BID
+  txSig     String?
+  status    String   @default("EXECUTED") // EXECUTED | PENDING | FAILED
+  createdAt DateTime @default(now())
+}
+
+/// Append-only. Never updated, never deleted. The sum of all entries across all
+/// accounts is invariantly zero (double-entry).
+model LedgerEntry {
+  id             String        @id @default(cuid())
+  accountId      String
+  account        Account       @relation(fields: [accountId], references: [id])
+  amount         BigInt // signed micro-units (USDC, 6 decimals)
+  type           LedgerType
+  refType        LedgerRefType
+  refId          String?
+  idempotencyKey String?       @unique
+  createdAt      DateTime      @default(now())
+
+  @@index([accountId])
+  @@index([refType, refId])
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  sellerId    String
+  seller      User          @relation(fields: [sellerId], references: [id])
+  title       String
+  description String?
+  photos      String[]
+  startingBid BigInt
+  /** Units the seller has of this item. Each sale decrements it; while > 0 the
+   *  listing can be auctioned again. */
+  quantity    Int           @default(1)
+  weightGrams Int?
+  category    String?
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+
+  /** Optional wheel-spin prize pool (WheelEntry[]). When set, the auction is a
+   *  "bid to win a roll" — on close the server spins to assign the prize. */
+  wheel       Json?
+
+  auctions Auction[]
+
+  @@index([sellerId])
+  @@index([status])
+}
+
+model Auction {
+  id                  String        @id @default(cuid())
+  listingId           String
+  listing             Listing       @relation(fields: [listingId], references: [id])
+  status              AuctionStatus @default(PENDING)
+  startingBid         BigInt
+  currentBid          BigInt?
+  currentLeaderUserId String?
+  durationSeconds     Int           @default(20)
+  counterBidSeconds   Int           @default(10)
+  minIncrementBps     Int           @default(500)
+  minIncrementFloor   BigInt        @default(1000000)
+  endsAt              DateTime?
+  createdAt           DateTime      @default(now())
+
+  bids  Bid[]
+  holds Hold[]
+  order Order?
+
+  @@index([listingId])
+  @@index([status])
+  @@index([status, endsAt])
+}
+
+model Bid {
+  id        String    @id @default(cuid())
+  auctionId String
+  auction   Auction   @relation(fields: [auctionId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  amount    BigInt
+  status    BidStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+
+  hold Hold?
+
+  @@index([auctionId])
+  @@index([userId])
+}
+
+/// Funds locked because a user is the current high bidder on an auction. At most
+/// one ACTIVE hold per auction at a time (the leader's). available_balance =
+/// settled_balance - SUM(ACTIVE holds). Authoritative here in Postgres; Redis
+/// becomes a real-time cache reconciled against this table in a later chunk.
+model Hold {
+  id         String     @id @default(cuid())
+  accountId  String
+  account    Account    @relation(fields: [accountId], references: [id])
+  auctionId  String
+  auction    Auction    @relation(fields: [auctionId], references: [id])
+  bidId      String?    @unique
+  bid        Bid?       @relation(fields: [bidId], references: [id])
+  amount     BigInt
+  status     HoldStatus @default(ACTIVE)
+  createdAt  DateTime   @default(now())
+  releasedAt DateTime?
+
+  @@index([accountId, status])
+  @@index([auctionId, status])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  auctionId      String      @unique
+  auction        Auction     @relation(fields: [auctionId], references: [id])
+  buyerId        String
+  buyer          User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId       String
+  seller         User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  amount         BigInt
+  platformFee    BigInt
+  sellerProceeds BigInt
+  status         OrderStatus @default(PENDING_SETTLEMENT)
+  escrowRef      String?
+  trackingNumber String?
+  lockedAt           DateTime?
+  noShipDeadline     DateTime?
+  shippedAt          DateTime?
+  deliveredAt        DateTime?
+  disputeWindowEndsAt DateTime?
+  disputedAt         DateTime?
+  releasedAt         DateTime?
+  refundedAt         DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime    @default(now())
+
+  @@index([status])
+  @@index([status, disputeWindowEndsAt])
+  @@index([status, noShipDeadline])
+}
+
+// Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid
+// coupling to shared/enums.ts via the drift test; values are validated in code.
+// The server commits seedHash at open and reveals seed at the draw, so the
+// winner is verifiable. No formal User relation — entrant handles are fetched
+// by id when the roll is built.
+model Giveaway {
+  id           String    @id @default(cuid())
+  sellerId     String
+  kind         String    // PUBLIC | BUYER_ONLY
+  prize        String
+  image        String?   // optional prize photo (data URL or https)
+  status       String    @default("OPEN") // OPEN | DRAWING | CLOSED
+  seed         String    // server secret, revealed at draw
+  seedHash     String    // sha256(seed), committed at open
+  winnerUserId String?
+  opensAt      DateTime  @default(now())
+  closesAt     DateTime
+  drawnAt      DateTime?
+  createdAt    DateTime  @default(now())
+
+  entries GiveawayEntry[]
+
+  @@index([sellerId, status])
+}
+
+model GiveawayEntry {
+  id         String   @id @default(cuid())
+  giveawayId String
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  userId     String
+  createdAt  DateTime @default(now())
+
+  @@unique([giveawayId, userId])
+  @@index([giveawayId])
+}

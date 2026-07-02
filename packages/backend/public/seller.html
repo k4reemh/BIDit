@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BIDit — Seller</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 15px/1.5 -apple-system, system-ui, sans-serif; background: #0b0e14; color: #e6e9ef; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 22px; }
+      h1 { font-size: 21px; margin: 0; } h1 b { color: #3b82f6; }
+      h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: #8b94a7; margin: 0 0 10px; }
+      .muted { color: #8b94a7; font-size: 13px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .card { background: #151a23; border: 1px solid #232a36; border-radius: 12px; padding: 16px; margin-top: 14px; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      input, textarea { flex: 1; min-width: 0; background: #0b0e14; border: 1px solid #2a3340; color: #e6e9ef; border-radius: 8px; padding: 9px 11px; font-size: 14px; }
+      textarea { width: 100%; min-height: 92px; resize: vertical; font-family: ui-monospace, SFMono-Regular, monospace; line-height: 1.5; }
+      input.sm { max-width: 90px; }
+      .wheelEditor { margin: 6px 0 12px; padding: 11px; background: #10141c; border: 1px solid #1b2230; border-radius: 8px; }
+      .pill.wheel { color: #c4b5fd; background: #241d35; }
+      button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+      button.secondary { background: #2a3340; }
+      label { font-size: 12px; color: #8b94a7; display: block; margin: 8px 0 3px; }
+      .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+      .badge.ok { background: #10331f; color: #34d399; } .badge.no { background: #3a2417; color: #fbbf24; }
+      .item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1b2230; }
+      .item img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #1b2230; }
+      .item .grow { flex: 1; min-width: 0; }
+      .pill { font-size: 11px; color: #93c5fd; background: #1d2735; padding: 1px 7px; border-radius: 999px; }
+      .timer { font-size: 22px; font-weight: 800; color: #fbbf24; font-variant-numeric: tabular-nums; }
+      .big { font-size: 24px; font-weight: 800; }
+      .hidden { display: none; }
+      a { color: #93c5fd; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="row" style="justify-content:space-between">
+        <h1><b>BID</b>it · Seller</h1>
+        <div class="muted" id="who">not signed in</div>
+      </div>
+
+      <div class="card" id="loginCard">
+        <h2>Sign in</h2>
+        <div class="row">
+          <input id="handle" placeholder="handle (dev login)" />
+          <button id="loginBtn">Sign in</button>
+          <button id="walletBtn" class="secondary">Connect wallet</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Dev login needs no password. Wallet sign-in uses a Solana signature.</div>
+      </div>
+
+      <div id="app" class="hidden">
+        <div class="grid">
+          <div class="card">
+            <h2>Account</h2>
+            <div>Verified: <span id="verBadge" class="badge no">no</span></div>
+            <div class="muted" id="verHint" style="margin-top:6px"></div>
+            <label>Pump coin you stream on</label>
+            <div class="row">
+              <input id="coin" placeholder="coin address" />
+              <button id="coinBtn" class="secondary">Save</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Add a card to the queue</h2>
+            <div class="row"><input id="title" placeholder="title, e.g. Charizard Holo" /></div>
+            <div class="row" style="margin-top:8px"><input id="image" placeholder="image URL (optional)" /></div>
+            <div class="row" style="margin-top:8px">
+              <input id="start" class="sm" type="number" step="0.01" placeholder="start $" value="5" />
+              <button id="addBtn">Add to queue</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Queue</h2>
+          <div id="queue"><div class="muted">No items yet.</div></div>
+        </div>
+
+        <div class="card hidden" id="liveCard">
+          <h2>Live auction</h2>
+          <div class="row" style="justify-content:space-between">
+            <div><div class="muted" id="liveTitle">—</div><div class="big" id="liveBid">—</div></div>
+            <div style="text-align:right"><div class="muted">Leader</div><div id="liveLeader">—</div></div>
+            <div class="timer" id="liveTimer">—</div>
+          </div>
+          <div class="muted" id="liveMsg" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let session = null, ws = null, endsAt = null, offset = 0, room = null;
+
+      // Wheel prizes <-> "Label | Tier | Weight" text, one per line.
+      function wheelToText(entries) {
+        return (entries || []).map((e) => [e.label, e.tier || '', e.weight || ''].join(' | ').replace(/( \| )+$/, '')).join('\n');
+      }
+      function parseWheelText(text) {
+        return text.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+          const [label, tier, weight] = line.split('|').map((s) => (s || '').trim());
+          const e = { label };
+          if (tier) e.tier = tier;
+          if (weight && !isNaN(Number(weight))) e.weight = Number(weight);
+          return e;
+        }).filter((e) => e.label);
+      }
+
+      async function api(path, opts = {}) {
+        const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+        if (session) headers.authorization = `Bearer ${session.token}`;
+        const r = await fetch(path, { ...opts, headers });
+        return r.json();
+      }
+
+      function onLogin(s) {
+        if (!s || s.error) { alert('login failed'); return; }
+        session = s; room = s.userId;
+        localStorage.setItem('bidit_seller_token', s.token);
+        $('loginCard').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        $('who').textContent = `${s.handle} · ${s.role}`;
+        renderVerified(s.verified);
+        loadQueue();
+        connectWs();
+      }
+
+      function renderVerified(verified) {
+        $('verBadge').className = `badge ${verified ? 'ok' : 'no'}`;
+        $('verBadge').textContent = verified ? 'yes' : 'no';
+        $('verHint').innerHTML = verified
+          ? 'You can create listings and run auctions.'
+          : 'Pending verification — an admin verifies you at <a href="/admin" target="_blank">/admin</a> (dev: sign in there as <b>admin</b>).';
+      }
+
+      $('loginBtn').onclick = async () => {
+        const handle = $('handle').value.trim();
+        if (handle) onLogin(await api('/auth/dev-login', { method: 'POST', body: JSON.stringify({ handle }) }));
+      };
+      $('walletBtn').onclick = connectWallet;
+      $('coinBtn').onclick = async () => { await api('/seller/coin', { method: 'POST', body: JSON.stringify({ coinAddress: $('coin').value.trim() }) }); };
+      $('addBtn').onclick = async () => {
+        const res = await api('/seller/listings', { method: 'POST', body: JSON.stringify({
+          title: $('title').value.trim() || 'Untitled', imageUrl: $('image').value.trim(), startingBid: $('start').value || '1',
+        }) });
+        if (res.error) { alert(res.error); return; }
+        $('title').value = ''; $('image').value = '';
+        loadQueue();
+      };
+
+      async function loadQueue() {
+        const listings = await api('/seller/listings');
+        const me = await api('/me'); renderVerified(me.verified);
+        const q = $('queue');
+        if (!listings.length) { q.innerHTML = '<div class="muted">No items yet.</div>'; return; }
+        q.innerHTML = '';
+        for (const l of listings) {
+          const wrap = document.createElement('div');
+          const row = document.createElement('div'); row.className = 'item';
+          const wheelPill = l.wheel ? ` · <span class="pill wheel">🎡 ${l.wheel.length} prizes</span>` : '';
+          row.innerHTML = `<img src="${l.imageUrl || ''}" alt=""><div class="grow"><b>${l.title}</b><div class="muted">start $${l.startingBid} · <span class="pill">${l.status}</span>${wheelPill}</div></div>`;
+          if (l.status === 'QUEUED') {
+            const ed = document.createElement('div'); ed.className = 'wheelEditor hidden';
+            ed.innerHTML = `<label>Wheel prizes — bidders bid to win a roll; on close the wheel spins to assign the prize.<br>One per line: <b>Label | Tier | Weight</b> (tier &amp; weight optional). Leave empty for a normal auction.</label>`;
+            const ta = document.createElement('textarea');
+            ta.value = wheelToText(l.wheel);
+            ta.placeholder = 'Charizard ex — Alt Art | Chase | 1\nSealed Booster Box | Box\nSingle Booster Pack | Pack | 3';
+            const saveWheel = document.createElement('button');
+            saveWheel.textContent = 'Save wheel';
+            saveWheel.style.marginTop = '8px';
+            saveWheel.onclick = async () => {
+              const res = await api('/seller/listing/wheel', { method: 'POST', body: JSON.stringify({ listingId: l.id, entries: parseWheelText(ta.value) }) });
+              if (res.error) alert(res.error); else loadQueue();
+            };
+            ed.append(ta, saveWheel);
+
+            const dur = document.createElement('input'); dur.className = 'sm'; dur.type = 'number'; dur.value = '20'; dur.title = 'duration (s)';
+            const wheelBtn = document.createElement('button'); wheelBtn.className = 'secondary';
+            wheelBtn.textContent = l.wheel ? `🎡 Edit wheel` : `🎡 Add wheel`;
+            wheelBtn.onclick = () => ed.classList.toggle('hidden');
+            const btn = document.createElement('button'); btn.textContent = 'Start Auction';
+            btn.onclick = async () => {
+              const res = await api('/seller/start-auction', { method: 'POST', body: JSON.stringify({ listingId: l.id, durationSeconds: Number(dur.value) || 20, counterBidSeconds: 10 }) });
+              if (res.error) alert(res.error); else loadQueue();
+            };
+            row.append(dur, wheelBtn, btn);
+            wrap.append(row, ed);
+          } else {
+            wrap.append(row);
+          }
+          q.append(wrap);
+        }
+      }
+
+      function connectWs() {
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(session.token)}`);
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'SUBSCRIBE', room }));
+        ws.onmessage = (ev) => handleWs(JSON.parse(ev.data));
+      }
+      function handleWs(m) {
+        if (typeof m.serverNow === 'number') offset = m.serverNow - Date.now();
+        if (m.type === 'AUCTION_STATE') {
+          $('liveCard').classList.remove('hidden');
+          $('liveTitle').textContent = m.title;
+          $('liveBid').textContent = m.currentBid ? '$' + m.currentBid : 'no bids';
+          $('liveLeader').textContent = m.leaderHandle || '—';
+          endsAt = m.endsAt;
+          if (m.status !== 'RUNNING') $('liveMsg').textContent = `status: ${m.status}`;
+        } else if (m.type === 'BID_ACCEPTED') {
+          $('liveMsg').textContent = `${m.leaderHandle} bid $${m.amount}`;
+        } else if (m.type === 'AUCTION_CLOSED') {
+          endsAt = null; $('liveTimer').textContent = 'DONE';
+          $('liveMsg').textContent = m.winnerHandle ? `SOLD to ${m.winnerHandle} for $${m.amount}` : 'no sale';
+          loadQueue();
+        }
+      }
+      setInterval(() => {
+        if (endsAt === null) return;
+        const r = Math.max(0, endsAt - (Date.now() + offset));
+        $('liveTimer').textContent = (r / 1000).toFixed(1) + 's';
+      }, 150);
+
+      // --- wallet sign-in (Solana) ---
+      const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      function bs58encode(bytes) {
+        let digits = [0];
+        for (const byte of bytes) {
+          let carry = byte;
+          for (let i = 0; i < digits.length; i++) { carry += digits[i] << 8; digits[i] = carry % 58; carry = (carry / 58) | 0; }
+          while (carry) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+        }
+        let zeros = ''; for (const b of bytes) { if (b === 0) zeros += '1'; else break; }
+        return zeros + digits.reverse().map((d) => B58[d]).join('');
+      }
+      async function connectWallet() {
+        if (!window.solana) { alert('No Solana wallet detected (install Phantom). Use dev login instead.'); return; }
+        try {
+          const resp = await window.solana.connect();
+          const wallet = resp.publicKey.toString();
+          const { message } = await api('/auth/challenge', { method: 'POST', body: JSON.stringify({ walletAddress: wallet }) });
+          const signed = await window.solana.signMessage(new TextEncoder().encode(message), 'utf8');
+          const signature = bs58encode(signed.signature);
+          onLogin(await api('/auth/verify', { method: 'POST', body: JSON.stringify({ walletAddress: wallet, signature }) }));
+        } catch (e) { alert('wallet sign-in failed: ' + e.message); }
+      }
+    </script>
+  </body>
+</html>

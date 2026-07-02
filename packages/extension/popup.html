@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>BIDit</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; width: 300px; padding: 14px;
+        font: 14px/1.45 -apple-system, system-ui, sans-serif;
+        background: #0e121a; color: #e6e9ef;
+      }
+      h1 { font-size: 17px; margin: 0 0 2px; }
+      h1 b { color: #3b82f6; }
+      .muted { color: #8b94a7; font-size: 12px; }
+      .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+      input {
+        flex: 1; min-width: 0; background: #0b0e14; border: 1px solid #2a3340;
+        color: #e6e9ef; border-radius: 8px; padding: 9px 11px; font-size: 14px;
+      }
+      button {
+        background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+        padding: 9px 13px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      }
+      button.secondary { background: #2a3340; }
+      .card { background: #151a23; border: 1px solid #232a36; border-radius: 10px; padding: 12px; margin-top: 12px; }
+      .conn { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+      .dot.on { background: #34d399; } .dot.off { background: #f87171; }
+      .bal { display: flex; justify-content: space-between; margin-top: 10px; font-variant-numeric: tabular-nums; }
+      .bal b { font-size: 16px; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1><b>BID</b>it</h1>
+    <div class="muted">Live card auctions on Pump.fun.</div>
+
+    <div id="loginView">
+      <div class="row">
+        <input id="handle" placeholder="pick a handle" />
+        <button id="loginBtn">Join</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Stub login for dev — no password.</div>
+    </div>
+
+    <div id="accountView" class="hidden">
+      <div class="card">
+        <div class="conn"><span id="dot" class="dot"></span> <span id="connText">…</span></div>
+        <div class="bal"><span class="muted">Available</span> <b id="avail">—</b></div>
+        <div class="bal"><span class="muted">Settled</span> <b id="settled">—</b></div>
+        <div class="row">
+          <button id="depositBtn" class="secondary">Deposit $100 (dev)</button>
+          <button id="logoutBtn" class="secondary">Log out</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        Open a Pump.fun coin page to see the auction panel.
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

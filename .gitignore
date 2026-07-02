@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+*.log
+*.tsbuildinfo
+
+# Local embedded Postgres data dirs (dev + test profiles)
+packages/backend/.pgdata*/
+
+# Env (local secrets / keypairs / local DB url) — never commit these
+.env
+.env.*
+!.env.example
+
+# Prisma generated client (regenerated from schema)
+packages/backend/src/generated/

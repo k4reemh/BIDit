@@ -1,0 +1,36 @@
+{
+  "name": "@bidit/backend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "BIDit backend — the authoritative engine. Chunk 1: data model + balance ledger.",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "postinstall": "prisma generate",
+    "db:push": "tsx scripts/with-db.ts prisma db push --skip-generate --accept-data-loss",
+    "test": "BIDIT_PG_PROFILE=test tsx scripts/with-db.ts vitest run",
+    "test:watch": "BIDIT_PG_PROFILE=test tsx scripts/with-db.ts vitest",
+    "demo": "tsx scripts/with-db.ts tsx scripts/demo.ts",
+    "dev": "tsx scripts/with-db.ts tsx scripts/dev-server.ts",
+    "devnet:e2e": "BIDIT_PG_PROFILE=test tsx scripts/with-db.ts tsx scripts/devnet-e2e.ts",
+    "deploy:push": "prisma db push --skip-generate",
+    "start": "tsx scripts/dev-server.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bidit/shared": "*",
+    "@prisma/client": "^6.19.3",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "embedded-postgres": "17.10.0-beta.17",
+    "ioredis": "^5.11.1",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "ioredis-mock": "^8.13.1",
+    "prisma": "^6.19.3"
+  }
+}

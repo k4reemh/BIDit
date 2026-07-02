@@ -1,0 +1,14 @@
+{
+  "name": "@bidit/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Shared domain types, enums and money helpers for BIDit. Imported by backend (and later the extension) so the wire protocol can't drift.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

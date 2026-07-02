@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "BIDit",
+  "version": "0.1.0",
+  "description": "Live trading-card auctions on Pump.fun streams. Bid in USDC, settle on-chain.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://localhost:8787/*",
+    "https://pump.fun/*",
+    "https://*.pump.fun/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://pump.fun/*", "https://*.pump.fun/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BIDit"
+  }
+}

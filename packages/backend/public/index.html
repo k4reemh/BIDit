@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BIDit — dev test page</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font: 15px/1.5 -apple-system, system-ui, sans-serif;
+        background: #0b0e14; color: #e6e9ef; display: flex; justify-content: center;
+      }
+      .app { width: 460px; max-width: 100%; padding: 20px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .muted { color: #8b94a7; font-size: 13px; }
+      .card { background: #151a23; border: 1px solid #232a36; border-radius: 12px; padding: 16px; margin-top: 14px; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      input { background: #0b0e14; border: 1px solid #2a3340; color: #e6e9ef; border-radius: 8px; padding: 9px 11px; font-size: 15px; width: 100%; }
+      button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 9px 14px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+      button.secondary { background: #2a3340; }
+      button:disabled { opacity: .45; cursor: not-allowed; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 10px 0; }
+      .label { color: #8b94a7; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+      .big { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .lead { color: #34d399; }
+      .timer { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fbbf24; }
+      .timer.urgent { color: #f87171; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #1d2735; color: #93c5fd; }
+      #feed { margin-top: 10px; max-height: 160px; overflow: auto; font-size: 13px; }
+      #feed div { padding: 3px 0; border-bottom: 1px solid #1b2230; color: #aeb6c6; }
+      #reject { color: #f87171; min-height: 18px; font-size: 13px; margin-top: 6px; }
+      .hide { display: none; }
+      .bal { font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <h1>BIDit <span class="pill">dev</span></h1>
+      <div class="muted">Whatnot-style live auctions over a WebSocket. Open two tabs.</div>
+
+      <div class="card" id="loginCard">
+        <div class="label">Log in (stub)</div>
+        <div class="row" style="margin-top:8px">
+          <input id="handle" placeholder="your handle, e.g. degen_ana" />
+          <button id="loginBtn">Join</button>
+        </div>
+      </div>
+
+      <div class="card hide" id="meCard">
+        <div class="row" style="justify-content:space-between">
+          <div>Signed in as <b id="meHandle"></b></div>
+          <div class="bal">avail <b id="avail">—</b> · settled <b id="settled">—</b></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" id="depositBtn">Deposit $100</button>
+          <button class="secondary" id="roundBtn">Start demo round</button>
+        </div>
+      </div>
+
+      <div class="card hide" id="auctionCard">
+        <div class="row" style="justify-content:space-between">
+          <span class="pill" id="status">—</span>
+          <span class="timer" id="timer">—</span>
+        </div>
+        <div class="grid">
+          <div><div class="label">Current bid</div><div class="big" id="currentBid">—</div></div>
+          <div><div class="label">Leader</div><div class="big lead" id="leader">—</div></div>
+        </div>
+        <div class="row">
+          <input id="amount" type="number" step="0.01" placeholder="amount" />
+          <button id="bidBtn">Bid</button>
+        </div>
+        <div class="muted" style="margin-top:6px">min next bid: $<span id="minNext">—</span></div>
+        <div id="reject"></div>
+        <div id="feed"></div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let me = null;        // { token, userId, handle }
+      let ws = null;
+      let room = null;
+      let auctionId = null;
+      let endsAt = null;    // server epoch ms
+      let offset = 0;       // serverNow - Date.now()
+      let lastNonce = null;
+
+      function log(msg) {
+        const d = document.createElement('div');
+        d.textContent = msg;
+        $('feed').prepend(d);
+      }
+
+      async function api(path, body) {
+        const r = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+        return r.json();
+      }
+
+      $('loginBtn').onclick = async () => {
+        const handle = $('handle').value.trim();
+        if (!handle) return;
+        me = await api('/dev/login', { handle });
+        $('meHandle').textContent = me.handle;
+        $('loginCard').classList.add('hide');
+        $('meCard').classList.remove('hide');
+        connect();
+      };
+
+      $('depositBtn').onclick = () => api('/dev/deposit', { userId: me.userId, amount: '100' });
+      $('roundBtn').onclick = async () => {
+        const d = await api('/dev/demo', {});
+        room = d.room; auctionId = d.auctionId;
+        ws.send(JSON.stringify({ type: 'SUBSCRIBE', room }));
+      };
+
+      $('bidBtn').onclick = () => {
+        if (!auctionId) return;
+        lastNonce = Math.random().toString(36).slice(2);
+        $('reject').textContent = '';
+        ws.send(JSON.stringify({ type: 'BID_INTENT', auctionId, amount: $('amount').value, clientNonce: lastNonce }));
+      };
+
+      function connect() {
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(me.token)}`);
+        ws.onopen = async () => {
+          const d = await api('/dev/demo', {});
+          room = d.room; auctionId = d.auctionId;
+          ws.send(JSON.stringify({ type: 'SUBSCRIBE', room }));
+        };
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => log('disconnected');
+      }
+
+      function handle(m) {
+        if (typeof m.serverNow === 'number') offset = m.serverNow - Date.now();
+        switch (m.type) {
+          case 'AUCTION_STATE':
+            auctionId = m.auctionId;
+            $('auctionCard').classList.remove('hide');
+            $('status').textContent = m.status;
+            $('currentBid').textContent = m.currentBid ? '$' + m.currentBid : '—';
+            $('leader').textContent = m.leaderHandle || '—';
+            $('minNext').textContent = m.minNextBid;
+            if (!$('amount').value || document.activeElement !== $('amount')) $('amount').value = m.minNextBid;
+            endsAt = m.endsAt;
+            break;
+          case 'BID_ACCEPTED':
+            log(`${m.leaderHandle} leads at $${m.amount}`);
+            break;
+          case 'BID_REJECTED':
+            if (m.clientNonce === lastNonce) $('reject').textContent = 'Bid rejected: ' + m.reason;
+            break;
+          case 'AUCTION_CLOSED':
+            endsAt = null;
+            $('timer').textContent = 'CLOSED';
+            log(m.winnerHandle ? `SOLD to ${m.winnerHandle} for $${m.amount}` : 'closed — no sale');
+            break;
+          case 'BALANCE_UPDATE':
+            $('avail').textContent = '$' + m.available;
+            $('settled').textContent = '$' + m.settled;
+            break;
+        }
+      }
+
+      setInterval(() => {
+        if (endsAt === null) return;
+        const remaining = Math.max(0, endsAt - (Date.now() + offset));
+        const t = $('timer');
+        t.textContent = (remaining / 1000).toFixed(1) + 's';
+        t.classList.toggle('urgent', remaining <= 10000);
+      }, 100);
+    </script>
+  </body>
+</html>
