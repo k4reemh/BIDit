@@ -27,6 +27,15 @@ export class AuthError extends Error {
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const normEmail = (e: string) => e.trim().toLowerCase();
 
+/** True if `err` is Prisma's unique-constraint violation (P2002) on `field`.
+ *  The DB @unique index is the real guard against races that slip past the
+ *  pre-check — this lets us turn the raw DB error into a friendly message. */
+function isUniqueViolation(err: unknown, field: string): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
+  const target = err.meta?.target;
+  return Array.isArray(target) ? target.includes(field) : String(target ?? '').includes(field);
+}
+
 async function uniquePlaceholderHandle(prisma: PrismaClient): Promise<string> {
   for (let i = 0; i < 10; i++) {
     const candidate = `collector_${randomBytes(3).toString('hex')}`;
@@ -58,9 +67,16 @@ export async function registerWithEmail(
     handle = await uniquePlaceholderHandle(prisma);
   }
 
-  const user = await prisma.user.create({
-    data: { email, handle, passwordHash: hashPassword(input.password), role: Role.buyer },
-  });
+  let user: User;
+  try {
+    user = await prisma.user.create({
+      data: { email, handle, passwordHash: hashPassword(input.password), role: Role.buyer },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, 'handle')) throw new AuthError('That handle is taken.');
+    if (isUniqueViolation(err, 'email')) throw new AuthError('That email is already registered.');
+    throw err;
+  }
   await getOrCreateUserAccount(user.id, prisma);
   return user;
 }
@@ -85,7 +101,12 @@ export async function completeOnboarding(
     data.interests = input.interests.filter((s) => typeof s === 'string').slice(0, 24);
   }
 
-  return prisma.user.update({ where: { id: userId }, data });
+  try {
+    return await prisma.user.update({ where: { id: userId }, data });
+  } catch (err) {
+    if (isUniqueViolation(err, 'handle')) throw new AuthError('That username is taken.');
+    throw err;
+  }
 }
 
 /** Verify email + password; returns the user or null (never says which field was wrong). */

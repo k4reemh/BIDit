@@ -22,7 +22,7 @@ import SellerListings from './pages/seller/Listings';
 import SellerOrders from './pages/seller/Orders';
 import SellerPayouts from './pages/seller/Payouts';
 import SellerSettings from './pages/seller/Settings';
-import { restore, clearToken, type Session } from './api';
+import { restore, clearToken, refreshMe, type Session } from './api';
 import { connectBalance } from './realtime';
 
 export interface User {
@@ -70,6 +70,18 @@ export default function App() {
     return connectBalance((b) =>
       setSession((prev) => (prev ? { ...prev, available: b.available, settled: b.settled } : prev)),
     );
+  }, [session?.userId]);
+
+  // Polling fallback: even if a WebSocket push is missed, re-sync the balance
+  // every 20s while signed in so deposits/withdrawals always reflect on their own.
+  useEffect(() => {
+    if (!session) return;
+    const id = setInterval(() => {
+      refreshMe()
+        .then((s) => setSession((prev) => (prev ? { ...prev, available: s.available, settled: s.settled } : prev)))
+        .catch(() => {});
+    }, 20_000);
+    return () => clearInterval(id);
   }, [session?.userId]);
 
   const onAuthed = (s: Session) => {

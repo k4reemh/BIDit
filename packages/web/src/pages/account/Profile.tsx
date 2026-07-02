@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
 import Avatar from '../../components/Avatar';
+import ImageUpload from '../../components/ImageUpload';
 import { updateMe } from '../../api';
 import { Check } from '../../icons';
 
@@ -52,8 +53,13 @@ export default function Profile() {
           <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" />
         </div>
         <div className="fld">
-          <label>Profile picture URL <span className="muted">— optional</span></label>
-          <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" />
+          <label>Profile picture <span className="muted">— optional</span></label>
+          <ImageUpload
+            value={avatarUrl}
+            onChange={setAvatarUrl}
+            label="Drag a photo here, or click to upload"
+            hint="PNG or JPG"
+          />
         </div>
         <div className="fld">
           <label>Bio <span className="muted">— optional</span></label>

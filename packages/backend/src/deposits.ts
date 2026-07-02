@@ -64,6 +64,9 @@ export class DepositWatcher {
     private readonly chain: ChainClient,
     private readonly prisma: PrismaClient = defaultPrisma,
     private readonly intervalMs = 5000,
+    /** Called with the userId after a deposit is credited, so the caller can push
+     *  a live BALANCE_UPDATE (the account balance updates without a page refresh). */
+    private readonly onCredit?: (userId: string) => void,
   ) {}
 
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -100,6 +103,11 @@ export class DepositWatcher {
             this.prisma,
           );
           credited += 1;
+          try {
+            this.onCredit?.(event.userId);
+          } catch {
+            /* a notify failure must never break crediting */
+          }
         } catch (err) {
           console.error('[deposit-watcher] credit failed for', event.txSig, (err as Error)?.message ?? err);
         }

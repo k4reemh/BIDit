@@ -123,9 +123,6 @@ async function main() {
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
-  // Watch the chain for inbound USDC and credit the ledger (deposit detection).
-  const depositWatcher = new DepositWatcher(chain, prisma);
-  depositWatcher.start();
   const httpServer = http.createServer((req, res) => void route(req, res));
   const realtime = new RealtimeServer({
     prisma,
@@ -134,6 +131,13 @@ async function main() {
     escrow: directPayout ? undefined : escrow,
     directPayout,
   });
+  // Watch the chain for inbound USDC and credit the ledger (deposit detection).
+  // On each credit, push a live BALANCE_UPDATE so the depositor's balance updates
+  // on-screen without a refresh.
+  const depositWatcher = new DepositWatcher(chain, prisma, 5000, (userId) =>
+    void realtime.notifyBalance(userId).catch(() => {}),
+  );
+  depositWatcher.start();
 
   // Dev endpoints (password-less login, balance minting, seeders) are ON only for
   // the local mock chain, OFF on any real chain unless explicitly forced.
