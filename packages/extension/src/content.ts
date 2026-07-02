@@ -46,9 +46,6 @@ function mountPanel(): PanelHandle {
         nonce: Math.random().toString(36).slice(2),
       });
     },
-    onSeedDemo: () => {
-      if (currentCoin) port?.postMessage({ cmd: 'LINK_COIN', coin: currentCoin });
-    },
   });
   shadow.append(p.root);
   document.body.append(host);

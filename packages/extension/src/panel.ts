@@ -14,7 +14,6 @@ import { makeAvatar } from './avatar.js';
 
 export interface PanelHandlers {
   onBid: (amount: string) => void;
-  onSeedDemo?: () => void;
 }
 
 export interface PanelHandle {
@@ -287,8 +286,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
   // Empty state
   const empty = el('div', 'empty hidden');
   const emptyText = el('div', 'emptytext', '');
-  const seedBtn = el('button', 'seedbtn hidden', 'Start a demo auction here');
-  empty.append(emptyText, seedBtn);
+  empty.append(emptyText);
 
   // Footer
   const footer = el('div', 'footer');
@@ -343,7 +341,6 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
     const v = amount.value.trim();
     if (v) handlers.onBid(v);
   });
-  seedBtn.addEventListener('click', () => handlers.onSeedDemo?.());
 
   // ---- drag-to-move (grab the header) -----------------------------------
   // We move the shadow *host* (the floating element), switching it from the
@@ -572,7 +569,6 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       emptyText.textContent = linked
         ? 'Waiting for the seller to start an auction…'
         : 'No BIDit auctions on this coin yet.';
-      seedBtn.classList.toggle('hidden', linked || !handlers.onSeedDemo);
     },
     destroy() {
       window.clearInterval(interval);

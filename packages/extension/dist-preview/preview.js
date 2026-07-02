@@ -228,8 +228,7 @@
     body.append(stage, prizes, clockrow, progressWrap, ext, banner, feed, bidBtn, customRow);
     const empty = el("div", "empty hidden");
     const emptyText = el("div", "emptytext", "");
-    const seedBtn = el("button", "seedbtn hidden", "Start a demo auction here");
-    empty.append(emptyText, seedBtn);
+    empty.append(emptyText);
     const footer = el("div", "footer");
     const availEl = el("b", "avail", "\u2014");
     footer.append(el("span", "flabel", "Balance"), availEl);
@@ -273,7 +272,6 @@
       const v = amount.value.trim();
       if (v) handlers.onBid(v);
     });
-    seedBtn.addEventListener("click", () => handlers.onSeedDemo?.());
     const hostEl = () => {
       const r = root.getRootNode();
       return r instanceof ShadowRoot ? r.host : null;
@@ -478,7 +476,6 @@
         showBody(false);
         live.classList.add("hidden");
         emptyText.textContent = linked ? "Waiting for the seller to start an auction\u2026" : "No BIDit auctions on this coin yet.";
-        seedBtn.classList.toggle("hidden", linked || !handlers.onSeedDemo);
       },
       destroy() {
         window.clearInterval(interval);
@@ -1521,8 +1518,7 @@
   var style = document.createElement("style");
   style.textContent = panel_default;
   shadow.append(style);
-  var panel = createPanel({ onBid: (a) => console.log("bid", a), onSeedDemo: () => {
-  } });
+  var panel = createPanel({ onBid: (a) => console.log("bid", a) });
   shadow.append(panel.root);
   window.__panel = panel;
   var IMG = "https://images.pokemontcg.io/base1/4_hires.png";

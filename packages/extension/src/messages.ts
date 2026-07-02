@@ -9,12 +9,9 @@ export type UiToSw =
   | { cmd: 'HELLO'; coin: string } // content script announces the coin on its page
   | { cmd: 'BID'; auctionId: string; amount: string; nonce: string }
   | { cmd: 'GIVEAWAY_ENTER'; giveawayId: string } // viewer taps Enter on a giveaway
-  | { cmd: 'LOGIN'; handle: string } // popup (dev login)
   | { cmd: 'EMAIL_LOGIN'; email: string; password: string } // popup (real login)
   | { cmd: 'SET_SESSION'; token: string; handle: string; userId: string } // popup (wallet sign-in)
   | { cmd: 'LOGOUT' }
-  | { cmd: 'DEPOSIT'; amount: string } // popup (dev)
-  | { cmd: 'LINK_COIN'; coin: string } // panel/popup (dev): seed an auction here
   | { cmd: 'PING' }; // keep the service worker alive
 
 /** Service worker -> UI. */

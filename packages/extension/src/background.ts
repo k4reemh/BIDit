@@ -154,18 +154,6 @@ async function handleHello(coin: string): Promise<void> {
   ensureSubscribed(resolved.room);
 }
 
-async function handleLogin(h: string): Promise<void> {
-  const data = await postJson('/auth/dev-login', { handle: h });
-  if (!data) return;
-  token = data.token;
-  handle = data.handle;
-  userId = data.userId;
-  await chrome.storage.local.set({ biditToken: token, biditHandle: handle, biditUserId: userId });
-  closeWs();
-  connectWs(); // open re-subscribes everything in `subscribed`
-  broadcast(statusMsg());
-}
-
 /** Real email/password login — same account as the BIDit website, so the
  *  extension bids from the same deposited balance. */
 async function handleEmailLogin(email: string, password: string): Promise<void> {
@@ -205,18 +193,6 @@ async function handleLogout(): Promise<void> {
   broadcast(statusMsg());
 }
 
-async function handleDeposit(amount: string): Promise<void> {
-  if (!token) return;
-  await postJson('/deposit', { amount }); // authenticated; server pushes BALANCE_UPDATE over WS
-}
-
-async function handleLinkCoin(coin: string): Promise<void> {
-  const data = await postJson('/dev/link-coin', { coinAddress: coin });
-  if (!data) return;
-  broadcast({ evt: 'ROOM', coin, room: data.room, sellerHandle: data.sellerHandle });
-  ensureSubscribed(data.room);
-}
-
 async function handleUi(msg: UiToSw, port: chrome.runtime.Port): Promise<void> {
   await ready;
   switch (msg.cmd) {
@@ -229,9 +205,6 @@ async function handleUi(msg: UiToSw, port: chrome.runtime.Port): Promise<void> {
     case 'GIVEAWAY_ENTER':
       sendWs({ type: 'GIVEAWAY_ENTER', giveawayId: msg.giveawayId });
       break;
-    case 'LOGIN':
-      await handleLogin(msg.handle);
-      break;
     case 'EMAIL_LOGIN':
       await handleEmailLogin(msg.email, msg.password);
       break;
@@ -240,12 +213,6 @@ async function handleUi(msg: UiToSw, port: chrome.runtime.Port): Promise<void> {
       break;
     case 'LOGOUT':
       await handleLogout();
-      break;
-    case 'DEPOSIT':
-      await handleDeposit(msg.amount);
-      break;
-    case 'LINK_COIN':
-      await handleLinkCoin(msg.coin);
       break;
     case 'PING':
       resync(); // reliable 20s heartbeat → re-subscribe → replay the live auction

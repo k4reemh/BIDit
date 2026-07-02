@@ -13,7 +13,7 @@ const style = document.createElement('style');
 style.textContent = panelCss;
 shadow.append(style);
 
-const panel = createPanel({ onBid: (a) => console.log('bid', a), onSeedDemo: () => {} });
+const panel = createPanel({ onBid: (a) => console.log('bid', a) });
 shadow.append(panel.root);
 (window as unknown as { __panel: typeof panel }).__panel = panel; // dev/test hook
 
