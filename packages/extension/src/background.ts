@@ -166,6 +166,23 @@ async function handleLogin(h: string): Promise<void> {
   broadcast(statusMsg());
 }
 
+/** Real email/password login — same account as the BIDit website, so the
+ *  extension bids from the same deposited balance. */
+async function handleEmailLogin(email: string, password: string): Promise<void> {
+  const data = await postJson('/auth/login', { email, password });
+  if (!data || !data.token) {
+    broadcast({ evt: 'AUTH_ERROR', message: 'Wrong email or password.' });
+    return;
+  }
+  token = data.token;
+  handle = data.handle;
+  userId = data.userId;
+  await chrome.storage.local.set({ biditToken: token, biditHandle: handle, biditUserId: userId });
+  closeWs();
+  connectWs();
+  broadcast(statusMsg());
+}
+
 /** Used by the popup's wallet sign-in: it does the signing and hands us a session. */
 async function handleSetSession(t: string, h: string, uid: string): Promise<void> {
   token = t;
@@ -214,6 +231,9 @@ async function handleUi(msg: UiToSw, port: chrome.runtime.Port): Promise<void> {
       break;
     case 'LOGIN':
       await handleLogin(msg.handle);
+      break;
+    case 'EMAIL_LOGIN':
+      await handleEmailLogin(msg.email, msg.password);
       break;
     case 'SET_SESSION':
       await handleSetSession(msg.token, msg.handle, msg.userId);

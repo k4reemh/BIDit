@@ -10,6 +10,7 @@ export type UiToSw =
   | { cmd: 'BID'; auctionId: string; amount: string; nonce: string }
   | { cmd: 'GIVEAWAY_ENTER'; giveawayId: string } // viewer taps Enter on a giveaway
   | { cmd: 'LOGIN'; handle: string } // popup (dev login)
+  | { cmd: 'EMAIL_LOGIN'; email: string; password: string } // popup (real login)
   | { cmd: 'SET_SESSION'; token: string; handle: string; userId: string } // popup (wallet sign-in)
   | { cmd: 'LOGOUT' }
   | { cmd: 'DEPOSIT'; amount: string } // popup (dev)
@@ -21,4 +22,5 @@ export type SwToUi =
   | { evt: 'STATUS'; connected: boolean; handle: string | null }
   | { evt: 'ROOM'; coin: string; room: string | null; sellerHandle?: string }
   | { evt: 'SERVER'; message: ServerMessage } // authoritative server message, passed through
+  | { evt: 'AUTH_ERROR'; message: string } // login failed (shown in the popup)
   | { evt: 'PONG' };

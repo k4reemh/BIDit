@@ -1,15 +1,16 @@
-/** Popup UI — login/account + connection status + balance. Talks only to the
- *  service worker over a port; does no networking itself. */
+/** Popup UI — email/password login + connection status + wallet balance. Talks
+ *  only to the service worker over a port; does no networking itself. */
 import { PORT_NAME, type SwToUi } from './messages.js';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 const loginView = $('loginView');
 const accountView = $('accountView');
-const handleInput = $<HTMLInputElement>('handle');
+const emailInput = $<HTMLInputElement>('email');
+const passwordInput = $<HTMLInputElement>('password');
+const loginError = $('loginError');
 const dot = $('dot');
 const connText = $('connText');
-const avail = $('avail');
 const settled = $('settled');
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
@@ -23,19 +24,27 @@ port.onMessage.addListener((msg: SwToUi) => {
     connText.textContent = loggedIn
       ? `${msg.handle} · ${msg.connected ? 'connected' : 'connecting…'}`
       : 'not signed in';
+    if (loggedIn) loginError.classList.add('hidden');
+  } else if (msg.evt === 'AUTH_ERROR') {
+    loginError.textContent = msg.message;
+    loginError.classList.remove('hidden');
   } else if (msg.evt === 'SERVER' && msg.message.type === 'BALANCE_UPDATE') {
-    avail.textContent = `$${msg.message.available}`;
+    // Wallet balance = total (only drops when you win), matching the website.
     settled.textContent = `$${msg.message.settled}`;
   }
 });
 
-$('loginBtn').addEventListener('click', () => {
-  const handle = handleInput.value.trim();
-  if (handle) port.postMessage({ cmd: 'LOGIN', handle });
-});
+function submitLogin(): void {
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+  if (!email || !password) return;
+  loginError.classList.add('hidden');
+  port.postMessage({ cmd: 'EMAIL_LOGIN', email, password });
+}
+
+$('loginBtn').addEventListener('click', submitLogin);
+passwordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitLogin(); });
 $('logoutBtn').addEventListener('click', () => {
-  avail.textContent = '—';
   settled.textContent = '—';
   port.postMessage({ cmd: 'LOGOUT' });
 });
-$('depositBtn').addEventListener('click', () => port.postMessage({ cmd: 'DEPOSIT', amount: '100' }));

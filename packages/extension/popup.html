@@ -38,25 +38,25 @@
     <div class="muted">Live card auctions on Pump.fun.</div>
 
     <div id="loginView">
+      <div class="row"><input id="email" type="email" placeholder="email" autocomplete="username" /></div>
       <div class="row">
-        <input id="handle" placeholder="pick a handle" />
-        <button id="loginBtn">Join</button>
+        <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+        <button id="loginBtn">Sign in</button>
       </div>
-      <div class="muted" style="margin-top:8px">Stub login for dev — no password.</div>
+      <div id="loginError" class="hidden" style="color:#f87171;font-size:12px;margin-top:8px"></div>
+      <div class="muted" style="margin-top:8px">Use the same account you made on the BIDit website. Sign up & add funds there first.</div>
     </div>
 
     <div id="accountView" class="hidden">
       <div class="card">
         <div class="conn"><span id="dot" class="dot"></span> <span id="connText">…</span></div>
-        <div class="bal"><span class="muted">Available</span> <b id="avail">—</b></div>
-        <div class="bal"><span class="muted">Settled</span> <b id="settled">—</b></div>
+        <div class="bal"><span class="muted">Wallet balance</span> <b id="settled">—</b></div>
         <div class="row">
-          <button id="depositBtn" class="secondary">Deposit $100 (dev)</button>
           <button id="logoutBtn" class="secondary">Log out</button>
         </div>
       </div>
       <div class="muted" style="margin-top:10px">
-        Open a Pump.fun coin page to see the auction panel.
+        Open a Pump.fun coin page to see the auction panel and bid.
       </div>
     </div>
 

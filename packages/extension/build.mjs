@@ -1,12 +1,17 @@
 import * as esbuild from 'esbuild';
 import { cp, rm, mkdir } from 'node:fs/promises';
 
+const BACKEND = process.env.BIDIT_BACKEND ?? 'https://bidit-backend-fekn.onrender.com';
+console.log(`[build] backend = ${BACKEND}`);
+
 const common = {
   bundle: true,
   target: 'chrome114',
   logLevel: 'info',
   // panel.css is imported as a string and injected into the panel's shadow root.
   loader: { '.css': 'text' },
+  // Baked-in backend URL (overridable with BIDIT_BACKEND for local dev).
+  define: { __BIDIT_BACKEND__: JSON.stringify(BACKEND) },
 };
 
 await rm('dist', { recursive: true, force: true });

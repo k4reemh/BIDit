@@ -5,6 +5,7 @@
   "description": "Live trading-card auctions on Pump.fun streams. Bid in USDC, settle on-chain.",
   "permissions": ["storage"],
   "host_permissions": [
+    "https://bidit-backend-fekn.onrender.com/*",
     "http://localhost:8787/*",
     "https://pump.fun/*",
     "https://*.pump.fun/*"
