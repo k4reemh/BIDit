@@ -62,6 +62,12 @@ import { systemClock } from '../src/clock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
+
+// Last-resort safety net: log stray async errors instead of letting Node crash
+// the whole server (Node exits on an unhandled rejection by default). A payments
+// backend must stay up; individual operations already handle their own failures.
+process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
+process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
 const DEMO_SELLER_HANDLE = 'demo_seller';
 
 const CORS = {

@@ -137,13 +137,21 @@ export class SolanaChain implements ChainClient {
     const events: DepositEvent[] = [];
     const treasury = this.wallets.treasury;
     for (const [userId, depositKp] of this.depositOwners) {
-      const amount = await this.balance(depositKp.publicKey.toBase58());
-      if (amount <= 0n) continue;
-      const fromAta = await getOrCreateAssociatedTokenAccount(this.conn, treasury, this.usdcMint, depositKp.publicKey);
-      const toAta = await getOrCreateAssociatedTokenAccount(this.conn, treasury, this.usdcMint, treasury.publicKey);
-      // treasury pays the fee; the deposit keypair authorizes the move.
-      const sig = await splTransfer(this.conn, treasury, fromAta.address, toAta.address, depositKp, amount);
-      events.push({ userId, amountMicros: amount, txSig: sig });
+      // Each address is swept in its own try/catch. A failure here (treasury out
+      // of SOL for fees, an RPC hiccup, an ATA-creation race) must NEVER abort the
+      // poll or crash the process — the user's USDC stays safe at their deposit
+      // address and the sweep is retried on the next poll once the cause clears.
+      try {
+        const amount = await this.balance(depositKp.publicKey.toBase58());
+        if (amount <= 0n) continue;
+        const fromAta = await getOrCreateAssociatedTokenAccount(this.conn, treasury, this.usdcMint, depositKp.publicKey);
+        const toAta = await getOrCreateAssociatedTokenAccount(this.conn, treasury, this.usdcMint, treasury.publicKey);
+        // treasury pays the fee; the deposit keypair authorizes the move.
+        const sig = await splTransfer(this.conn, treasury, fromAta.address, toAta.address, depositKp, amount);
+        events.push({ userId, amountMicros: amount, txSig: sig });
+      } catch (err) {
+        console.error(`[deposit-sweep] userId=${userId} failed (will retry next poll):`, (err as Error)?.message ?? err);
+      }
     }
     return { events, cursor: null };
   }

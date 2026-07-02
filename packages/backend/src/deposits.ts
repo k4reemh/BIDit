@@ -79,24 +79,35 @@ export class DepositWatcher {
     }
   }
 
-  /** One poll. Returns the number of deposits credited. */
+  /** One poll. Returns the number of deposits credited. Never throws — a failed
+   *  poll is logged and retried next tick, so the watcher (and the whole server)
+   *  can't be taken down by a transient chain/RPC error. */
   async tick(): Promise<number> {
-    const { events, cursor } = await this.chain.pollDeposits(this.cursor);
-    this.cursor = cursor;
-    let credited = 0;
-    for (const event of events) {
-      const accountId = await getOrCreateUserAccount(event.userId, this.prisma);
-      await deposit(
-        {
-          accountId,
-          amount: event.amountMicros,
-          refId: event.txSig,
-          idempotencyKey: `chain-deposit:${event.txSig}`,
-        },
-        this.prisma,
-      );
-      credited += 1;
+    try {
+      const { events, cursor } = await this.chain.pollDeposits(this.cursor);
+      this.cursor = cursor;
+      let credited = 0;
+      for (const event of events) {
+        try {
+          const accountId = await getOrCreateUserAccount(event.userId, this.prisma);
+          await deposit(
+            {
+              accountId,
+              amount: event.amountMicros,
+              refId: event.txSig,
+              idempotencyKey: `chain-deposit:${event.txSig}`,
+            },
+            this.prisma,
+          );
+          credited += 1;
+        } catch (err) {
+          console.error('[deposit-watcher] credit failed for', event.txSig, (err as Error)?.message ?? err);
+        }
+      }
+      return credited;
+    } catch (err) {
+      console.error('[deposit-watcher] poll failed (will retry):', (err as Error)?.message ?? err);
+      return 0;
     }
-    return credited;
   }
 }
