@@ -173,7 +173,36 @@
     const connText = el("span", "conn-text", "connecting\u2026");
     conn.append(dot, connText);
     const grip = el("div", "grip", "\u283F");
-    head.append(grip, brand, live, conn);
+    const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
+    const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    const themeBtn = el("button", "themebtn");
+    themeBtn.title = "Toggle dark mode";
+    let theme = "light";
+    const shadowHost = () => root.getRootNode()?.host;
+    const renderThemeIcon = () => {
+      themeBtn.innerHTML = theme === "dark" ? SUN : MOON;
+    };
+    const applyTheme = (t) => {
+      theme = t;
+      shadowHost()?.setAttribute("data-theme", t);
+      renderThemeIcon();
+    };
+    renderThemeIcon();
+    themeBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+    themeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const next = theme === "dark" ? "light" : "dark";
+      applyTheme(next);
+      try {
+        chrome.storage?.local?.set({ biditPanelTheme: next });
+      } catch {
+      }
+    });
+    try {
+      chrome.storage?.local?.get("biditPanelTheme", (r) => applyTheme(r?.biditPanelTheme === "dark" ? "dark" : "light"));
+    } catch {
+    }
+    head.append(grip, brand, live, conn, themeBtn);
     const body = el("div", "body");
     const stage = el("div", "stage");
     const thumbWrap = el("div", "thumb-wrap");
@@ -1226,23 +1255,41 @@
   --red: #ef3b4e;
   --amber: #e0a012;
   --line: rgba(11, 36, 71, 0.10);
+  --surface: #ffffff;
   --surface-2: #f1f5fb;
   --surface-3: #e6edf6;
 }
+/* Dark "Navy Immersive": navy surfaces, white text, orange stays. */
+:host([data-theme="dark"]) {
+  --ink: #ffffff;
+  --muted: #8ca0bd;
+  --good: #22c58a;
+  --red: #ff5a6a;
+  --amber: #f0b429;
+  --line: rgba(255, 255, 255, 0.11);
+  --surface: #0b2447;
+  --surface-2: #10233f;
+  --surface-3: #17304f;
+}
+:host([data-theme="dark"]) .panel {
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+:host([data-theme="dark"]) .banner.info { background: rgba(255, 255, 255, 0.08); color: #cfe0f5; }
 * { box-sizing: border-box; margin: 0; }
 
 .panel {
   position: relative;
   width: 392px;
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: 0 24px 70px rgba(11, 36, 71, 0.28), 0 2px 8px rgba(11, 36, 71, 0.12);
   color: var(--ink);
   overflow: hidden;
 }
 .panel > * { position: relative; }
-.head, .body, .footer { background: #ffffff; }
+.head, .body, .footer { background: var(--surface); }
 
 .head {
   display: flex;
@@ -1276,6 +1323,10 @@
 }
 .live i { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: live 1.4s ease-in-out infinite; }
 .conn { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.themebtn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: none;
+  border: 0; border-radius: 8px; padding: 0; cursor: pointer; color: var(--muted); background: transparent; }
+.themebtn:hover { color: var(--ink); background: var(--surface-2); }
+.themebtn svg { width: 16px; height: 16px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
 .dot.on { background: var(--good); box-shadow: 0 0 8px rgba(14, 159, 110, 0.45); }
 .dot.off { background: var(--red); }
@@ -1287,7 +1338,7 @@
   width: 82px; height: 82px; flex: none; border-radius: 13px; padding: 2px;
   background: linear-gradient(150deg, var(--navy), var(--accent));
 }
-.thumb { width: 100%; height: 100%; border-radius: 11px; object-fit: cover; background: #eef2f8; display: block; }
+.thumb { width: 100%; height: 100%; border-radius: 11px; object-fit: cover; background: var(--surface-3); display: block; }
 .info { min-width: 0; }
 .title { font-weight: 700; font-size: 16.5px; line-height: 1.25; color: var(--ink); }
 .leaderrow { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 13px; color: var(--muted); }
