@@ -8,6 +8,7 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
   const [image, setImage] = useState('');
   const [startingBid, setStartingBid] = useState('1');
   const [quantity, setQuantity] = useState('1');
+  const [weight, setWeight] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,7 +17,13 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
     setBusy(true);
     setError('');
     try {
-      await createListing({ title: title.trim(), imageUrl: image || undefined, startingBid, quantity: Math.max(1, Number(quantity) || 1) });
+      await createListing({
+        title: title.trim(),
+        imageUrl: image || undefined,
+        startingBid,
+        quantity: Math.max(1, Number(quantity) || 1),
+        weightGrams: weight ? Math.max(1, Math.round(Number(weight))) : undefined,
+      });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -51,6 +58,10 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
               <input type="number" min="1" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
             </label>
           </div>
+          <label className="auth__field">
+            <span>Est. weight in grams <em className="muted">— for shipping quotes</em></span>
+            <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 60 (a sleeved card + mailer)" />
+          </label>
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={busy}>
             {busy ? 'Adding…' : 'Add to listings'}
           </button>

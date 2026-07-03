@@ -15,6 +15,7 @@ const NAV = [
   { to: '/deposit', label: 'Deposit', icon: Wallet },
   { to: '/saved', label: 'Saved', icon: Bookmark },
   { to: '/purchases', label: 'Purchases', icon: Bag },
+  { to: '/ship', label: 'Ready to ship', icon: Truck },
   { to: '/bids', label: 'Bids & Offers', icon: Bolt },
 ];
 

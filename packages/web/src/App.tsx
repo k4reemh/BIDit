@@ -15,10 +15,12 @@ import Shipping from './pages/account/Shipping';
 import Deposit from './pages/account/Deposit';
 import Saved from './pages/account/Saved';
 import Purchases from './pages/account/Purchases';
+import ShipItems from './pages/account/ShipItems';
 import Bids from './pages/account/Bids';
 import SellerOverview from './pages/seller/Overview';
 import SellerLive from './pages/seller/Live';
 import SellerListings from './pages/seller/Listings';
+import SellerShipments from './pages/seller/Shipments';
 import SellerOrders from './pages/seller/Orders';
 import SellerPayouts from './pages/seller/Payouts';
 import SellerSettings from './pages/seller/Settings';
@@ -105,6 +107,7 @@ export default function App() {
             <Route path="/deposit" element={<Deposit />} />
             <Route path="/saved" element={<Saved />} />
             <Route path="/purchases" element={<Purchases />} />
+            <Route path="/ship" element={<ShipItems />} />
             <Route path="/bids" element={<Bids />} />
           </Route>
 
@@ -113,6 +116,7 @@ export default function App() {
             <Route path="/seller" element={<SellerOverview />} />
             <Route path="/seller/live" element={<SellerLive />} />
             <Route path="/seller/listings" element={<SellerListings />} />
+            <Route path="/seller/shipments" element={<SellerShipments />} />
             <Route path="/seller/orders" element={<SellerOrders />} />
             <Route path="/seller/payouts" element={<SellerPayouts />} />
             <Route path="/seller/settings" element={<SellerSettings />} />

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
 import Avatar from './Avatar';
 import { applySeller, type Session } from '../api';
-import { Grid, Radio, Tag, Truck, Wallet, Settings, Check, ArrowRight } from '../icons';
+import { Grid, Radio, Tag, Truck, Wallet, Settings, Check, ArrowRight, Bag } from '../icons';
 
 interface Ctx {
   session: Session;
@@ -14,7 +14,8 @@ const NAV = [
   { to: '/seller', label: 'Overview', icon: Grid, end: true },
   { to: '/seller/live', label: 'Live', icon: Radio },
   { to: '/seller/listings', label: 'Listings', icon: Tag },
-  { to: '/seller/orders', label: 'Orders', icon: Truck },
+  { to: '/seller/shipments', label: 'Shipments', icon: Truck },
+  { to: '/seller/orders', label: 'Orders', icon: Bag },
   { to: '/seller/payouts', label: 'Payouts', icon: Wallet },
   { to: '/seller/settings', label: 'Settings', icon: Settings },
 ];

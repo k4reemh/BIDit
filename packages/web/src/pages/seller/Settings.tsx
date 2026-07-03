@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSeller } from '../../components/SellerLayout';
 import { setSellerCoin, refreshMe } from '../../api';
 import { Check, ArrowRight } from '../../icons';
+import ShippingSettingsCard from '../../components/seller/ShippingSettingsCard';
 
 export default function Settings() {
   const { session, setSession } = useSeller();
@@ -38,6 +39,8 @@ export default function Settings() {
           {saved && <span className="acct-saved"><Check width={16} height={16} /> Saved</span>}
         </div>
       </div>
+
+      <ShippingSettingsCard session={session} setSession={setSession} />
 
       <div className="card acct-card">
         <h3 className="acct-sub">Verification</h3>

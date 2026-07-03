@@ -12,6 +12,16 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface ShippingSettings {
+  originCountry: string | null;
+  originRegion: string | null;
+  originCity: string | null;
+  originPostal: string | null;
+  weeklyBundling: boolean;
+  shipLater: boolean;
+  privateShipping: boolean;
+}
+
 export interface Session {
   token: string;
   userId: string;
@@ -28,6 +38,7 @@ export interface Session {
   role: string;
   verified: boolean;
   pumpCoinAddress: string | null;
+  shipping?: ShippingSettings;
   available: string;
   settled: string;
 }
@@ -110,8 +121,16 @@ export const applySeller = () => req<Session>('/seller/apply', { method: 'POST',
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 
-export const createListing = (body: { title: string; imageUrl?: string; startingBid: string; quantity?: number }) =>
-  req<SellerListing>('/seller/listings', { method: 'POST', body: JSON.stringify(body) });
+export const createListing = (body: {
+  title: string;
+  imageUrl?: string;
+  startingBid: string;
+  quantity?: number;
+  weightGrams?: number;
+}) => req<SellerListing>('/seller/listings', { method: 'POST', body: JSON.stringify(body) });
+
+export const saveShippingSettings = (s: ShippingSettings) =>
+  req<Session>('/seller/shipping-settings', { method: 'POST', body: JSON.stringify(s) });
 
 export const setWheel = (listingId: string, entries: WheelEntryInput[]) =>
   req<{ ok: boolean; count: number }>('/seller/listing/wheel', {
@@ -189,6 +208,55 @@ export async function resolveCoin(coin: string): Promise<ResolvedRoom | null> {
     return null;
   }
 }
+
+// ---- fulfillment / shipping ------------------------------------------------
+export interface FulfillmentItem {
+  id: string;
+  title: string;
+  image: string | null;
+  weightGrams: number | null;
+  amount: string;
+  sellerId: string;
+  status: string;
+  heldUntil: number | null;
+}
+export interface ShipmentItem {
+  id: string;
+  title: string;
+  image: string | null;
+  amount: string;
+}
+export interface Shipment {
+  id: string;
+  mode: string;
+  status: string;
+  shippingFee: string;
+  privacyFee: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+  shipTo: unknown;
+  sellerHandle: string | null;
+  buyerHandle: string | null;
+  createdAt: number;
+  shippedAt: number | null;
+  items: ShipmentItem[];
+}
+export interface Fulfillment {
+  items: FulfillmentItem[];
+  shipments: Shipment[];
+}
+
+export const getFulfillment = () => req<Fulfillment>('/me/fulfillment');
+export const createShipment = (itemIds: string[], opts?: { mode?: string; private?: boolean }) =>
+  req<Shipment>('/shipments', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
+export const discardFulfillmentItem = (itemId: string) =>
+  req<Fulfillment>('/shipment/discard', { method: 'POST', body: JSON.stringify({ itemId }) });
+export const confirmReceived = (shipmentId: string) =>
+  req<Fulfillment>('/shipment/confirm-received', { method: 'POST', body: JSON.stringify({ shipmentId }) });
+
+export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
+export const shipShipment = (shipmentId: string, trackingNumber?: string, carrier?: string) =>
+  req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId, trackingNumber, carrier }) });
 
 // ---- deposits / withdrawals ------------------------------------------------
 export const refreshMe = () => req<Session>('/me');
