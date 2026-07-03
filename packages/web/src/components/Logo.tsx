@@ -8,7 +8,7 @@ export default function Logo({ size = 28 }: { size?: number }) {
           width: size,
           height: size,
           borderRadius: size * 0.3,
-          background: 'var(--ink)',
+          background: 'var(--navy)',
           display: 'grid',
           placeItems: 'center',
           flex: 'none',

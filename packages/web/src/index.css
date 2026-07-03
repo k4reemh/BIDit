@@ -14,6 +14,7 @@
 
   --line: rgba(11, 36, 71, 0.10);
   --line-2: rgba(11, 36, 71, 0.06);
+  --nav-bg: rgba(244, 246, 250, 0.82);
 
   --navy: #0b2447;
   --accent: #ff6a00;
@@ -37,6 +38,43 @@
   --font-display: "General Sans", "Inter", system-ui, sans-serif;
   --font: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
 }
+
+/* Dark mode — "Navy Immersive": deep-navy surfaces, white text, orange stays.
+   Only the color tokens change; the whole token-driven UI follows. */
+:root[data-theme="dark"] {
+  --bg: #050a14;
+  --surface: #0b2447;
+  --surface-2: #10233f;
+  --surface-3: #17304f;
+
+  --ink: #ffffff;
+  --ink-2: #dce4f1;
+  --muted: #8ca0bd;
+  --faint: #64769a;
+
+  --line: rgba(255, 255, 255, 0.11);
+  --line-2: rgba(255, 255, 255, 0.06);
+  --nav-bg: rgba(5, 10, 20, 0.82);
+
+  --navy: #0b2447;
+  --accent: #ff6a00;
+  --accent-strong: #ff7d1f;
+  --accent-soft: rgba(255, 106, 0, 0.16);
+  --red: #ff5a6a;
+  --amber: #f0b429;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+/* Soft-tinted alert/status boxes that were baked light — dark equivalents. */
+:root[data-theme="dark"] .auth__error,
+:root[data-theme="dark"] .ob__error,
+:root[data-theme="dark"] .bp__reject,
+:root[data-theme="dark"] .soon-tag--mainnet {
+  background: rgba(255, 90, 106, 0.14); color: #ff9aa5; border-color: rgba(255, 90, 106, 0.30);
+}
+:root[data-theme="dark"] .pm__soon { background: var(--surface-3); color: var(--accent); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -112,7 +150,7 @@ img { display: block; max-width: 100%; }
 
 /* ===== nav ================================================================= */
 .nav { position: sticky; top: 0; z-index: 50; height: var(--nav-h);
-  background: rgba(247, 246, 242, 0.82); backdrop-filter: blur(16px) saturate(1.3); border-bottom: 1px solid var(--line-2); }
+  background: var(--nav-bg); backdrop-filter: blur(16px) saturate(1.3); border-bottom: 1px solid var(--line-2); }
 .nav__inner { height: 100%; display: flex; align-items: center; gap: 18px; }
 .nav__left { display: flex; align-items: center; gap: 24px; }
 .nav__links { display: flex; align-items: center; gap: 20px; }

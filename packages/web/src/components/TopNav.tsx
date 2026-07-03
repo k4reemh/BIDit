@@ -4,6 +4,7 @@ import Logo from './Logo';
 import Avatar from './Avatar';
 import ProfileMenu from './ProfileMenu';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 import { Search, Chat, Gift, XLogo, Chevron, Wallet } from '../icons';
 import type { User } from '../App';
 
@@ -46,6 +47,7 @@ export default function TopNav({
           <a className="icon-btn" href="https://x.com/biditsol" target="_blank" rel="noreferrer" aria-label="BIDit on X">
             <XLogo width={18} height={18} />
           </a>
+          <ThemeToggle />
           {user ? (
             <>
               <Link className="nav__bal" to="/deposit" title="Your wallet balance"><Wallet width={15} height={15} /> ${user.settled}</Link>

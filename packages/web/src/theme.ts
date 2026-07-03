@@ -1,0 +1,30 @@
+/** Light/dark theme. Dark = the "Navy Immersive" scheme (navy surfaces, white
+ *  text, orange stays). The choice is a `data-theme` attribute on <html> that
+ *  flips the CSS color tokens; persisted in localStorage. */
+export type Theme = 'light' | 'dark';
+const KEY = 'bidit_theme';
+
+export function getTheme(): Theme {
+  return localStorage.getItem(KEY) === 'dark' ? 'dark' : 'light';
+}
+
+export function applyTheme(t: Theme): void {
+  document.documentElement.dataset.theme = t;
+}
+
+export function setTheme(t: Theme): void {
+  localStorage.setItem(KEY, t);
+  applyTheme(t);
+}
+
+/** Apply the saved theme ASAP (called before React renders, to avoid a flash). */
+export function initTheme(): void {
+  applyTheme(getTheme());
+}
+
+/** Flip and persist; returns the new theme. */
+export function toggleTheme(): Theme {
+  const next: Theme = getTheme() === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  return next;
+}
