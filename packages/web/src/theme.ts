@@ -5,7 +5,8 @@ export type Theme = 'light' | 'dark';
 const KEY = 'bidit_theme';
 
 export function getTheme(): Theme {
-  return localStorage.getItem(KEY) === 'dark' ? 'dark' : 'light';
+  // Dark by default (the Navy Immersive scheme); only an explicit 'light' choice opts out.
+  return localStorage.getItem(KEY) === 'light' ? 'light' : 'dark';
 }
 
 export function applyTheme(t: Theme): void {

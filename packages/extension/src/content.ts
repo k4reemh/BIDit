@@ -31,6 +31,7 @@ let giveaway: GiveawayHandle | null = null;
 function mountPanel(): PanelHandle {
   const host = document.createElement('div');
   host.id = HOST_ID;
+  host.dataset.theme = 'dark'; // default before the saved choice loads (no light flash)
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = panelCss;
