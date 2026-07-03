@@ -1089,6 +1089,12 @@ img { display: block; max-width: 100%; }
 .bidtip__list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
 .bidtip__list li svg { color: var(--accent); flex: none; margin-top: 2px; }
 
+/* ---- content editor (admin) ---- */
+.ce { max-width: 720px; margin: 0 auto; padding: 32px 24px 100px; }
+.ce--gate { max-width: 420px; padding-top: 60px; }
+.ce__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.ce__save { position: sticky; bottom: 0; display: flex; align-items: center; gap: 14px; padding: 14px 0; background: var(--bg); border-top: 1px solid var(--line-2); }
+
 /* ---- notification bell ---- */
 .nbell { position: relative; display: inline-flex; }
 .nbell__badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: #ef3b4e; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
