@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import BidPanel from '../components/BidPanel';
+import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
 import { resolveCoin, getPumpCoin, type ResolvedRoom, type PumpCoin, type Session } from '../api';
 
@@ -82,7 +83,10 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
               </div>
             </aside>
           ) : (
-            <BidPanel room={resolved.room} session={session} onAuth={onAuth} />
+            <>
+              <BidTip />
+              <BidPanel room={resolved.room} session={session} onAuth={onAuth} />
+            </>
           )}
         </div>
       </div>

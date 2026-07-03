@@ -8,6 +8,7 @@ import AccountLayout from './components/AccountLayout';
 import SellerLayout from './components/SellerLayout';
 import Home from './pages/Home';
 import Docs from './pages/Docs';
+import Help from './pages/Help';
 import Watch from './pages/Watch';
 import StubPage from './pages/StubPage';
 import Profile from './pages/account/Profile';
@@ -47,7 +48,6 @@ const STUBS: Record<string, { title: string; sub: string }> = {
   '/refer': { title: 'Refer friends', sub: 'Invite friends and earn $BID rewards when they bid.' },
   '/friends': { title: 'Friends', sub: 'Find and follow other collectors.' },
   '/settings': { title: 'Account settings', sub: 'Manage your account, security and notifications.' },
-  '/help': { title: 'Help & legal', sub: 'Support, docs, terms and privacy.' },
   '/account-health': { title: 'Account health', sub: 'Your standing as a buyer and seller on BIDit.' },
 };
 
@@ -99,6 +99,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
           <Route path="/docs" element={<Docs />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />
 
           <Route element={<AccountLayout session={session} setSession={setSession} onAuth={() => setAuth('signin')} />}>

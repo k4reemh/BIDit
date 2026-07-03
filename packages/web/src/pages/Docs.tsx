@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bolt, Radio, Eye, Wallet, Shield, Tag, Gift, Dice, UserCheck, Info, Book, ArrowRight,
+  Bolt, Radio, Eye, Wallet, Shield, Tag, Gift, Dice, UserCheck, Info, Book, ArrowRight, Truck,
 } from '../icons';
 
 const SECTIONS = [
@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: 'overlay', label: 'Getting the overlay', icon: Eye },
   { id: 'balance', label: 'Balance & deposits', icon: Wallet },
   { id: 'escrow', label: 'Escrow & settlement', icon: Shield },
+  { id: 'shipping', label: 'Shipping & delivery', icon: Truck },
   { id: 'fees', label: 'Fees', icon: Tag },
   { id: 'tokenomics', label: '$BID tokenomics', icon: Gift },
   { id: 'randomizer', label: 'The randomizer', icon: Dice },
@@ -249,6 +250,39 @@ export default function Docs() {
             <li><b>Didn’t ship?</b> If a seller never ships within the deadline, the order auto-cancels and you’re refunded <b>100%</b>.</li>
             <li><b>Something wrong?</b> Open a dispute inside the window; it resolves to either a release to the seller or a full refund to you.</li>
             <li><b>Refunds carry no fee.</b> The 5% is only ever taken on a successful release — a refund returns the entire amount.</li>
+          </ul>
+        </section>
+
+        {/* SHIPPING */}
+        <section id="shipping" className="docs__sec">
+          <h2 className="docs__h2"><Truck width={22} height={22} /> Shipping &amp; delivery</h2>
+          <p>
+            Win a card and it lands in <b>Ready to ship</b>. The buyer pays shipping (not the seller),
+            and only when you choose to send items your way — so you can let wins pile up and pay once.
+            Cost is based on the seller’s location and the item’s weight, to your saved address.
+          </p>
+          <div className="docs__cards3">
+            <div className="docs__mini card">
+              <span className="docs__mini-ic"><Truck width={18} height={18} /></span>
+              <h3>Standard</h3>
+              <p className="muted">Ship a card whenever you like and pay that package’s shipping.</p>
+            </div>
+            <div className="docs__mini card">
+              <span className="docs__mini-ic"><Gift width={18} height={18} /></span>
+              <h3>Weekly bundling</h3>
+              <p className="muted">Where a seller offers it, pay shipping once a week — that week’s wins ship together.</p>
+            </div>
+            <div className="docs__mini card">
+              <span className="docs__mini-ic"><Shield width={18} height={18} /></span>
+              <h3>Private &amp; secure</h3>
+              <p className="muted">Hide your address — the seller ships to BIDit and we forward it to you.</p>
+            </div>
+          </div>
+          <ul className="docs__ul">
+            <li><b>Buy now, ship later.</b> Let wins sit in Ready to ship (held up to 7 days), then pick which to send and pay shipping once. Don’t want one? Discard it.</li>
+            <li><b>One package per seller.</b> Bundling and ship-later group a single seller’s items into one shipment with one shipping charge.</li>
+            <li><b>Delivery.</b> The seller adds tracking and marks it shipped — then you tap <b>Confirm received</b> when it arrives.</li>
+            <li><b>Set your address first.</b> Add it under Payments &amp; Shipping so we can quote and label correctly.</li>
           </ul>
         </section>
 

@@ -5,9 +5,9 @@ import { XLogo } from '../icons';
 type FLink = string | { label: string; to: string };
 const COLS: { h: string; links: FLink[] }[] = [
   { h: 'Marketplace', links: ['Live now', 'Browse', 'Categories', { label: 'Sell on BIDit', to: '/seller' }] },
-  { h: 'Resources', links: [{ label: 'Docs', to: '/docs' }, { label: '$BID token', to: '/docs#tokenomics' }, 'Status', 'Developer API'] },
+  { h: 'Resources', links: [{ label: 'Help & quick start', to: '/help' }, { label: 'Docs', to: '/docs' }, { label: '$BID token', to: '/docs#tokenomics' }, 'Status'] },
   { h: 'Company', links: ['About', 'Careers', 'Blog', 'Press'] },
-  { h: 'Legal', links: ['Terms', 'Privacy', { label: 'Shipping policy', to: '/docs#escrow' }, 'Contact'] },
+  { h: 'Legal', links: ['Terms', 'Privacy', { label: 'Shipping policy', to: '/docs#shipping' }, 'Contact'] },
 ];
 
 export default function Footer() {

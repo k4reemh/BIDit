@@ -1053,6 +1053,42 @@ img { display: block; max-width: 100%; }
 .ship-addr__body { display: flex; flex-direction: column; line-height: 1.4; font-size: 13.5px; margin-top: 3px; }
 .ship-addr__body b { font-size: 14px; }
 
+/* ---- help / quick start ---- */
+.help { padding: 34px 0 90px; }
+.help__hero { text-align: center; max-width: 660px; margin: 0 auto 32px; }
+.help__h1 { font-size: clamp(30px, 5vw, 44px); letter-spacing: -0.02em; margin: 14px 0 10px; }
+.help__lead { color: var(--muted); font-size: 16px; line-height: 1.6; }
+.qs { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.qs__kicker { font-size: 12.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 7px; margin-bottom: 13px; }
+.qs__steps { display: flex; flex-direction: column; gap: 12px; }
+.qs__step { display: flex; gap: 13px; padding: 15px; align-items: flex-start; text-decoration: none; color: inherit; position: relative; transition: border-color 0.15s, transform 0.08s; }
+.qs__step:hover { border-color: rgba(255, 106, 0, 0.42); transform: translateY(-1px); }
+.qs__n { position: absolute; top: 12px; right: 14px; font-size: 12px; font-weight: 800; color: var(--faint); }
+.qs__ic { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.qs__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qs__meta b { font-size: 15px; }
+.qs__meta > .muted { font-size: 13px; line-height: 1.5; }
+.qs__cta { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
+.help__guides { margin-top: 36px; }
+.help__guidegrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.help__guide { display: flex; align-items: center; gap: 10px; padding: 14px 16px; text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; transition: border-color 0.15s; }
+.help__guide:hover { border-color: rgba(255, 106, 0, 0.42); }
+.help__guidearr { margin-left: auto; color: var(--faint); }
+.help__contact { margin-top: 30px; display: flex; align-items: center; gap: 16px; padding: 20px 22px; }
+.help__contact-ic { width: 46px; height: 46px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.help__contact > div { flex: 1; }
+@media (max-width: 760px) { .qs, .help__guidegrid { grid-template-columns: 1fr; } .help__contact { flex-direction: column; text-align: center; } }
+
+/* ---- first-run bid tip (watch page) ---- */
+.bidtip { position: relative; background: var(--accent-soft); border: 1px solid rgba(255, 106, 0, 0.28); border-radius: 14px; padding: 14px 15px; margin-bottom: 14px; }
+.bidtip__x { position: absolute; top: 10px; right: 10px; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; }
+.bidtip__x:hover { color: var(--ink); }
+.bidtip__h { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13.5px; color: var(--ink); margin-bottom: 9px; padding-right: 18px; }
+.bidtip__h svg { color: var(--accent); }
+.bidtip__list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.bidtip__list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
+.bidtip__list li svg { color: var(--accent); flex: none; margin-top: 2px; }
+
 /* ---- notification bell ---- */
 .nbell { position: relative; display: inline-flex; }
 .nbell__badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: #ef3b4e; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }

@@ -44,7 +44,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         </div>
         <div className="live-grid">
           {live && live.length > 0
-            ? live.map((c) => <LiveCoinCard key={c.coin} c={c} />)
+            ? [...new Map(live.map((c) => [c.coin, c])).values()].map((c) => <LiveCoinCard key={c.coin} c={c} />)
             : FEATURED.map((a) => <LiveCard key={a.id} a={a} />)}
         </div>
       </section>
