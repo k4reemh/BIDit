@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useSeller } from '../../components/SellerLayout';
 import EmptyState from '../../components/EmptyState';
-import { getSellerShipments, shipShipment, type Shipment } from '../../api';
+import { getSellerShipments, getSellerHeld, shipShipment, type Shipment, type HeldItem } from '../../api';
 import { Truck, Check } from '../../icons';
 
 interface Addr { name?: string; line1?: string; line2?: string; city?: string; region?: string; postal?: string; country?: string }
 
+const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
 export default function Shipments() {
   useSeller();
   const [shipments, setShipments] = useState<Shipment[] | null>(null);
+  const [held, setHeld] = useState<HeldItem[]>([]);
   const [error, setError] = useState('');
-  const load = () => getSellerShipments().then(setShipments).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+  const load = () => {
+    getSellerShipments().then(setShipments).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getSellerHeld().then(setHeld).catch(() => {});
+  };
   useEffect(() => { void load(); }, []);
 
   const toShip = (shipments ?? []).filter((s) => s.status === 'PAID');
@@ -29,6 +35,26 @@ export default function Shipments() {
       )}
 
       {toShip.map((s) => <FulfillCard key={s.id} shipment={s} onShipped={load} />)}
+
+      {held.length > 0 && (
+        <div className="card acct-card">
+          <div className="ship-grp__head">
+            <h3 className="acct-sub" style={{ margin: 0 }}>Held for buyers</h3>
+            <span className="muted" style={{ fontSize: 12 }}>They’re deciding when to ship</span>
+          </div>
+          <div className="ship-list">
+            {held.map((it) => (
+              <div key={it.id} className="ship-row">
+                {it.image ? <img className="ship-thumb" src={it.image} alt="" /> : <div className="ship-thumb ship-thumb--ph" />}
+                <div className="ship-meta">
+                  <b>{it.title}</b>
+                  <span className="muted">@{it.buyerHandle}{it.heldUntil ? ` · hold until ${fmtDate(it.heldUntil)}` : ''}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {shipped.length > 0 && <h2 className="acct-sub" style={{ fontSize: 18, marginTop: 24 }}>Shipped</h2>}
       {shipped.map((s) => (

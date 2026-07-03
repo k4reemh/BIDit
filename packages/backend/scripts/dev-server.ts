@@ -61,6 +61,8 @@ import {
 import {
   getBuyerFulfillment,
   getSellerShipments,
+  getSellerHeldItems,
+  listPrivateShipments,
   shipmentItems,
   createAndPayShipment,
   markShipmentShipped,
@@ -473,6 +475,25 @@ async function main() {
         const shipments = await getSellerShipments(userId, prisma);
         return send(res, 200, await Promise.all(shipments.map((s) => shipmentDto(s.id))));
       }
+      if (req.method === 'GET' && p === '/seller/held') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const held = await getSellerHeldItems(userId, prisma);
+        const handles = new Map<string, string | null>();
+        for (const it of held) {
+          if (!handles.has(it.buyerId)) {
+            const u = await prisma.user.findUnique({ where: { id: it.buyerId }, select: { handle: true } });
+            handles.set(it.buyerId, u?.handle ?? null);
+          }
+        }
+        return send(res, 200, held.map((it) => ({
+          id: it.id,
+          title: it.title,
+          image: it.photo,
+          buyerHandle: handles.get(it.buyerId) ?? null,
+          heldUntil: it.heldUntil ? it.heldUntil.getTime() : null,
+        })));
+      }
       if (req.method === 'POST' && p === '/seller/shipment/ship') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -627,6 +648,38 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await ledgerAudit(userId, prisma));
+      }
+      // Operator-only: Private Secure Shipping reship queue. Exposes each buyer's
+      // REAL address (privateLeg2) — never shown to sellers — so the operator can
+      // ship the hub→buyer leg.
+      if (req.method === 'GET' && p === '/admin/private-shipments') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const user = await getUser(userId, prisma);
+        if (user?.role !== Role.admin) return send(res, 403, { error: 'admin required' });
+        const shipments = await listPrivateShipments(prisma);
+        const out = await Promise.all(
+          shipments.map(async (s) => {
+            const [items, buyer, seller] = await Promise.all([
+              shipmentItems(s.id, prisma),
+              prisma.user.findUnique({ where: { id: s.buyerId }, select: { handle: true } }),
+              prisma.user.findUnique({ where: { id: s.sellerId }, select: { handle: true } }),
+            ]);
+            return {
+              id: s.id,
+              status: s.status,
+              buyerHandle: buyer?.handle ?? null,
+              sellerHandle: seller?.handle ?? null,
+              privacyFee: formatUsdc(s.privacyFee),
+              buyerRealAddress: s.privateLeg2, // operator-only
+              trackingNumber: s.trackingNumber,
+              carrier: s.carrier,
+              items: items.map((it) => ({ id: it.id, title: it.title })),
+              createdAt: s.createdAt.getTime(),
+            };
+          }),
+        );
+        return send(res, 200, out);
       }
       if (req.method === 'GET' && p === '/admin/orders') {
         const userId = authUser(req);

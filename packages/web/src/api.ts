@@ -260,6 +260,15 @@ export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
 export const shipShipment = (shipmentId: string, trackingNumber?: string, carrier?: string) =>
   req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId, trackingNumber, carrier }) });
 
+export interface HeldItem {
+  id: string;
+  title: string;
+  image: string | null;
+  buyerHandle: string | null;
+  heldUntil: number | null;
+}
+export const getSellerHeld = () => req<HeldItem[]>('/seller/held');
+
 // ---- notifications ---------------------------------------------------------
 export interface Notif {
   id: string;

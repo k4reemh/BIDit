@@ -204,6 +204,25 @@ export function shipmentItems(shipmentId: string, prisma: PrismaClient = default
   return prisma.fulfillmentItem.findMany({ where: { shipmentId }, orderBy: { createdAt: 'asc' } });
 }
 
+/** Items a seller is physically holding while the buyer decides to ship (ship-later). */
+export function getSellerHeldItems(sellerId: string, prisma: PrismaClient = defaultPrisma) {
+  return prisma.fulfillmentItem.findMany({
+    where: { sellerId, status: 'READY_TO_SHIP' },
+    orderBy: { createdAt: 'asc' },
+    take: 60,
+  });
+}
+
+/** Operator view: Private shipments awaiting the hub→buyer reship leg. Includes the
+ *  buyer's real address (privateLeg2), which is intentionally never exposed to sellers. */
+export function listPrivateShipments(prisma: PrismaClient = defaultPrisma) {
+  return prisma.shipment.findMany({
+    where: { mode: 'PRIVATE', status: { in: ['PAID', 'SHIPPED'] } },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Create + pay a shipment (buyer groups items and pays one shipping fee)
 // ---------------------------------------------------------------------------
