@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
 import Avatar from './Avatar';
+import SellerOnboarding from './SellerOnboarding';
 import { applySeller, type Session } from '../api';
 import { Grid, Radio, Tag, Truck, Wallet, Settings, Check, ArrowRight, Bag } from '../icons';
 
@@ -49,7 +50,7 @@ export default function SellerLayout({
     );
   }
 
-  if (!session.verified) {
+  if (!session.isSeller) {
     const apply = async () => {
       setBusy(true);
       try {
@@ -63,7 +64,7 @@ export default function SellerLayout({
         <div className="sell-apply__card card">
           <span className="hero__tag"><span className="dot" /> Seller studio</span>
           <h1 className="display sell-apply__title">Turn your stream into an auction house.</h1>
-          <p className="muted">List cards, run live auctions and wheel spins, and get paid in USDC — setup takes a minute.</p>
+          <p className="muted">List anything, run live auctions and wheel spins, and get paid in USDC — setup takes a minute.</p>
           <ul className="sell-apply__perks">
             {PERKS.map((p) => (
               <li key={p}><span className="sell-apply__check"><Check width={14} height={14} /></span>{p}</li>
@@ -72,10 +73,14 @@ export default function SellerLayout({
           <button className="btn btn-primary btn-lg" onClick={apply} disabled={busy}>
             {busy ? 'Setting up…' : 'Become a seller'} {!busy && <ArrowRight width={18} height={18} />}
           </button>
-          <p className="sell-apply__note muted">Beta: sellers are auto-approved. KYC verification comes with mainnet.</p>
+          <p className="sell-apply__note muted">You’re approved instantly and can start right away. Fulfill 10 orders to become a <b>Verified Seller</b>.</p>
         </div>
       </main>
     );
+  }
+
+  if (!session.sellerOnboarded) {
+    return <SellerOnboarding session={session} setSession={setSession} />;
   }
 
   const name = session.displayName || session.handle;
@@ -86,7 +91,11 @@ export default function SellerLayout({
           <Avatar handle={session.handle} size={42} />
           <div className="sl__brandid">
             <b>{name}</b>
-            <span className="sl__badge"><Check width={12} height={12} /> Verified seller</span>
+            {session.verified ? (
+              <span className="sl__badge"><Check width={12} height={12} /> Verified seller</span>
+            ) : (
+              <span className="sl__badge sl__badge--pending">Seller · {session.fulfilledCount ?? 0}/{session.verifyThreshold ?? 10} to Verified</span>
+            )}
           </div>
         </div>
         <nav className="acct__nav">

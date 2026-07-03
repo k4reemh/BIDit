@@ -38,7 +38,15 @@ export interface Session {
   onboarded: boolean;
   role: string;
   verified: boolean;
+  isSeller?: boolean;
+  isAdmin?: boolean;
+  sellerOnboarded?: boolean;
+  fulfilledCount?: number;
+  verifyThreshold?: number;
   pumpCoinAddress: string | null;
+  website?: string | null;
+  socials?: Record<string, string> | null;
+  pitch?: string | null;
   shipping?: ShippingSettings;
   available: string;
   settled: string;
@@ -120,6 +128,35 @@ export interface SellerOrder {
 }
 
 export const applySeller = () => req<Session>('/seller/apply', { method: 'POST', body: '{}' });
+
+export const submitSellerOnboarding = (payload: {
+  website?: string;
+  socials?: Record<string, string>;
+  pitch?: string;
+  coinAddress?: string;
+  origin?: { country?: string; region?: string; city?: string; postal?: string };
+}) => req<Session>('/seller/onboarding', { method: 'POST', body: JSON.stringify(payload) });
+
+export interface SellerApplication {
+  userId: string;
+  handle: string;
+  displayName: string | null;
+  email: string | null;
+  verified: boolean;
+  verifiedBy: string | null;
+  appliedAt: number | null;
+  onboarded: boolean;
+  fulfilledCount: number;
+  threshold: number;
+  pitch: string | null;
+  website: string | null;
+  socials: Record<string, string> | null;
+  pumpCoinAddress: string | null;
+  origin: { country: string | null; region: string | null; city: string | null; postal: string | null };
+}
+export const getSellerApplications = () => req<SellerApplication[]>('/admin/sellers');
+export const verifySellerAdmin = (sellerUserId: string) =>
+  req<{ ok: boolean }>('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 
