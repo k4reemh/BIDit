@@ -6,7 +6,7 @@ import type { LiveCoin } from '../api';
 /** A real linked-coin card in "Live right now" → links to the in-site watch page. */
 export default function LiveCoinCard({ c }: { c: LiveCoin }) {
   const live = c.streamLive || c.hasAuction || c.hasGiveaway;
-  const heading = c.title || c.prize || c.coinName || 'Card auctions';
+  const heading = c.title || c.prize || c.coinName || 'Live auctions';
   const short = `${c.coin.slice(0, 4)}…${c.coin.slice(-4)}`;
   return (
     <Link className="live-card" to={`/live/${c.coin}`}>

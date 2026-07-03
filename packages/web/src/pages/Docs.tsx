@@ -57,9 +57,9 @@ export default function Docs() {
           <span className="hero__tag"><span className="dot" /> Docs · Beta (devnet)</span>
           <h1 className="display docs__h1">How BIDit works</h1>
           <p className="docs__lead">
-            BIDit turns a live pump.fun stream into a real trading-card auction house. Sellers run live auctions
-            straight on their stream, bidders bid in <b>USDC</b> from a funded balance, cards are held in escrow
-            until they ship, and <b>5% of every shipped sale</b> buys back <b className="accent">$BID</b> on-chain.
+            BIDit turns a live pump.fun stream into a real-time auction house. Sellers run live auctions
+            straight on their stream, bidders bid in <b>USDC</b> from a funded balance, items are held
+            until they ship, and <b>4% of every shipped sale</b> buys back <b className="accent">$BID</b> on-chain.
             This page explains the whole loop end to end.
           </p>
         </header>
@@ -68,10 +68,10 @@ export default function Docs() {
         <section id="overview" className="docs__sec">
           <h2 className="docs__h2"><Bolt width={22} height={22} /> What is BIDit</h2>
           <p>
-            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off cards; the BIDit browser
-            overlay drops a live auction panel right onto the stream. Viewers place bids in real time, the highest
-            bidder when the clock hits zero wins, and the card ships to them. Money moves in USDC — no chat comments,
-            no manual invoicing, no “DM me to pay.”
+            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything — cards, clothes,
+            tech, bounties; the BIDit browser overlay drops a live auction panel right onto the stream. Viewers place
+            bids in real time, the highest bidder when the clock hits zero wins, and the item ships to them. Money moves
+            in USDC — no chat comments, no manual invoicing, no “DM me to pay.”
           </p>
           <div className="docs__cards3">
             <div className="docs__mini card">
@@ -87,7 +87,7 @@ export default function Docs() {
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Gift width={18} height={18} /></span>
               <b>Every ship pumps $BID</b>
-              <p className="muted">5% of each shipped sale routes to an on-chain $BID buyback — the flywheel.</p>
+              <p className="muted">4% of each shipped sale routes to an on-chain $BID buyback — the flywheel.</p>
             </div>
           </div>
           <div className="docs__note">
@@ -140,8 +140,8 @@ export default function Docs() {
               <span className="docs__step-n">5</span>
               <div>
                 <b>Ship → settle</b>
-                <p className="muted">The seller ships the card. Once it’s delivered and the dispute window passes,
-                escrow releases: 95% to the seller, 5% to the $BID buyback.</p>
+                <p className="muted">The seller ships the item. Once it’s delivered and the dispute window passes,
+                escrow releases: 95% to the seller, 4% to the $BID buyback, 1% to the community treasury.</p>
               </div>
             </li>
           </ol>
@@ -249,7 +249,7 @@ export default function Docs() {
             <li><b>Buyer protection.</b> Funds are locked in escrow — the seller is only paid after delivery and a short dispute window.</li>
             <li><b>Didn’t ship?</b> If a seller never ships within the deadline, the order auto-cancels and you’re refunded <b>100%</b>.</li>
             <li><b>Something wrong?</b> Open a dispute inside the window; it resolves to either a release to the seller or a full refund to you.</li>
-            <li><b>Refunds carry no fee.</b> The 5% is only ever taken on a successful release — a refund returns the entire amount.</li>
+            <li><b>Refunds carry no fee.</b> The fee is only ever taken on a successful release — a refund returns the entire amount.</li>
           </ul>
         </section>
 
@@ -257,7 +257,7 @@ export default function Docs() {
         <section id="shipping" className="docs__sec">
           <h2 className="docs__h2"><Truck width={22} height={22} /> Shipping &amp; delivery</h2>
           <p>
-            Win a card and it lands in <b>Ready to ship</b>. The buyer pays shipping (not the seller),
+            Win an item and it lands in <b>Ready to ship</b>. The buyer pays shipping (not the seller),
             and only when you choose to send items your way — so you can let wins pile up and pay once.
             Cost is based on the seller’s location and the item’s weight, to your saved address.
           </p>
@@ -265,7 +265,7 @@ export default function Docs() {
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Truck width={18} height={18} /></span>
               <h3>Standard</h3>
-              <p className="muted">Ship a card whenever you like and pay that package’s shipping.</p>
+              <p className="muted">Ship an item whenever you like and pay that package’s shipping.</p>
             </div>
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Gift width={18} height={18} /></span>
@@ -289,7 +289,7 @@ export default function Docs() {
         {/* FEES */}
         <section id="fees" className="docs__sec">
           <h2 className="docs__h2"><Tag width={22} height={22} /> Fees</h2>
-          <p>BIDit’s fee is simple: <b>5% of a shipped sale</b>, taken only when escrow releases to the seller.</p>
+          <p>BIDit’s fee is simple: <b>5% of a shipped sale</b>, taken only when escrow releases to the seller — split into a <b>4% $BID buyback</b> and <b>1% to a community treasury</b> for buyer protection.</p>
           <div className="card docs__split">
             <div className="split__bar">
               <span className="split__seller" style={{ width: '95%' }}>95% seller</span>
@@ -297,13 +297,14 @@ export default function Docs() {
             </div>
             <div className="docs__split-legend">
               <span><i className="docs__sw docs__sw--seller" /> <b>95%</b> — paid to the seller in USDC</span>
-              <span><i className="docs__sw docs__sw--fee" /> <b>5%</b> — buys back <b className="accent">$BID</b> on-chain</span>
+              <span><i className="docs__sw docs__sw--fee" /> <b>4%</b> — buys back <b className="accent">$BID</b> on-chain</span>
+              <span><i className="docs__sw docs__sw--fee" /> <b>1%</b> — community treasury for buyer protection</span>
             </div>
           </div>
           <ul className="docs__ul">
             <li><b>Buyers pay no platform fee.</b> You pay your winning bid — nothing on top.</li>
             <li><b>The fee is success-based.</b> No sale, no ship, no fee. It’s only deducted on release.</li>
-            <li><b>The 5% isn’t pocketed</b> — it goes straight into the $BID buyback below, which every holder benefits from.</li>
+            <li><b>Nothing is pocketed</b> — 4% goes straight into the $BID buyback below, and 1% funds a community treasury that backs buyer protection.</li>
           </ul>
         </section>
 
@@ -313,13 +314,13 @@ export default function Docs() {
           <p>
             <b className="accent">$BID</b> is the platform token, and its core mechanic is a <b>buyback flywheel</b>:
             real marketplace activity turns into steady on-chain buy pressure. The pitch is one line —
-            <b> every card that ships pumps the token.</b>
+            <b> every item that ships pumps the token.</b>
           </p>
           <div className="docs__fly">
             {[
               ['Bid & win', 'A buyer wins a live auction and pays in USDC.'],
-              ['Card ships', 'The seller ships; escrow releases on delivery.'],
-              ['5% buys $BID', 'The 5% fee is used to buy back $BID on-chain.'],
+              ['Item ships', 'The seller ships; escrow releases on delivery.'],
+              ['4% buys $BID', 'The 4% buyback portion of the fee buys back $BID on-chain.'],
               ['Everyone benefits', 'More sales → more buybacks → stronger token.'],
             ].map(([t, d], i) => (
               <div key={t} className="docs__fly-step card">
@@ -330,9 +331,9 @@ export default function Docs() {
             ))}
           </div>
           <ul className="docs__ul">
-            <li><b>Fee-funded, not inflationary.</b> Buybacks are paid from real revenue (the 5%), not by minting new supply.</li>
+            <li><b>Fee-funded, not inflationary.</b> Buybacks are paid from real revenue (the 4% buyback), not by minting new supply.</li>
             <li><b>On-chain & auditable.</b> Buyback spends are recorded so the flywheel is transparent, not a promise.</li>
-            <li><b>Volume-linked.</b> The more real cards move through BIDit, the more $BID gets bought back.</li>
+            <li><b>Volume-linked.</b> The more real items move through BIDit, the more $BID gets bought back.</li>
           </ul>
           <div className="docs__note">
             <Info width={18} height={18} />
@@ -391,9 +392,9 @@ export default function Docs() {
             {[
               ['Do I need a crypto wallet to bid?', 'You need somewhere to send USDC from. Once your BIDit balance is funded you bid from that balance — no wallet pop-up per bid.'],
               ['What happens to my money if I get outbid?', 'The hold on your bid releases back to your available balance instantly, ready for your next bid or a withdrawal.'],
-              ['When does the seller actually get paid?', 'Not at win — the winning bid sits in escrow and only releases (95% to the seller) after the card is delivered and the dispute window passes.'],
-              ['What if the card never arrives?', 'If a seller doesn’t ship in time the order auto-cancels and you’re refunded 100%. You can also open a dispute within the window.'],
-              ['Is there a fee for buyers?', 'No. Buyers pay only their winning bid. The 5% fee comes out of the seller’s side on shipped sales and funds the $BID buyback.'],
+              ['When does the seller actually get paid?', 'Not at win — the winning bid sits in escrow and only releases (95% to the seller) after the item is delivered and the dispute window passes.'],
+              ['What if the item never arrives?', 'If a seller doesn’t ship in time the order auto-cancels and you’re refunded 100%. You can also open a dispute within the window.'],
+              ['Is there a fee for buyers?', 'No. Buyers pay only their winning bid. The 5% fee comes out of the seller’s side on shipped sales — 4% funds the $BID buyback and 1% a community treasury for buyer protection.'],
               ['Is this real money right now?', 'It’s live on Solana devnet with test USDC during beta. Real-money mainnet turns on after audit, key custody, and compliance work.'],
             ].map(([q, a]) => (
               <details key={q} className="docs__q">

@@ -16,7 +16,7 @@ export default function Footer() {
       <div className="container footer__top">
         <div className="footer__brand">
           <Logo size={30} />
-          <p className="muted">The live card auction that lives on the streams you already watch. Win it, we ship it, 5% pumps $BID.</p>
+          <p className="muted">The live auction that lives on the streams you already watch. Bid anything, win it, we ship it — 4% pumps $BID.</p>
           <div className="footer__social">
             <a className="icon-btn" href="https://x.com/biditsol" target="_blank" rel="noreferrer" aria-label="BIDit on X"><XLogo width={18} height={18} /></a>
             <a className="icon-btn" href="#" aria-label="Discord" style={{ fontSize: 18 }}>◇</a>

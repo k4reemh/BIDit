@@ -16,10 +16,10 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       <section className="hero">
         <div className="hero__inner risein">
           <span className="hero__tag"><span className="dot" /> Now live in beta</span>
-          <h1 className="display hero__title">The live marketplace for trading cards.</h1>
+          <h1 className="display hero__title">The live crypto marketplace for bidding on Anything, Anytime, Anywhere.</h1>
           <p className="hero__sub">
-            Bid in real time on the Pokémon, One Piece and sports breaks streaming on pump.fun.
-            Win it, <b>we ship it</b>, and you settle in USDC.
+            Bid in real time on Pokémon, One Piece, Clothes, Tech, Bounties, Anything, directly on pump.fun.{' '}
+            <b>Bid it, Win it, Ship it.</b> Buyer protection guaranteed.
           </p>
           <div className="hero__cta">
             <button className="btn btn-primary btn-lg" onClick={onAuth}>Start bidding — it's free</button>
@@ -28,7 +28,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
           <div className="hero__trust">
             <span>Settles in USDC</span><span className="d" />
             <span>Built on Solana</span><span className="d" />
-            <span>5% of sales buy back $BID</span>
+            <span>4% of sales buy back $BID</span>
           </div>
         </div>
       </section>
@@ -74,8 +74,8 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="how">
           {[
             { ic: Bolt, t: 'Bid live on stream', d: 'Place real USDC bids during the break. Anti-snipe keeps every auction fair to the buzzer.' },
-            { ic: Truck, t: 'Win it, we ship it', d: 'Your funds sit in escrow until the seller ships and the card lands in your hands.' },
-            { ic: Wallet, t: '5% buys back $BID', d: <>Every shipped sale routes a cut to the <b>$BID</b> buyback — the more cards move, the more it pumps.</> },
+            { ic: Truck, t: 'Win it, we ship it', d: 'Your funds sit in escrow until the seller ships and the item lands in your hands.' },
+            { ic: Wallet, t: '4% buys back $BID', d: <>Every shipped sale routes <b>4%</b> to the $BID buyback and <b>1%</b> to a buyer-protection treasury — the more items move, the more it pumps.</> },
           ].map((s) => (
             <div className="how__step" key={s.t}>
               <span className="how__ic"><s.ic width={22} height={22} /></span>

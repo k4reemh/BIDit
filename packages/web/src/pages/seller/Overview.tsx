@@ -26,7 +26,7 @@ export default function Overview() {
     { label: 'Gross sales', value: money(gmv), sub: `${orders.length} orders` },
     { label: 'Available balance', value: `$${session.available}`, sub: 'USDC' },
     { label: 'Live now', value: String(live), sub: `${queued} queued` },
-    { label: '→ $BID buyback', value: money(bid), sub: '5% of sales' },
+    { label: '→ $BID buyback', value: money(bid), sub: '4% of sales' },
   ];
 
   const actions = [

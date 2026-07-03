@@ -23,7 +23,7 @@ const NAV = [
 const PERKS = [
   'Run live auctions + randomizer wheels right on your pump.fun stream',
   'Get paid in USDC — funds held in escrow until the card ships',
-  'Every sale routes 5% into the $BID buyback',
+  'Every sale routes 4% into the $BID buyback + 1% to a buyer-protection treasury',
 ];
 
 export default function SellerLayout({
