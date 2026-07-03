@@ -10,12 +10,13 @@
  * EscrowProvider moves the money; this module owns the status transitions and the
  * timers. Funds are simulated in v1.
  */
-import { AuctionStatus, OrderStatus, ListingStatus, splitAmount } from '@bidit/shared';
+import { AuctionStatus, OrderStatus, ListingStatus, splitAmount, formatUsdc } from '@bidit/shared';
 import type { Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
 import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
+import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
 
@@ -179,6 +180,17 @@ export async function settleAuctionDirect(
   // If both sides opted into weekly bundling, fold it into this week's shipment
   // (charging shipping once, on the first win of the week).
   await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
+
+  const price = `$${formatUsdc(amount)}`;
+  const title = auction.listing.title;
+  await notify(
+    { userId: buyerId, kind: 'won', title: `You won ${title}`, body: `Winning bid ${price}. Go to Ready to ship to send it your way.`, href: '/ship' },
+    prisma,
+  );
+  await notify(
+    { userId: sellerId, kind: 'sold', title: `You sold ${title}`, body: `Winning bid ${price}. You'll get a shipment to fulfill once the buyer pays shipping.`, href: '/seller/shipments' },
+    prisma,
+  );
 
   return created;
 }

@@ -70,6 +70,7 @@ import {
   ShippingError,
   type ShipMode,
 } from '../src/fulfillment.js';
+import { listNotifications, markAllRead } from '../src/notifications.js';
 import { systemClock } from '../src/clock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -357,6 +358,19 @@ async function main() {
         await realtime.notifyBalance(userId);
         const accountId = await getOrCreateUserAccount(userId, prisma);
         return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
+      }
+
+      // ---- notifications ----
+      if (req.method === 'GET' && p === '/me/notifications') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await listNotifications(userId, prisma));
+      }
+      if (req.method === 'POST' && p === '/me/notifications/read') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await markAllRead(userId, prisma);
+        return send(res, 200, await listNotifications(userId, prisma));
       }
 
       // ---- fulfillment (buyer) ----

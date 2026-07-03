@@ -3,7 +3,8 @@ import { NavLink, Link } from 'react-router-dom';
 import Logo from './Logo';
 import Avatar from './Avatar';
 import ProfileMenu from './ProfileMenu';
-import { Search, Chat, Bell, Gift, XLogo, Chevron, Wallet } from '../icons';
+import NotificationBell from './NotificationBell';
+import { Search, Chat, Gift, XLogo, Chevron, Wallet } from '../icons';
 import type { User } from '../App';
 
 export default function TopNav({
@@ -49,7 +50,7 @@ export default function TopNav({
             <>
               <Link className="nav__bal" to="/deposit" title="Your wallet balance"><Wallet width={15} height={15} /> ${user.settled}</Link>
               <button className="icon-btn" aria-label="Messages"><Chat /></button>
-              <button className="icon-btn" aria-label="Notifications"><Bell /><span className="badge-dot" /></button>
+              <NotificationBell />
               <button className="icon-btn" aria-label="Rewards"><Gift /></button>
               <button className="nav__avatar" onClick={() => setMenu((v) => !v)} aria-label="Account">
                 <Avatar handle={user.handle} size={36} />

@@ -12,6 +12,7 @@ import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
 import { quoteShipping, privacyPremium, type ShipLocation } from './shipping.js';
+import { notify } from './notifications.js';
 
 const DAY_MS = 86_400_000;
 export const SHIP_LATER_HOLD_MS = 7 * DAY_MS;
@@ -303,7 +304,7 @@ export async function markShipmentShipped(
       data: { closedAt: now },
     });
   }
-  return prisma.shipment.update({
+  const updated = await prisma.shipment.update({
     where: { id: s.id },
     data: {
       status: 'SHIPPED',
@@ -312,6 +313,9 @@ export async function markShipmentShipped(
       shippedAt: now,
     },
   });
+  const track = updated.trackingNumber ? `Tracking: ${updated.carrier ? `${updated.carrier} · ` : ''}${updated.trackingNumber}` : 'Your package is on the way.';
+  await notify({ userId: s.buyerId, kind: 'shipped', title: 'Your order shipped', body: track, href: '/ship' }, prisma);
+  return updated;
 }
 
 /** Mark a shipment delivered (buyer confirm or seller/ops). SHIPPED -> DELIVERED. */

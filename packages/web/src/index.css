@@ -1011,3 +1011,16 @@ img { display: block; max-width: 100%; }
 .ship-addr { margin: 4px 0 12px; }
 .ship-addr__body { display: flex; flex-direction: column; line-height: 1.4; font-size: 13.5px; margin-top: 3px; }
 .ship-addr__body b { font-size: 14px; }
+
+/* ---- notification bell ---- */
+.nbell { position: relative; display: inline-flex; }
+.nbell__badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: #ef3b4e; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.nbell__menu { position: absolute; right: 0; top: calc(100% + 8px); width: 320px; max-height: 60vh; overflow: auto; background: var(--surface, #fff); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 42px rgba(0,0,0,.16); z-index: 60; padding: 6px; }
+.nbell__head { font-weight: 700; font-size: 13px; padding: 8px 10px 6px; color: var(--muted); }
+.nbell__empty { padding: 18px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+.nbell__item { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 10px; padding: 9px 10px; cursor: pointer; }
+.nbell__item:hover { background: var(--surface-2, #f3f4f7); }
+.nbell__item.unread { background: rgba(109,40,217,.06); }
+.nbell__title { font-size: 13px; font-weight: 650; }
+.nbell__body { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.nbell__time { font-size: 11px; color: var(--muted); margin-top: 3px; }

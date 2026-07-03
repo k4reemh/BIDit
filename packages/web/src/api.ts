@@ -260,6 +260,23 @@ export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
 export const shipShipment = (shipmentId: string, trackingNumber?: string, carrier?: string) =>
   req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId, trackingNumber, carrier }) });
 
+// ---- notifications ---------------------------------------------------------
+export interface Notif {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  read: boolean;
+  createdAt: number;
+}
+export interface Notifs {
+  unread: number;
+  items: Notif[];
+}
+export const getNotifications = () => req<Notifs>('/me/notifications');
+export const markNotificationsRead = () => req<Notifs>('/me/notifications/read', { method: 'POST', body: '{}' });
+
 // ---- deposits / withdrawals ------------------------------------------------
 export const refreshMe = () => req<Session>('/me');
 export const simulateDeposit = (amount: string) =>
