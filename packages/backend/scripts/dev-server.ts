@@ -58,6 +58,17 @@ import {
   processOrderTimers,
   type DisputeOutcome,
 } from '../src/orders.js';
+import {
+  getBuyerFulfillment,
+  getSellerShipments,
+  shipmentItems,
+  createAndPayShipment,
+  markShipmentShipped,
+  markShipmentDelivered,
+  discardItem,
+  ShippingError,
+  type ShipMode,
+} from '../src/fulfillment.js';
 import { systemClock } from '../src/clock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -168,6 +179,15 @@ async function main() {
       walletAddress: user.walletAddress,
       verified: profile?.verified === true,
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
+      shipping: {
+        originCountry: profile?.originCountry ?? null,
+        originRegion: profile?.originRegion ?? null,
+        originCity: profile?.originCity ?? null,
+        originPostal: profile?.originPostal ?? null,
+        weeklyBundling: profile?.weeklyBundling ?? false,
+        shipLater: profile?.shipLater ?? false,
+        privateShipping: profile?.privateShipping ?? false,
+      },
       depositAddress: await ensureDepositAddress(userId, chain, prisma),
       cluster: chain.cluster, // 'mock' | 'devnet' | 'mainnet-beta' — drives the deposit UI
       available: account ? formatUsdc(await getAvailableBalance(account.id, prisma)) : '0',
@@ -331,6 +351,60 @@ async function main() {
         return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
       }
 
+      // ---- fulfillment (buyer) ----
+      if (req.method === 'GET' && p === '/me/fulfillment') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await buyerFulfillmentDto(userId));
+      }
+      if (req.method === 'POST' && p === '/shipments') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const itemIds = Array.isArray(b.itemIds) ? (b.itemIds as unknown[]).map(String) : [];
+        try {
+          const shipment = await createAndPayShipment(
+            { buyerId: userId, itemIds, mode: b.mode as ShipMode | undefined, private: b.private === true },
+            systemClock,
+            prisma,
+          );
+          await realtime.notifyBalance(userId);
+          return send(res, 200, await shipmentDto(shipment.id));
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          if (err instanceof InsufficientFundsError) {
+            return send(res, 400, { error: 'Not enough balance to cover shipping.' });
+          }
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/shipment/discard') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await discardItem(String(b.itemId ?? ''), userId, systemClock, prisma);
+          return send(res, 200, await buyerFulfillmentDto(userId));
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/shipment/confirm-received') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const s = await prisma.shipment.findUnique({ where: { id: String(b.shipmentId ?? '') } });
+        if (!s || s.buyerId !== userId) return send(res, 404, { error: 'Shipment not found.' });
+        try {
+          await markShipmentDelivered(s.id, systemClock, prisma);
+          return send(res, 200, await buyerFulfillmentDto(userId));
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+
       // ---- seller ----
       if (req.method === 'POST' && p === '/seller/apply') {
         const userId = authUser(req);
@@ -349,6 +423,54 @@ async function main() {
         const b = await readJson(req);
         await setSellerCoin(userId, String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && p === '/seller/shipping-settings') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+        const data = {
+          originCountry: str(b.originCountry),
+          originRegion: str(b.originRegion),
+          originCity: str(b.originCity),
+          originPostal: str(b.originPostal),
+          weeklyBundling: b.weeklyBundling === true,
+          shipLater: b.shipLater === true,
+          privateShipping: b.privateShipping === true,
+        };
+        await prisma.sellerProfile.upsert({
+          where: { userId },
+          update: data,
+          create: { userId, ...data },
+        });
+        return send(res, 200, await sessionPayload(userId));
+      }
+      if (req.method === 'GET' && p === '/seller/shipments') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const shipments = await getSellerShipments(userId, prisma);
+        return send(res, 200, await Promise.all(shipments.map((s) => shipmentDto(s.id))));
+      }
+      if (req.method === 'POST' && p === '/seller/shipment/ship') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await markShipmentShipped(
+            {
+              shipmentId: String(b.shipmentId ?? ''),
+              sellerId: userId,
+              trackingNumber: b.trackingNumber ? String(b.trackingNumber) : undefined,
+              carrier: b.carrier ? String(b.carrier) : undefined,
+            },
+            systemClock,
+            prisma,
+          );
+          return send(res, 200, await shipmentDto(String(b.shipmentId ?? '')));
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
       }
       if (req.method === 'GET' && p === '/seller/listings') {
         const userId = authUser(req);
@@ -682,6 +804,50 @@ function listingDto(l: {
     quantity: l.quantity,
     imageUrl: l.photos[0] ?? null,
     wheel: wheel.length ? wheel : null,
+  };
+}
+
+async function buyerFulfillmentDto(buyerId: string) {
+  const { items, shipments } = await getBuyerFulfillment(buyerId, prisma);
+  return {
+    items: items.map((it) => ({
+      id: it.id,
+      title: it.title,
+      image: it.photo,
+      weightGrams: it.weightGrams,
+      amount: formatUsdc(it.amount),
+      sellerId: it.sellerId,
+      status: it.status,
+      heldUntil: it.heldUntil ? it.heldUntil.getTime() : null,
+    })),
+    shipments: (await Promise.all(shipments.map((s) => shipmentDto(s.id)))).filter(Boolean),
+  };
+}
+
+/** Shipment DTO. Deliberately omits `privateLeg2` (the buyer's real address on a
+ *  Private shipment) — only the operator sees that, never the seller. */
+async function shipmentDto(shipmentId: string) {
+  const s = await prisma.shipment.findUnique({ where: { id: shipmentId } });
+  if (!s) return null;
+  const [items, seller, buyer] = await Promise.all([
+    shipmentItems(shipmentId, prisma),
+    prisma.user.findUnique({ where: { id: s.sellerId }, select: { handle: true } }),
+    prisma.user.findUnique({ where: { id: s.buyerId }, select: { handle: true } }),
+  ]);
+  return {
+    id: s.id,
+    mode: s.mode,
+    status: s.status,
+    shippingFee: formatUsdc(s.shippingFee),
+    privacyFee: formatUsdc(s.privacyFee),
+    trackingNumber: s.trackingNumber,
+    carrier: s.carrier,
+    shipTo: s.shipTo,
+    sellerHandle: seller?.handle ?? null,
+    buyerHandle: buyer?.handle ?? null,
+    createdAt: s.createdAt.getTime(),
+    shippedAt: s.shippedAt ? s.shippedAt.getTime() : null,
+    items: items.map((it) => ({ id: it.id, title: it.title, image: it.photo, amount: formatUsdc(it.amount) })),
   };
 }
 

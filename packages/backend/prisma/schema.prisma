@@ -126,6 +126,15 @@ model SellerProfile {
   verified            Boolean  @default(false)
   pumpCoinAddress     String?
   payoutWalletAddress String?
+  // Ship-from origin (drives weight/zone rate quotes) + which shipping modes the
+  // seller offers on their page.
+  originCountry       String?
+  originRegion        String?
+  originCity          String?
+  originPostal        String?
+  weeklyBundling      Boolean  @default(false)
+  shipLater           Boolean  @default(false)
+  privateShipping     Boolean  @default(false)
   createdAt           DateTime @default(now())
 }
 
@@ -301,6 +310,57 @@ model Order {
   @@index([status])
   @@index([status, disputeWindowEndsAt])
   @@index([status, noShipDeadline])
+}
+
+/// A physical card a buyer won and must receive. Created on each direct-payout
+/// sale. Snapshots title/photo/weight so the buyer's "Ready to ship" list needs
+/// no joins. Grouped into a Shipment for fulfillment. Plain-string status (see
+/// Giveaway) to stay out of the shared-enum drift test.
+model FulfillmentItem {
+  id          String    @id @default(cuid())
+  orderId     String    @unique
+  buyerId     String
+  sellerId    String
+  listingId   String
+  title       String
+  photo       String?
+  weightGrams Int?
+  amount      BigInt    // item price paid — for display + forfeit accounting
+  status      String    @default("READY_TO_SHIP") // READY_TO_SHIP | IN_SHIPMENT | SHIPPED | DELIVERED | DISCARDED
+  heldUntil   DateTime? // seller physically holds the item until this (ship-later 7d cap)
+  shipmentId  String?
+  discardedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([shipmentId])
+  @@index([status, heldUntil])
+}
+
+/// One package: items from ONE seller to ONE buyer, one shipping fee. All four
+/// shipping modes (standard / weekly bundle / ship-later / private) are just
+/// policies over how items land here and when the fee is charged.
+model Shipment {
+  id             String    @id @default(cuid())
+  buyerId        String
+  sellerId       String
+  mode           String    @default("STANDARD") // STANDARD | WEEKLY_BUNDLE | SHIP_LATER | PRIVATE
+  status         String    @default("PENDING_PAYMENT") // PENDING_PAYMENT | PAID | SHIPPED | DELIVERED | CANCELED
+  shippingFee    BigInt    @default(0)
+  privacyFee     BigInt    @default(0)
+  shipTo         Json      // address snapshot the seller ships to (operator hub when PRIVATE)
+  privateLeg2    Json?     // buyer's real address for the operator's reship leg (PRIVATE only)
+  trackingNumber String?
+  carrier        String?
+  paidAt         DateTime?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  canceledAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
 }
 
 // Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid

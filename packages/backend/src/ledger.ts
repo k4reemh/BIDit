@@ -403,6 +403,68 @@ export async function settleDirectSale(
   }
 }
 
+/**
+ * Charge a buyer for a shipment: buyer -> seller (they pay the carrier), with an
+ * optional platform cut (the flat privacy premium on Private Secure Shipping,
+ * which the operator uses to fund the reship leg). Paid from AVAILABLE balance
+ * (funds locked in active bids stay put). Idempotent per shipment. All legs sum
+ * to zero. Reuses existing ledger types to stay out of the enum drift test.
+ */
+export async function settleShipping(
+  params: {
+    buyerAccountId: string;
+    sellerAccountId: string;
+    /** To the seller (carrier cost). */
+    sellerAmount: Micros;
+    /** To the PLATFORM account (privacy premium); 0/undefined for normal shipping. */
+    platformAmount?: Micros;
+    shipmentId: string;
+  },
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const platformAmount = params.platformAmount ?? 0n;
+  const total = params.sellerAmount + platformAmount;
+  assertPositive(total);
+  const key = `shipping:${params.shipmentId}`;
+  if (await alreadyApplied(key, prisma)) return;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await lockAccount(tx, params.buyerAccountId);
+      const available = await availableWithinTx(tx, params.buyerAccountId);
+      if (available < total) {
+        throw new InsufficientFundsError(params.buyerAccountId, available, total);
+      }
+      await postEntries(tx, [
+        {
+          accountId: params.buyerAccountId,
+          amount: -total,
+          type: LedgerType.PURCHASE_DEBIT,
+          refType: LedgerRefType.TRANSFER,
+          refId: params.shipmentId,
+          idempotencyKey: key,
+        },
+        {
+          accountId: params.sellerAccountId,
+          amount: params.sellerAmount,
+          type: LedgerType.PAYOUT_CREDIT,
+          refType: LedgerRefType.TRANSFER,
+          refId: params.shipmentId,
+        },
+        {
+          accountId: SYSTEM_ACCOUNT_IDS.PLATFORM,
+          amount: platformAmount,
+          type: LedgerType.PLATFORM_FEE,
+          refType: LedgerRefType.TRANSFER,
+          refId: params.shipmentId,
+        },
+      ]);
+    }, TX_OPTS);
+  } catch (err) {
+    if (isUniqueViolation(err)) return;
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Escrow ledger primitives (used by DevWalletEscrow)
 // ---------------------------------------------------------------------------

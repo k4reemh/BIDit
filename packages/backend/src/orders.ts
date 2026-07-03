@@ -15,6 +15,7 @@ import type { Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
+import { createFulfillmentItem } from './fulfillment.js';
 import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
 
@@ -113,7 +114,7 @@ export async function settleAuctionDirect(
 
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { listing: { select: { sellerId: true, id: true } } },
+    include: { listing: { select: { sellerId: true, id: true, title: true, photos: true, weightGrams: true } } },
   });
   if (
     !auction ||
@@ -159,6 +160,22 @@ export async function settleAuctionDirect(
     where: { id: auction.listing.id },
     data: { status: listing.quantity > 0 ? ListingStatus.QUEUED : ListingStatus.SOLD },
   });
+
+  // Physical fulfillment: the won card enters the buyer's "Ready to ship" list.
+  await createFulfillmentItem(
+    {
+      orderId: created.id,
+      buyerId,
+      sellerId,
+      listingId: auction.listing.id,
+      title: auction.listing.title,
+      photo: auction.listing.photos[0] ?? null,
+      weightGrams: auction.listing.weightGrams,
+      amount,
+    },
+    clock,
+    prisma,
+  );
 
   return created;
 }
