@@ -4,32 +4,35 @@
     <meta charset="utf-8" />
     <title>BIDit</title>
     <style>
-      :root { color-scheme: dark; }
+      :root { color-scheme: light; }
       * { box-sizing: border-box; }
       body {
         margin: 0; width: 300px; padding: 14px;
         font: 14px/1.45 -apple-system, system-ui, sans-serif;
-        background: #0e121a; color: #e6e9ef;
+        background: #ffffff; color: #0b2447;
       }
-      h1 { font-size: 17px; margin: 0 0 2px; }
-      h1 b { color: #3b82f6; }
-      .muted { color: #8b94a7; font-size: 12px; }
+      h1 { font-size: 17px; margin: 0 0 2px; color: #0b2447; }
+      h1 b { color: #ff6a00; }
+      .muted { color: #5c6e88; font-size: 12px; }
       .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
       input {
-        flex: 1; min-width: 0; background: #0b0e14; border: 1px solid #2a3340;
-        color: #e6e9ef; border-radius: 8px; padding: 9px 11px; font-size: 14px;
+        flex: 1; min-width: 0; background: #f1f5fb; border: 1px solid rgba(11,36,71,0.12);
+        color: #0b2447; border-radius: 8px; padding: 9px 11px; font-size: 14px;
       }
+      input:focus { outline: none; border-color: #ff6a00; box-shadow: 0 0 0 3px rgba(255,106,0,0.14); }
       button {
-        background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
-        padding: 9px 13px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+        background: #ff6a00; color: #fff; border: 0; border-radius: 8px;
+        padding: 9px 13px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
       }
-      button.secondary { background: #2a3340; }
-      .card { background: #151a23; border: 1px solid #232a36; border-radius: 10px; padding: 12px; margin-top: 12px; }
+      button:hover { background: #e85d00; }
+      button.secondary { background: #eef2f8; color: #0b2447; }
+      button.secondary:hover { background: #e2e9f3; }
+      .card { background: #ffffff; border: 1px solid rgba(11,36,71,0.12); border-radius: 10px; padding: 12px; margin-top: 12px; }
       .conn { display: flex; align-items: center; gap: 7px; font-size: 13px; }
-      .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
-      .dot.on { background: #34d399; } .dot.off { background: #f87171; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #e0a012; }
+      .dot.on { background: #0e9f6e; } .dot.off { background: #ef3b4e; }
       .bal { display: flex; justify-content: space-between; margin-top: 10px; font-variant-numeric: tabular-nums; }
-      .bal b { font-size: 16px; }
+      .bal b { font-size: 16px; color: #0b2447; }
       .hidden { display: none; }
     </style>
   </head>

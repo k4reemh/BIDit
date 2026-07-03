@@ -48,18 +48,18 @@ const CSS = `
   border-radius: 24px; color: #eaf0fb; font-family: "Inter", -apple-system, system-ui, sans-serif;
   background: rgba(11,14,20,0.96);
   border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 30px 90px rgba(0,0,0,0.6), 0 0 80px rgba(34,224,161,0.22);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.6), 0 0 80px rgba(255,106,0,0.20);
   animation: pop 0.5s cubic-bezier(0.18,0.9,0.3,1.3) both;
 }
-.brand { font-weight: 800; font-size: 16px; }
-.brand .b { background: linear-gradient(90deg, #22e0a1, #4f8cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand { font-weight: 800; font-size: 16px; color: #ff6a00; }
+.brand .b { color: #ffffff; }
 .kicker { margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #8a93a7; }
 .who { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 20px; font-weight: 800; }
 .window { position: relative; height: ${ROW_H * WINDOW_ROWS}px; margin-top: 16px; border-radius: 16px; overflow: hidden;
   background: #070a10; border: 1px solid rgba(255,255,255,0.07); }
 .band { position: absolute; left: 10px; right: 10px; top: ${ROW_H * CENTER_SLOT}px; height: ${ROW_H}px;
-  border-radius: 12px; background: linear-gradient(90deg, rgba(34,224,161,0.14), rgba(79,140,255,0.14));
-  border: 1.5px solid rgba(34,224,161,0.5); box-shadow: 0 0 26px rgba(34,224,161,0.18) inset; z-index: 2; pointer-events: none; }
+  border-radius: 12px; background: linear-gradient(90deg, rgba(255,106,0,0.16), rgba(255,138,60,0.16));
+  border: 1.5px solid rgba(255,106,0,0.55); box-shadow: 0 0 26px rgba(255,106,0,0.20) inset; z-index: 2; pointer-events: none; }
 .band.land { animation: land 0.5s ease; }
 .strip { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
 .row { height: ${ROW_H}px; display: flex; align-items: center; gap: 12px; padding: 0 22px; box-sizing: border-box; }
@@ -72,12 +72,12 @@ const CSS = `
 .prize { height: 26px; margin-top: 14px; font-size: 17px; font-weight: 900; opacity: 0; }
 .prize.show { animation: rise 0.5s cubic-bezier(0.16,0.95,0.28,1) forwards; }
 .fair { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #8a93a7; }
-.fair i { width: 6px; height: 6px; border-radius: 50%; background: #22e0a1; }
-.fair code { color: #9cc0ff; font-family: ui-monospace, SFMono-Regular, monospace; }
+.fair i { width: 6px; height: 6px; border-radius: 50%; background: #ff6a00; }
+.fair code { color: #cbd5e1; font-family: ui-monospace, SFMono-Regular, monospace; }
 .card.out { animation: out 0.45s ease forwards; }
 @keyframes pop { 0% { transform: scale(0.7) translateY(20px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 @keyframes out { to { transform: scale(0.96) translateY(8px); opacity: 0; } }
-@keyframes land { 0% { transform: scale(1); } 40% { transform: scale(1.04); box-shadow: 0 0 40px rgba(34,224,161,0.6) inset; } 100% { transform: scale(1); } }
+@keyframes land { 0% { transform: scale(1); } 40% { transform: scale(1.04); box-shadow: 0 0 40px rgba(255,106,0,0.6) inset; } 100% { transform: scale(1); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 `;
 
