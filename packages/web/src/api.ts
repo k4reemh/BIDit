@@ -31,6 +31,7 @@ export interface Session {
   avatarUrl: string | null;
   bio: string | null;
   shippingAddress: ShippingAddress | null;
+  bundleShipping?: boolean;
   depositAddress: string | null;
   cluster?: 'mock' | 'devnet' | 'mainnet-beta';
   interests: string[];
@@ -74,6 +75,7 @@ export async function updateMe(patch: {
   avatarUrl?: string;
   bio?: string;
   shippingAddress?: ShippingAddress | null;
+  bundleShipping?: boolean;
 }): Promise<Session> {
   return req<Session>('/me', { method: 'PATCH', body: JSON.stringify(patch) });
 }

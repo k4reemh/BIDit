@@ -7,6 +7,7 @@ import {
   discardFulfillmentItem,
   confirmReceived,
   refreshMe,
+  updateMe,
   type Fulfillment,
   type FulfillmentItem,
   type Shipment,
@@ -16,12 +17,16 @@ import { Truck, Check } from '../../icons';
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 export default function ShipItems() {
-  const { setSession } = useAccount();
+  const { session, setSession } = useAccount();
   const [data, setData] = useState<Fulfillment | null>(null);
   const [error, setError] = useState('');
 
   const load = () => getFulfillment().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
   useEffect(() => { void load(); }, []);
+
+  const toggleBundle = async () => {
+    setSession(await updateMe({ bundleShipping: !session.bundleShipping }));
+  };
 
   // Group ready-to-ship items by seller — a shipment can only hold one seller's items.
   const bySeller = new Map<string, FulfillmentItem[]>();
@@ -43,6 +48,11 @@ export default function ShipItems() {
         <h1 className="display acct-title">Ready to ship</h1>
         <p className="muted">Cards you’ve won and are being held for you. Ship them whenever you like — bundle a seller’s items to pay shipping once.</p>
       </div>
+
+      <label className="ship-priv card acct-card" style={{ alignItems: 'center', padding: '12px 14px' }}>
+        <input type="checkbox" checked={session.bundleShipping ?? false} onChange={toggleBundle} />
+        <span><b>Weekly bundling</b> — where a seller offers it, pay shipping just once a week and get all that week’s wins in one package.</span>
+      </label>
 
       {error && <div className="auth__error">{error}</div>}
 

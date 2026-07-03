@@ -104,6 +104,7 @@ model User {
   avatarUrl     String?
   bio           String?
   shippingAddress Json?
+  bundleShipping Boolean @default(false) // opt-in: bundle shipping weekly per seller (where offered)
   interests     String[] @default([])
   onboarded     Boolean  @default(false)
   walletAddress String?  @unique
@@ -361,6 +362,38 @@ model Shipment {
 
   @@index([buyerId, status])
   @@index([sellerId, status])
+}
+
+/// Weekly bundling: while a buyer has an open pass with a seller, that week's
+/// wins ride the same Shipment for free (shipping charged once, at the first win
+/// of the week — see decision log). Closed when the seller ships the bundle.
+model WeeklyShippingPass {
+  id         String    @id @default(cuid())
+  buyerId    String
+  sellerId   String
+  shipmentId String
+  weekStart  DateTime  @default(now())
+  expiresAt  DateTime
+  closedAt   DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([buyerId, sellerId, closedAt])
+}
+
+/// In-app notification (also emailed via Resend for key events). Plain-string
+/// kind to stay out of the shared-enum drift test.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 // Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid

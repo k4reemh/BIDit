@@ -122,7 +122,7 @@ export async function loginWithEmail(
 /** Update a user's editable profile fields. */
 export async function updateProfile(
   userId: string,
-  patch: { displayName?: string; avatarUrl?: string; bio?: string; shippingAddress?: unknown },
+  patch: { displayName?: string; avatarUrl?: string; bio?: string; shippingAddress?: unknown; bundleShipping?: boolean },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User> {
   return prisma.user.update({
@@ -134,6 +134,7 @@ export async function updateProfile(
       ...(patch.shippingAddress !== undefined
         ? { shippingAddress: (patch.shippingAddress ?? null) as Prisma.InputJsonValue }
         : {}),
+      ...(patch.bundleShipping !== undefined ? { bundleShipping: patch.bundleShipping } : {}),
     },
   });
 }

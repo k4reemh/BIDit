@@ -66,6 +66,7 @@ import {
   markShipmentShipped,
   markShipmentDelivered,
   discardItem,
+  processFulfillmentTimers,
   ShippingError,
   type ShipMode,
 } from '../src/fulfillment.js';
@@ -149,6 +150,11 @@ async function main() {
     void realtime.notifyBalance(userId).catch(() => {}),
   );
   depositWatcher.start();
+  // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
+  const fulfillmentTimer = setInterval(() => {
+    void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
+  }, 10 * 60_000);
+  fulfillmentTimer.unref?.();
 
   // Dev endpoints (password-less login, balance minting, seeders) are ON only for
   // the local mock chain, OFF on any real chain unless explicitly forced.
@@ -173,6 +179,7 @@ async function main() {
       avatarUrl: user.avatarUrl,
       bio: user.bio,
       shippingAddress: user.shippingAddress,
+      bundleShipping: user.bundleShipping,
       interests: user.interests,
       onboarded: user.onboarded,
       role: user.role,
@@ -268,6 +275,7 @@ async function main() {
             avatarUrl: typeof b.avatarUrl === 'string' ? b.avatarUrl : undefined,
             bio: typeof b.bio === 'string' ? b.bio : undefined,
             shippingAddress: 'shippingAddress' in b ? b.shippingAddress : undefined,
+            bundleShipping: typeof b.bundleShipping === 'boolean' ? b.bundleShipping : undefined,
           },
           prisma,
         );

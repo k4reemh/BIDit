@@ -85,6 +85,92 @@ export async function createFulfillmentItem(
   }
 }
 
+/**
+ * Weekly bundling: if the buyer opted in AND the seller offers it, the just-won
+ * item joins a weekly Shipment instead of sitting in Ready-to-Ship.
+ *  - First win of the week: open a WEEKLY_BUNDLE shipment, charge shipping ONCE
+ *    (decision), attach the item, open a pass (7-day week).
+ *  - Later wins that week: attach free to the open pass's shipment.
+ * Best-effort — any precondition miss (no address, insufficient funds) silently
+ * falls back to Standard (the item just stays Ready-to-Ship). Runs after the item
+ * is created, inside the sale settlement.
+ */
+export async function applyWeeklyBundling(
+  params: { orderId: string; buyerId: string; sellerId: string },
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const [buyer, sellerProfile, item] = await Promise.all([
+    prisma.user.findUnique({ where: { id: params.buyerId } }),
+    prisma.sellerProfile.findUnique({ where: { userId: params.sellerId } }),
+    prisma.fulfillmentItem.findUnique({ where: { orderId: params.orderId } }),
+  ]);
+  if (!buyer?.bundleShipping || !sellerProfile?.weeklyBundling) return;
+  if (!item || item.status !== 'READY_TO_SHIP') return;
+
+  const now = clock.now();
+  const open = await prisma.weeklyShippingPass.findFirst({
+    where: { buyerId: params.buyerId, sellerId: params.sellerId, closedAt: null, expiresAt: { gt: now } },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (open) {
+    // Ride the existing week free.
+    await prisma.fulfillmentItem.update({
+      where: { id: item.id },
+      data: { status: 'IN_SHIPMENT', shipmentId: open.shipmentId },
+    });
+    return;
+  }
+
+  // First win of the week — needs an address to ship to and funds for shipping.
+  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  if (!dest || !dest.line1 || !dest.country) return; // fall back to Standard
+  const origin: ShipLocation = {
+    country: sellerProfile.originCountry,
+    region: sellerProfile.originRegion,
+    city: sellerProfile.originCity,
+    postal: sellerProfile.originPostal,
+  };
+  const fee = quoteShipping(origin, dest, item.weightGrams ?? DEFAULT_WEIGHT_G);
+
+  const shipment = await prisma.shipment.create({
+    data: {
+      buyerId: params.buyerId,
+      sellerId: params.sellerId,
+      mode: 'WEEKLY_BUNDLE',
+      status: 'PENDING_PAYMENT',
+      shippingFee: fee,
+      shipTo: dest as Prisma.InputJsonValue,
+    },
+  });
+  const [buyerAccountId, sellerAccountId] = await Promise.all([
+    getOrCreateUserAccount(params.buyerId, prisma),
+    getOrCreateUserAccount(params.sellerId, prisma),
+  ]);
+  try {
+    await settleShipping({ buyerAccountId, sellerAccountId, sellerAmount: fee, shipmentId: shipment.id }, prisma);
+  } catch {
+    // Can't afford shipping right now — undo and fall back to Standard.
+    await prisma.shipment.delete({ where: { id: shipment.id } }).catch(() => {});
+    return;
+  }
+  await prisma.shipment.update({ where: { id: shipment.id }, data: { status: 'PAID', paidAt: now } });
+  await prisma.fulfillmentItem.update({
+    where: { id: item.id },
+    data: { status: 'IN_SHIPMENT', shipmentId: shipment.id },
+  });
+  await prisma.weeklyShippingPass.create({
+    data: {
+      buyerId: params.buyerId,
+      sellerId: params.sellerId,
+      shipmentId: shipment.id,
+      weekStart: now,
+      expiresAt: new Date(now.getTime() + SHIP_LATER_HOLD_MS),
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
@@ -209,6 +295,14 @@ export async function markShipmentShipped(
   if (s.status !== 'PAID') throw new ShippingError(`Can’t ship a shipment that is ${s.status}.`);
   const now = clock.now();
   await prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
+  // Shipping a weekly bundle closes the week — the buyer's next win starts a fresh
+  // pass (and a fresh shipping charge).
+  if (s.mode === 'WEEKLY_BUNDLE') {
+    await prisma.weeklyShippingPass.updateMany({
+      where: { shipmentId: s.id, closedAt: null },
+      data: { closedAt: now },
+    });
+  }
   return prisma.shipment.update({
     where: { id: s.id },
     data: {
