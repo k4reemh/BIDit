@@ -3,7 +3,7 @@ import { ListingStatus, normalizeWheelEntries, type Micros, type WheelEntry } fr
 import { Prisma, type Listing } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
-import { requireVerifiedSeller } from './authz.js';
+import { requireSeller } from './authz.js';
 
 export interface CreateListingInput {
   title: string;
@@ -21,7 +21,7 @@ export async function createListing(
   input: CreateListingInput,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Listing> {
-  await requireVerifiedSeller(sellerId, prisma);
+  await requireSeller(sellerId, prisma);
   const quantity = Math.max(1, Math.floor(input.quantity ?? 1));
   return prisma.listing.create({
     data: {
@@ -58,7 +58,7 @@ export async function setListingWheel(
   rawEntries: unknown,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<WheelEntry[]> {
-  await requireVerifiedSeller(sellerId, prisma);
+  await requireSeller(sellerId, prisma);
   const listing = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
   if (listing.sellerId !== sellerId) throw new Error('not your listing');
   if (listing.status !== ListingStatus.QUEUED) {

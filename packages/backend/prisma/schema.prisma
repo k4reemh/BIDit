@@ -124,7 +124,18 @@ model SellerProfile {
   id                  String   @id @default(cuid())
   userId              String   @unique
   user                User     @relation(fields: [userId], references: [id])
-  verified            Boolean  @default(false)
+  // A seller is active as soon as they apply, but stays UNVERIFIED until they
+  // fulfill 10 orders (or an admin verifies them). `verified` is the trust badge,
+  // NOT a gate on selling.
+  verified            Boolean   @default(false)
+  verifiedAt          DateTime?
+  verifiedBy          String?   // 'auto' (10 orders) | admin userId
+  appliedAt           DateTime?
+  onboardedSeller     Boolean   @default(false)
+  // Seller application / shop profile.
+  website             String?
+  socials             Json?     // { x?, instagram?, tiktok?, youtube? }
+  pitch               String?   // what they sell, in their words
   pumpCoinAddress     String?
   payoutWalletAddress String?
   // Ship-from origin (drives weight/zone rate quotes) + which shipping modes the
@@ -133,10 +144,10 @@ model SellerProfile {
   originRegion        String?
   originCity          String?
   originPostal        String?
-  weeklyBundling      Boolean  @default(false)
-  shipLater           Boolean  @default(false)
-  privateShipping     Boolean  @default(false)
-  createdAt           DateTime @default(now())
+  weeklyBundling      Boolean   @default(false)
+  shipLater           Boolean   @default(false)
+  privateShipping     Boolean   @default(false)
+  createdAt           DateTime  @default(now())
 }
 
 /// One per user (USER kind), plus two singleton system accounts (PLATFORM,

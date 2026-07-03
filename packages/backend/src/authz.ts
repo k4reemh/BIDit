@@ -174,6 +174,7 @@ export async function findOrCreateByHandle(
   return user;
 }
 
+/** The trust badge (earned at 10 fulfilled orders or granted by an admin). */
 export async function isVerifiedSeller(
   userId: string,
   prisma: PrismaClient = defaultPrisma,
@@ -182,19 +183,23 @@ export async function isVerifiedSeller(
   return profile?.verified === true;
 }
 
-export async function requireVerifiedSeller(
-  userId: string,
-  prisma: PrismaClient = defaultPrisma,
-): Promise<void> {
-  if (!(await isVerifiedSeller(userId, prisma))) {
-    throw new ForbiddenError('A verified seller account is required for this action');
+/** An ACTIVE seller = has applied (has a SellerProfile). This is the gate on
+ *  selling; `verified` is only the badge. */
+export async function isSeller(userId: string, prisma: PrismaClient = defaultPrisma): Promise<boolean> {
+  return !!(await prisma.sellerProfile.findUnique({ where: { userId }, select: { userId: true } }));
+}
+
+export async function requireSeller(userId: string, prisma: PrismaClient = defaultPrisma): Promise<void> {
+  if (!(await isSeller(userId, prisma))) {
+    throw new ForbiddenError('A seller account is required for this action');
   }
 }
 
 /**
- * Turn a user into a seller. In production this is gated behind KYC + admin
- * review; for the dev/beta build it auto-verifies so the seller dashboard is
- * usable end-to-end.
+ * Become a seller. Auto-approved: the SellerProfile is created immediately so
+ * they can list and go live right away — but UNVERIFIED (no badge) until they
+ * fulfill 10 orders or an admin verifies them. Never clobbers an admin's role,
+ * and re-applying never un-verifies.
  */
 export async function applyAsSeller(
   userId: string,
@@ -202,18 +207,67 @@ export async function applyAsSeller(
 ): Promise<User> {
   await prisma.sellerProfile.upsert({
     where: { userId },
-    update: { verified: true },
-    create: { userId, verified: true },
+    update: {},
+    create: { userId, verified: false, appliedAt: new Date() },
   });
-  return prisma.user.update({ where: { id: userId }, data: { role: Role.seller } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  if (user.role === Role.buyer) {
+    return prisma.user.update({ where: { id: userId }, data: { role: Role.seller } });
+  }
+  return user;
+}
+
+/** Save the seller's onboarding / shop profile and mark onboarding complete. */
+export async function submitSellerOnboarding(
+  userId: string,
+  input: {
+    website?: string;
+    socials?: Record<string, string> | null;
+    pitch?: string;
+    coinAddress?: string;
+    origin?: { country?: string; region?: string; city?: string; postal?: string };
+  },
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const o = input.origin ?? {};
+  const str = (v?: string) => (v && v.trim() ? v.trim() : null);
+  await prisma.sellerProfile.update({
+    where: { userId },
+    data: {
+      onboardedSeller: true,
+      ...(input.website !== undefined ? { website: str(input.website) } : {}),
+      ...(input.socials !== undefined ? { socials: (input.socials ?? null) as Prisma.InputJsonValue } : {}),
+      ...(input.pitch !== undefined ? { pitch: str(input.pitch) } : {}),
+      ...(input.coinAddress !== undefined ? { pumpCoinAddress: str(input.coinAddress) } : {}),
+      ...(input.origin !== undefined
+        ? { originCountry: str(o.country), originRegion: str(o.region), originCity: str(o.city), originPostal: str(o.postal) }
+        : {}),
+    },
+  });
+}
+
+function adminEmails(): string[] {
+  return (process.env.BIDIT_ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** Admin = the `admin` role OR an email in the BIDIT_ADMIN_EMAILS allowlist (so
+ *  the operator can be admin with their normal account, no DB surgery). */
+export async function isAdmin(userId: string, prisma: PrismaClient = defaultPrisma): Promise<boolean> {
+  const user = await getUser(userId, prisma);
+  if (!user) return false;
+  if (user.role === Role.admin) return true;
+  const email = user.email?.toLowerCase();
+  return !!email && adminEmails().includes(email);
 }
 
 export async function requireAdmin(
   userId: string,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
-  const user = await getUser(userId, prisma);
-  if (user?.role !== Role.admin) {
+  if (!(await isAdmin(userId, prisma))) {
     throw new ForbiddenError('Admin access required');
   }
 }

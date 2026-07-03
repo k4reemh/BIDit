@@ -6,7 +6,8 @@ import { startAuctionFromListing } from '../src/sellers.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import {
   requireAdmin,
-  requireVerifiedSeller,
+  applyAsSeller,
+  isVerifiedSeller,
   findOrCreateByWallet,
   findOrCreateByHandle,
   ForbiddenError,
@@ -22,55 +23,57 @@ async function makeAdmin(): Promise<string> {
   return user.id;
 }
 
+/** A seller who has applied (active, but UNVERIFIED — no badge). */
+async function activeSeller(): Promise<string> {
+  const seller = await makeUser('buyer');
+  await applyAsSeller(seller.userId, prisma);
+  return seller.userId;
+}
+
 beforeEach(async () => {
   await resetDb();
 });
 
-describe('seller verification gate', () => {
-  it('blocks unverified sellers from creating listings', async () => {
-    const seller = await makeUser('seller');
+describe('seller gate (applied = can sell; verified = badge)', () => {
+  it('blocks users who have not applied from creating listings', async () => {
+    const buyer = await makeUser('buyer'); // never applied → no SellerProfile
     await expect(
-      createListing(seller.userId, { title: 'Card', startingBid: usdc('5') }, prisma),
+      createListing(buyer.userId, { title: 'Item', startingBid: usdc('5') }, prisma),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('admin verifies a seller, who can then list and run auctions', async () => {
-    const adminId = await makeAdmin();
-    const seller = await makeUser('buyer'); // starts as a plain buyer
-    await verifySeller(adminId, seller.userId, prisma);
+  it('an applied (unverified) seller can list and run auctions', async () => {
+    const sellerId = await activeSeller();
+    expect(await isVerifiedSeller(sellerId, prisma)).toBe(false); // active but no badge yet
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: sellerId } })).role).toBe(Role.seller);
 
-    const updated = await prisma.user.findUniqueOrThrow({ where: { id: seller.userId } });
-    expect(updated.role).toBe(Role.seller);
-    await requireVerifiedSeller(seller.userId, prisma); // no throw
-
-    const listing = await createListing(
-      seller.userId,
-      { title: 'Charizard', startingBid: usdc('5'), photos: ['x.png'] },
-      prisma,
-    );
+    const listing = await createListing(sellerId, { title: 'Charizard', startingBid: usdc('5'), photos: ['x.png'] }, prisma);
     expect(listing.status).toBe(ListingStatus.QUEUED);
 
     const clock = new ManualClock(Date.now());
     const { auctionId, room } = await startAuctionFromListing(listing.id, { durationSeconds: 30 }, clock, prisma);
-    expect(room).toBe(seller.userId);
-    expect((await prisma.auction.findUniqueOrThrow({ where: { id: auctionId } })).status).toBe(
-      AuctionStatus.RUNNING,
-    );
+    expect(room).toBe(sellerId);
+    expect((await prisma.auction.findUniqueOrThrow({ where: { id: auctionId } })).status).toBe(AuctionStatus.RUNNING);
 
     const buyer = await makeFundedUser('100');
     const r = await placeBid({ auctionId, userId: buyer.userId, amount: usdc('5') }, clock, prisma);
     expect(r.ok).toBe(true);
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status).toBe(ListingStatus.LIVE);
+  });
 
-    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).status).toBe(
-      ListingStatus.LIVE,
-    );
+  it('admin can grant the verified badge', async () => {
+    const adminId = await makeAdmin();
+    const sellerId = await activeSeller();
+    expect(await isVerifiedSeller(sellerId, prisma)).toBe(false);
+    await verifySeller(adminId, sellerId, prisma);
+    expect(await isVerifiedSeller(sellerId, prisma)).toBe(true);
+    const p = await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: sellerId } });
+    expect(p.verifiedBy).toBe(adminId);
   });
 
   it("can't start an auction on a non-queued listing", async () => {
-    const adminId = await makeAdmin();
-    const seller = await makeUser('seller');
-    await verifySeller(adminId, seller.userId, prisma);
-    const listing = await createListing(seller.userId, { title: 'Card', startingBid: usdc('5') }, prisma);
+    const sellerId = await activeSeller();
+    const listing = await createListing(sellerId, { title: 'Item', startingBid: usdc('5') }, prisma);
     const clock = new ManualClock(Date.now());
     await startAuctionFromListing(listing.id, {}, clock, prisma); // QUEUED -> LIVE
     await expect(startAuctionFromListing(listing.id, {}, clock, prisma)).rejects.toThrow();
@@ -109,15 +112,8 @@ describe('account resolution', () => {
 });
 
 describe('wheel setup (setListingWheel)', () => {
-  async function verifiedSeller(): Promise<string> {
-    const adminId = await makeAdmin();
-    const seller = await makeUser('buyer');
-    await verifySeller(adminId, seller.userId, prisma);
-    return seller.userId;
-  }
-
-  it('a verified seller attaches a normalized wheel, then clears it', async () => {
-    const sellerId = await verifiedSeller();
+  it('an active seller attaches a normalized wheel, then clears it', async () => {
+    const sellerId = await activeSeller();
     const listing = await createListing(sellerId, { title: 'Roll', startingBid: usdc('5') }, prisma);
 
     const entries = await setListingWheel(
@@ -140,24 +136,24 @@ describe('wheel setup (setListingWheel)', () => {
   });
 
   it("refuses to touch another seller's listing", async () => {
-    const owner = await verifiedSeller();
-    const intruder = await verifiedSeller();
+    const owner = await activeSeller();
+    const intruder = await activeSeller();
     const listing = await createListing(owner, { title: 'X', startingBid: usdc('5') }, prisma);
     await expect(setListingWheel(intruder, listing.id, [{ label: 'A' }], prisma)).rejects.toThrow(/not your listing/);
   });
 
-  it('blocks unverified sellers', async () => {
-    const seller = await makeUser('seller');
+  it('blocks users who have not applied', async () => {
+    const buyer = await makeUser('buyer'); // no SellerProfile
     const listing = await prisma.listing.create({
-      data: { sellerId: seller.userId, title: 'X', photos: [], startingBid: usdc('5'), status: ListingStatus.QUEUED },
+      data: { sellerId: buyer.userId, title: 'X', photos: [], startingBid: usdc('5'), status: ListingStatus.QUEUED },
     });
-    await expect(setListingWheel(seller.userId, listing.id, [{ label: 'A' }], prisma)).rejects.toBeInstanceOf(
+    await expect(setListingWheel(buyer.userId, listing.id, [{ label: 'A' }], prisma)).rejects.toBeInstanceOf(
       ForbiddenError,
     );
   });
 
   it('locks the wheel once the auction starts (must be set up beforehand)', async () => {
-    const sellerId = await verifiedSeller();
+    const sellerId = await activeSeller();
     const listing = await createListing(sellerId, { title: 'X', startingBid: usdc('5') }, prisma);
     await setListingWheel(sellerId, listing.id, [{ label: 'A' }], prisma); // fine while QUEUED
     const clock = new ManualClock(Date.now());

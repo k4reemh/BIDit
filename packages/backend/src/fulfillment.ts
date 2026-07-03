@@ -13,6 +13,7 @@ import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
 import { quoteShipping, privacyPremium, type ShipLocation } from './shipping.js';
 import { notify } from './notifications.js';
+import { maybeVerifySeller } from './seller-verify.js';
 
 const DAY_MS = 86_400_000;
 export const SHIP_LATER_HOLD_MS = 7 * DAY_MS;
@@ -334,6 +335,8 @@ export async function markShipmentShipped(
   });
   const track = updated.trackingNumber ? `Tracking: ${updated.carrier ? `${updated.carrier} · ` : ''}${updated.trackingNumber}` : 'Your package is on the way.';
   await notify({ userId: s.buyerId, kind: 'shipped', title: 'Your order shipped', body: track, href: '/ship' }, prisma);
+  // Fulfilling orders is what earns the Verified badge.
+  await maybeVerifySeller(s.sellerId, prisma);
   return updated;
 }
 

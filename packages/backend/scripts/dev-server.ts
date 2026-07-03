@@ -33,8 +33,11 @@ import {
   updateProfile,
   completeOnboarding,
   applyAsSeller,
+  submitSellerOnboarding,
+  isAdmin,
   AuthError,
 } from '../src/authz.js';
+import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
 import {
   resolveRoomByCoin,
   linkCoinToSeller,
@@ -187,8 +190,18 @@ async function main() {
       onboarded: user.onboarded,
       role: user.role,
       walletAddress: user.walletAddress,
+      // Selling: a SellerProfile means you're an active seller; `verified` is the
+      // trust badge earned at VERIFY_THRESHOLD fulfilled orders (or by an admin).
+      isSeller: profile != null,
+      isAdmin: await isAdmin(userId, prisma),
       verified: profile?.verified === true,
+      sellerOnboarded: profile?.onboardedSeller === true,
+      fulfilledCount: profile ? await sellerFulfilledCount(userId, prisma) : 0,
+      verifyThreshold: VERIFY_THRESHOLD,
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
+      website: profile?.website ?? null,
+      socials: (profile?.socials as Record<string, string> | null) ?? null,
+      pitch: profile?.pitch ?? null,
       shipping: {
         originCountry: profile?.originCountry ?? null,
         originRegion: profile?.originRegion ?? null,
@@ -434,6 +447,26 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         await applyAsSeller(userId, prisma);
+        return send(res, 200, await sessionPayload(userId));
+      }
+      if (req.method === 'POST' && p === '/seller/onboarding') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        await submitSellerOnboarding(
+          userId,
+          {
+            website: typeof b.website === 'string' ? b.website : undefined,
+            socials: b.socials && typeof b.socials === 'object' ? (b.socials as Record<string, string>) : undefined,
+            pitch: typeof b.pitch === 'string' ? b.pitch : undefined,
+            coinAddress: typeof b.coinAddress === 'string' ? b.coinAddress : undefined,
+            origin:
+              b.origin && typeof b.origin === 'object'
+                ? (b.origin as { country?: string; region?: string; city?: string; postal?: string })
+                : undefined,
+          },
+          prisma,
+        );
         return send(res, 200, await sessionPayload(userId));
       }
       if (req.method === 'GET' && p === '/seller/orders') {

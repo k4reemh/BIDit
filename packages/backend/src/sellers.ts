@@ -8,7 +8,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount } from './ledger.js';
 import { createAuction, startAuction } from './auction.js';
-import { requireVerifiedSeller } from './authz.js';
+import { requireSeller } from './authz.js';
 import { systemClock, type Clock } from './clock.js';
 
 export const DEMO_TITLE = 'Charizard — Base Set Holo';
@@ -129,7 +129,7 @@ export async function startAuctionFromListing(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ auctionId: string; room: string }> {
   const listing = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
-  await requireVerifiedSeller(listing.sellerId, prisma);
+  await requireSeller(listing.sellerId, prisma);
   if (listing.quantity <= 0) throw new Error('Out of stock — no units left to auction.');
   if (listing.status !== ListingStatus.QUEUED) {
     throw new Error(`Listing is not QUEUED (${listing.status})`);
