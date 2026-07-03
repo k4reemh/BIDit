@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useCopy } from '../ContentProvider';
 import {
   Bolt, Radio, Eye, Wallet, Shield, Tag, Gift, Dice, UserCheck, Info, Book, ArrowRight, Truck,
 } from '../icons';
@@ -21,7 +20,6 @@ const SECTIONS = [
 ];
 
 export default function Docs() {
-  const t = useCopy();
   const [active, setActive] = useState('overview');
 
   useEffect(() => {
@@ -57,8 +55,13 @@ export default function Docs() {
       <article className="docs__body">
         <header className="docs__hero">
           <span className="hero__tag"><span className="dot" /> Docs · Beta (devnet)</span>
-          <h1 className="display docs__h1">{t('docs.hero.title')}</h1>
-          <p className="docs__lead">{t('docs.hero.lead')}</p>
+          <h1 className="display docs__h1">How BIDit works</h1>
+          <p className="docs__lead">
+            BIDit turns a live pump.fun stream into a real trading-card auction house. Sellers run live auctions
+            straight on their stream, bidders bid in <b>USDC</b> from a funded balance, cards are held in escrow
+            until they ship, and <b>5% of every shipped sale</b> buys back <b className="accent">$BID</b> on-chain.
+            This page explains the whole loop end to end.
+          </p>
         </header>
 
         {/* OVERVIEW */}

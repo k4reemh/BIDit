@@ -396,15 +396,6 @@ model Notification {
   @@index([userId, createdAt])
 }
 
-/// Editable site copy (a key→value store). The web reads overrides at runtime and
-/// falls back to in-code defaults, so marketing/help/footer text can change with
-/// no code change or redeploy. Written only via the admin-key-gated endpoint.
-model SiteContent {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
-}
-
 // Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid
 // coupling to shared/enums.ts via the drift test; values are validated in code.
 // The server commits seedHash at open and reveals seed at the draw, so the

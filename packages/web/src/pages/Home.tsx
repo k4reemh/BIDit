@@ -3,11 +3,9 @@ import LiveCard from '../components/LiveCard';
 import LiveCoinCard from '../components/LiveCoinCard';
 import { FEATURED, CATEGORIES } from '../data';
 import { getLive, type LiveCoin } from '../api';
-import { useCopy } from '../ContentProvider';
 import { ArrowRight, Bolt, Truck, Wallet } from '../icons';
 
 export default function Home({ onAuth }: { onAuth: () => void }) {
-  const t = useCopy();
   const [live, setLive] = useState<LiveCoin[] | null>(null);
   useEffect(() => {
     getLive().then(setLive).catch(() => setLive([]));
@@ -17,17 +15,20 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       {/* ---- hero ---- */}
       <section className="hero">
         <div className="hero__inner risein">
-          <span className="hero__tag"><span className="dot" /> {t('home.hero.tag')}</span>
-          <h1 className="display hero__title">{t('home.hero.title')}</h1>
-          <p className="hero__sub">{t('home.hero.sub')}</p>
+          <span className="hero__tag"><span className="dot" /> Now live in beta</span>
+          <h1 className="display hero__title">The live marketplace for trading cards.</h1>
+          <p className="hero__sub">
+            Bid in real time on the Pokémon, One Piece and sports breaks streaming on pump.fun.
+            Win it, <b>we ship it</b>, and you settle in USDC.
+          </p>
           <div className="hero__cta">
-            <button className="btn btn-primary btn-lg" onClick={onAuth}>{t('home.hero.ctaPrimary')}</button>
-            <a className="btn btn-ghost btn-lg" href="#featured">{t('home.hero.ctaSecondary')}</a>
+            <button className="btn btn-primary btn-lg" onClick={onAuth}>Start bidding — it's free</button>
+            <a className="btn btn-ghost btn-lg" href="#featured">Browse live auctions</a>
           </div>
           <div className="hero__trust">
-            <span>{t('home.trust.1')}</span><span className="d" />
-            <span>{t('home.trust.2')}</span><span className="d" />
-            <span>{t('home.trust.3')}</span>
+            <span>Settles in USDC</span><span className="d" />
+            <span>Built on Solana</span><span className="d" />
+            <span>5% of sales buy back $BID</span>
           </div>
         </div>
       </section>
@@ -36,8 +37,8 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       <section id="featured" className="section container">
         <div className="section__head">
           <div>
-            <h2 className="section-title">{t('home.live.title')}</h2>
-            <div className="section-sub">{t('home.live.sub')}</div>
+            <h2 className="section-title">Live right now</h2>
+            <div className="section-sub">Watch the stream and bid — right here, no extension needed.</div>
           </div>
           <a className="section__all" href="#">Browse all <ArrowRight width={16} height={16} /></a>
         </div>

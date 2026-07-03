@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import Logo from './Logo';
-import { useCopy } from '../ContentProvider';
 import { XLogo } from '../icons';
 
 type FLink = string | { label: string; to: string };
@@ -12,13 +11,12 @@ const COLS: { h: string; links: FLink[] }[] = [
 ];
 
 export default function Footer() {
-  const t = useCopy();
   return (
     <footer className="footer">
       <div className="container footer__top">
         <div className="footer__brand">
           <Logo size={30} />
-          <p className="muted">{t('footer.blurb')}</p>
+          <p className="muted">The live card auction that lives on the streams you already watch. Win it, we ship it, 5% pumps $BID.</p>
           <div className="footer__social">
             <a className="icon-btn" href="https://x.com/biditsol" target="_blank" rel="noreferrer" aria-label="BIDit on X"><XLogo width={18} height={18} /></a>
             <a className="icon-btn" href="#" aria-label="Discord" style={{ fontSize: 18 }}>◇</a>

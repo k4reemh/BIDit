@@ -269,15 +269,6 @@ export interface HeldItem {
 }
 export const getSellerHeld = () => req<HeldItem[]>('/seller/held');
 
-// ---- editable site copy ----------------------------------------------------
-export const getContent = () => req<Record<string, string>>('/content');
-export const saveContent = (entries: Record<string, string>, adminKey: string) =>
-  req<{ ok: boolean; count: number }>('/content', {
-    method: 'PUT',
-    headers: { 'x-admin-key': adminKey },
-    body: JSON.stringify(entries),
-  });
-
 // ---- notifications ---------------------------------------------------------
 export interface Notif {
   id: string;

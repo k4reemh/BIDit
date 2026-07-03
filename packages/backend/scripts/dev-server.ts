@@ -73,7 +73,6 @@ import {
   type ShipMode,
 } from '../src/fulfillment.js';
 import { listNotifications, markAllRead } from '../src/notifications.js';
-import { getAllContent, setContent } from '../src/content.js';
 import { systemClock } from '../src/clock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -361,19 +360,6 @@ async function main() {
         await realtime.notifyBalance(userId);
         const accountId = await getOrCreateUserAccount(userId, prisma);
         return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
-      }
-
-      // ---- editable site copy ----
-      if (req.method === 'GET' && p === '/content') {
-        return send(res, 200, await getAllContent(prisma)); // public: display copy
-      }
-      if (req.method === 'PUT' && p === '/content') {
-        const adminKey = process.env.BIDIT_ADMIN_KEY;
-        const provided = req.headers['x-admin-key'];
-        if (!adminKey || provided !== adminKey) return send(res, 401, { error: 'Wrong or unset admin passcode.' });
-        const b = await readJson(req);
-        const count = await setContent(b, prisma);
-        return send(res, 200, { ok: true, count });
       }
 
       // ---- notifications ----

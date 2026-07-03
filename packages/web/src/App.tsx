@@ -9,7 +9,6 @@ import SellerLayout from './components/SellerLayout';
 import Home from './pages/Home';
 import Docs from './pages/Docs';
 import Help from './pages/Help';
-import ContentEditor from './pages/admin/ContentEditor';
 import Watch from './pages/Watch';
 import StubPage from './pages/StubPage';
 import Profile from './pages/account/Profile';
@@ -101,7 +100,6 @@ export default function App() {
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/help" element={<Help />} />
-          <Route path="/admin/content" element={<ContentEditor />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />
 
           <Route element={<AccountLayout session={session} setSession={setSession} onAuth={() => setAuth('signin')} />}>

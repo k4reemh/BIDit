@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { useCopy } from '../ContentProvider';
 import {
   Wallet, Radio, Bolt, Truck, UserCheck, Tag, Book, Shield, Gift, ArrowRight, XLogo,
 } from '../icons';
@@ -49,13 +48,12 @@ function Track({ kicker, steps }: { kicker: string; steps: typeof BUYER }) {
 }
 
 export default function Help() {
-  const t = useCopy();
   return (
     <main className="container help">
       <header className="help__hero">
-        <span className="hero__tag"><span className="dot" /> {t('help.hero.tag')}</span>
-        <h1 className="display help__h1">{t('help.hero.title')}</h1>
-        <p className="help__lead">{t('help.hero.lead')} <Link to="/docs" className="accent">Read the docs →</Link></p>
+        <span className="hero__tag"><span className="dot" /> Help &amp; quick start</span>
+        <h1 className="display help__h1">Everything you need to get going.</h1>
+        <p className="help__lead">New to BIDit? Follow the steps below. Want the full picture — escrow, fees, the $BID flywheel — the <Link to="/docs" className="accent">docs</Link> cover it all.</p>
       </header>
 
       <div className="qs">
