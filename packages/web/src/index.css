@@ -1126,6 +1126,17 @@ img { display: block; max-width: 100%; }
 .adm-row__grid b { color: var(--muted); font-weight: 600; margin-right: 5px; }
 .adm-row__pitch { margin-top: 10px; font-style: italic; font-size: 13.5px; }
 @media (max-width: 640px) { .adm-row__grid { grid-template-columns: 1fr; } }
+.adm-nav { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 10px; }
+.adm-nav a { color: var(--muted); font-weight: 600; text-decoration: none; }
+.adm-nav a.active { color: var(--accent); }
+.adm-nav span { color: var(--faint); }
+.adm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ord-pill { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; vertical-align: middle; background: rgba(127, 127, 127, 0.16); color: var(--muted); }
+.ord-pill--locked { background: rgba(224, 160, 18, 0.16); color: var(--amber); }
+.ord-pill--shipped { background: rgba(96, 125, 220, 0.2); color: #8aa0ee; }
+.ord-pill--dispute_window { background: rgba(255, 106, 0, 0.16); color: var(--accent); }
+.ord-pill--disputed { background: rgba(239, 59, 78, 0.16); color: var(--red); }
+.ord-pill--released { background: rgba(34, 197, 138, 0.16); color: #1eb980; }
 
 /* ---- embedded pump.fun stream (LiveKit) ---- */
 .pstream { position: absolute; inset: 0; background: #000; overflow: hidden; }

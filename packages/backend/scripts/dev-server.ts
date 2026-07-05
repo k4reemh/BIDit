@@ -161,6 +161,12 @@ async function main() {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
   }, 10 * 60_000);
   fulfillmentTimer.unref?.();
+  // Escrow order timers: release funds once the dispute window passes, and refund
+  // if a seller never ships. Harmless no-op in direct-payout mode (no held orders).
+  const orderTimer = setInterval(() => {
+    void processOrderTimers(escrow, systemClock, prisma).catch((e) => console.error('[order-timer]', e));
+  }, 10 * 60_000);
+  orderTimer.unref?.();
 
   // Dev endpoints (password-less login, balance minting, seeders) are ON only for
   // the local mock chain, OFF on any real chain unless explicitly forced.
@@ -717,30 +723,34 @@ async function main() {
       if (req.method === 'GET' && p === '/admin/orders') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const user = await getUser(userId, prisma);
-        if (user?.role !== Role.admin) return send(res, 403, { error: 'admin required' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         return send(res, 200, await ordersDto());
       }
       if (req.method === 'POST' && p === '/admin/order/action') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const user = await getUser(userId, prisma);
-        if (user?.role !== Role.admin) return send(res, 403, { error: 'admin required' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         const b = await readJson(req);
         const orderId = String(b.orderId);
         const action = String(b.action);
-        let status: string;
-        if (action === 'dispute') status = (await openDispute(orderId, systemClock, prisma)).status;
-        else if (action === 'release') status = (await releaseOrder(orderId, escrow, systemClock, prisma)).status;
-        else if (action === 'refund')
-          status = (await resolveDispute(orderId, 'REFUND' as DisputeOutcome, escrow, systemClock, prisma)).status;
-        else if (action === 'release-disputed')
-          status = (await resolveDispute(orderId, 'RELEASE' as DisputeOutcome, escrow, systemClock, prisma)).status;
-        else return send(res, 400, { error: 'unknown action' });
-        const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-        await realtime.notifyBalance(order.sellerId);
-        await realtime.notifyBalance(order.buyerId);
-        return send(res, 200, { status });
+        try {
+          let status: string;
+          if (action === 'ship') status = (await markShipped(orderId, String(b.tracking ?? 'ADMIN'), systemClock, prisma)).status;
+          else if (action === 'deliver') status = (await markDelivered(orderId, systemClock, prisma)).status;
+          else if (action === 'dispute') status = (await openDispute(orderId, systemClock, prisma)).status;
+          else if (action === 'release') status = (await releaseOrder(orderId, escrow, systemClock, prisma)).status;
+          else if (action === 'refund')
+            status = (await resolveDispute(orderId, 'REFUND' as DisputeOutcome, escrow, systemClock, prisma)).status;
+          else if (action === 'release-disputed')
+            status = (await resolveDispute(orderId, 'RELEASE' as DisputeOutcome, escrow, systemClock, prisma)).status;
+          else return send(res, 400, { error: 'unknown action' });
+          const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+          await realtime.notifyBalance(order.sellerId);
+          await realtime.notifyBalance(order.buyerId);
+          return send(res, 200, { status });
+        } catch (err) {
+          return send(res, 400, { error: err instanceof Error ? err.message : 'Action failed' });
+        }
       }
 
       // ---- coin resolution (used by the extension) ----
@@ -1033,18 +1043,26 @@ async function sellerOrdersDto(sellerId: string) {
 async function ordersDto() {
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: 'desc' },
-    take: 25,
-    include: { buyer: { select: { handle: true } }, seller: { select: { handle: true } } },
+    take: 60,
+    include: {
+      buyer: { select: { handle: true } },
+      seller: { select: { handle: true } },
+      auction: { select: { listing: { select: { title: true } } } },
+    },
   });
   return orders.map((o) => ({
     id: o.id,
     status: o.status,
+    title: o.auction.listing.title,
     amount: formatUsdc(o.amount),
     platformFee: formatUsdc(o.platformFee),
     sellerProceeds: formatUsdc(o.sellerProceeds),
     buyer: o.buyer.handle,
     seller: o.seller.handle,
     trackingNumber: o.trackingNumber,
+    createdAt: o.createdAt.getTime(),
+    disputeWindowEndsAt: o.disputeWindowEndsAt ? o.disputeWindowEndsAt.getTime() : null,
+    noShipDeadline: o.noShipDeadline ? o.noShipDeadline.getTime() : null,
   }));
 }
 

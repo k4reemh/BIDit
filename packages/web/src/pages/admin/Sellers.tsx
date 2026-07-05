@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getSellerApplications, verifySellerAdmin, type SellerApplication, type Session } from '../../api';
 import { Check } from '../../icons';
 
@@ -35,6 +36,7 @@ export default function AdminSellers({ session }: { session: Session | null }) {
   return (
     <main className="admin">
       <div className="acct-head">
+        <div className="adm-nav"><Link to="/admin/sellers" className="active">Sellers</Link> <span>·</span> <Link to="/admin/orders">Orders</Link></div>
         <h1 className="display acct-title">Seller applications</h1>
         <p className="muted">Everyone who’s applied to sell. Verify trusted sellers to grant the badge + priority dispute support.</p>
       </div>

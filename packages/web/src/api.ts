@@ -157,6 +157,24 @@ export interface SellerApplication {
 export const getSellerApplications = () => req<SellerApplication[]>('/admin/sellers');
 export const verifySellerAdmin = (sellerUserId: string) =>
   req<{ ok: boolean }>('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
+
+export interface AdminOrder {
+  id: string;
+  status: string;
+  title: string;
+  amount: string;
+  platformFee: string;
+  sellerProceeds: string;
+  buyer: string;
+  seller: string;
+  trackingNumber: string | null;
+  createdAt: number;
+  disputeWindowEndsAt: number | null;
+  noShipDeadline: number | null;
+}
+export const getAdminOrders = () => req<AdminOrder[]>('/admin/orders');
+export const adminOrderAction = (orderId: string, action: string, tracking?: string) =>
+  req<{ status: string }>('/admin/order/action', { method: 'POST', body: JSON.stringify({ orderId, action, tracking }) });
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 
