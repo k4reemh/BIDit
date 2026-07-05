@@ -213,14 +213,17 @@ img { display: block; max-width: 100%; }
 .live-card__tags .pill:first-child { color: var(--accent-strong); background: var(--accent-soft); }
 
 /* categories */
-.cat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
-.cat { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line);
-  box-shadow: var(--shadow-sm); position: relative; transition: transform 0.15s, box-shadow 0.15s; }
-.cat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
-.cat__glyph { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; }
-.cat__name { font-size: 14.5px; font-weight: 600; }
-.cat__arrow { position: absolute; top: 18px; right: 16px; color: var(--faint); opacity: 0; transition: opacity 0.15s, transform 0.15s; }
-.cat:hover .cat__arrow { opacity: 1; transform: translateX(2px); }
+.cat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+.cat { position: relative; display: block; aspect-ratio: 3 / 4; border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--line); background: var(--surface-2); text-decoration: none; transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.cat:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.cat__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.cat:hover .cat__img { transform: scale(1.07); }
+.cat__grad { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.28) 46%, rgba(0,0,0,0) 72%); }
+.cat__name { position: absolute; left: 14px; right: 14px; bottom: 13px; z-index: 2; color: #fff; font-size: 15px; font-weight: 700;
+  letter-spacing: -0.01em; text-shadow: 0 1px 8px rgba(0,0,0,0.55); }
+@media (max-width: 860px) { .cat-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 440px) { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
 
 /* how it works */
 .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }

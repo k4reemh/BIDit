@@ -35,7 +35,7 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
         <div className="lc__meta">
           <span className={`pill lc__status lc__status--${l.status.toLowerCase()}`}>{l.status}</span>
           {!isWheel && l.quantity > 1 && <span className="pill lc__qty">×{l.quantity} left</span>}
-          {isWheel && <span className="pill lc__wheelpill">🎡 {l.wheel!.length} prizes</span>}
+          {isWheel && <span className="pill lc__wheelpill">{l.wheel!.length} prizes</span>}
           <span className="lc__start">Start ${l.startingBid}</span>
         </div>
         {l.status === 'QUEUED' && l.quantity > 0 && (
@@ -44,7 +44,7 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
             <button className="btn btn-primary btn-sm" onClick={start} disabled={busy}>{busy ? 'Starting…' : l.quantity > 1 ? `Auction 1 of ${l.quantity}` : 'Start auction'}</button>
           </div>
         )}
-        {l.status === 'SOLD' && <div className="lc__go"><span className="muted" style={{ fontSize: 13 }}>Sold out ✓</span></div>}
+        {l.status === 'SOLD' && <div className="lc__go"><span className="muted" style={{ fontSize: 13 }}>Sold out</span></div>}
         {l.status === 'LIVE' && <div className="lc__go"><span className="live-badge"><span className="dot" /> LIVE</span><span className="muted" style={{ fontSize: 13 }}>Auction running</span></div>}
       </div>
     </div>

@@ -2,12 +2,14 @@
 export function runConfetti(
   canvas: HTMLCanvasElement | null,
   colors: string[] = ['#f5c518', '#0e9f6e', '#4f8cff', '#ff7a45', '#e5484d', '#ffffff'],
-  count = 170,
+  count = 140,
   durationMs = 5600,
 ): void {
   const ctx = canvas?.getContext('2d');
   if (!canvas || !ctx) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  // Cap DPR at 1.5 — a full-screen clearRect at native 4K every frame is the main
+  // cost and reads as jank; 1.5 is indistinguishable for confetti.
+  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
   const W = (canvas.width = window.innerWidth * dpr);
   const H = (canvas.height = window.innerHeight * dpr);
   canvas.style.width = `${window.innerWidth}px`;

@@ -182,7 +182,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
   // --- header ---
   const top = el('div', 'top');
   const brand = el('div', 'brand');
-  brand.innerHTML = '<span class="g">🎁</span> <span class="b">BID</span>it giveaway';
+  brand.innerHTML = '<span class="b">BID</span>it giveaway';
   const kind = el('span', 'kind');
   kind.style.color = meta.color;
   kind.style.background = `${meta.color}22`;
@@ -328,7 +328,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
       const wkick = el('div', 'wkick');
       wkick.textContent = r.isMe ? 'You won!' : 'Winner';
       const whead = el('div', 'whead');
-      whead.textContent = r.isMe ? '🎉 YOU WON! 🎉' : `@${r.winnerHandle}`;
+      whead.textContent = r.isMe ? 'YOU WON!' : `@${r.winnerHandle}`;
       const wprize = el('div', 'wprize');
       wprize.innerHTML = `wins <b>${r.prize}</b>`;
       const fair = el('div', 'fair');
@@ -363,7 +363,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
     markEntered: () => {
       entered_ = true;
       enterBtn.className = 'enter done';
-      enterBtn.textContent = "You're in ✓";
+      enterBtn.textContent = "You're in";
     },
     markRejected: (reason) => {
       enterBtn.className = 'enter blocked';

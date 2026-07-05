@@ -38,13 +38,13 @@ export default function WinCelebration({ win, onDone }: { win: WinInfo; onDone: 
       <div className={`wc__card${win.isMe ? ' wc__card--me' : ''}${leaving ? ' wc__card--out' : ''}`}>
         <div className="wc__av"><Avatar handle={win.winnerHandle} size={74} /></div>
         <div className="wc__kick">{win.isMe ? 'You won' : 'Sold'}</div>
-        <div className="wc__head">{win.isMe ? 'WINNER! 🎉' : `@${win.winnerHandle} won`}</div>
+        <div className="wc__head">{win.isMe ? 'WINNER!' : `@${win.winnerHandle} won`}</div>
         <div className="wc__item">
           {win.imageUrl && <img src={win.imageUrl} alt="" />}
           <span>{win.title}</span>
         </div>
         <div className="wc__price">${win.amount}</div>
-        <div className="wc__buyback">+${pumped} → <b>$BID</b> buyback 📈</div>
+        <div className="wc__buyback">+${pumped} → <b>$BID</b> buyback</div>
       </div>
     </div>,
     document.body,

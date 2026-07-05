@@ -65,7 +65,7 @@ export default function GiveawayReveal({
     <div className="gvr">
       <canvas ref={canvasRef} className="gvr__confetti" />
       <div className={`gvr__card${landed ? ' gvr__card--win' : ''}${leaving ? ' gvr__card--out' : ''}`}>
-        <div className="gvr__brand">🎁 <b>Giveaway</b> · <span className="gvr__kind">{kindLabel}</span></div>
+        <div className="gvr__brand"><b>Giveaway</b> · <span className="gvr__kind">{kindLabel}</span></div>
         {win.image && <img className="gvr__prizeimg" src={win.image} alt="" />}
         <div className="gvr__prize">{win.prize}</div>
 
@@ -87,7 +87,7 @@ export default function GiveawayReveal({
           <div className="gvr__win">
             <Avatar handle={win.winnerHandle} size={70} />
             <div className="gvr__kick">{isMe ? 'You won!' : 'Winner'}</div>
-            <div className="gvr__head">{isMe ? '🎉 YOU WON! 🎉' : `@${win.winnerHandle}`}</div>
+            <div className="gvr__head">{isMe ? 'YOU WON!' : `@${win.winnerHandle}`}</div>
             <div className="gvr__wprize">wins <b>{win.prize}</b></div>
             <div className="gvr__meta">{win.entrantCount} {win.entrantCount === 1 ? 'entry' : 'entries'}</div>
             <div className="gvr__fair"><i /> Provably fair · seed <code>{win.seedHash.slice(0, 10)}…</code></div>

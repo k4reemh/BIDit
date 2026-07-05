@@ -78,7 +78,7 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
           <span className="pstream__badge"><span className="dot" /> LIVE</span>
           {muted && (
             <button className="pstream__unmute" onClick={unmute} aria-label="Unmute stream">
-              🔇 Tap to unmute
+              Tap to unmute
             </button>
           )}
         </>

@@ -38,7 +38,7 @@ type StatusKind = 'info' | 'error' | 'outbid' | 'leading';
 const REJECT_TEXT: Record<RealtimeRejectReason, [string, StatusKind]> = {
   INSUFFICIENT_BALANCE: ['Not enough balance — add funds', 'error'],
   BID_TOO_LOW: ['Too low — try the suggested bid', 'error'],
-  ALREADY_LEADING: ["You're already winning 🔥", 'leading'],
+  ALREADY_LEADING: ["You're already winning", 'leading'],
   AUCTION_ENDED: ['Auction has ended', 'info'],
   AUCTION_NOT_FOUND: ['Auction not found', 'error'],
   RATE_LIMITED: ['Slow down — too many bids', 'error'],
@@ -459,7 +459,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       const wheel = s.wheel ?? [];
       if (wheel.length > 0) {
         prizes.classList.remove('hidden');
-        prizesToggle.textContent = `🎡 ${wheel.length} prizes on the wheel`;
+        prizesToggle.textContent = `${wheel.length} prizes on the wheel`;
         if (prizesList.dataset.for !== s.auctionId) {
           prizesList.dataset.for = s.auctionId;
           prizesList.replaceChildren();
@@ -508,13 +508,13 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       leaderAv.replaceChildren();
       if (s.leaderHandle) leaderAv.append(makeAvatar(s.leaderHandle, 20));
       leaderText.textContent = leadingMe
-        ? "You're winning 🔥"
+        ? "You're winning"
         : s.leaderHandle
           ? `${s.leaderHandle} is winning`
           : 'No bids yet — take the lead';
 
       if (leadingMe) {
-        setStatus("You're winning 🔥", 'leading');
+        setStatus("You're winning", 'leading');
       } else if (lastLeader === myHandle && myHandle !== null && s.leaderHandle !== null) {
         setStatus('Outbid! Bid again', 'outbid');
       } else {
@@ -531,7 +531,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
         lastMinNum = toMin;
       } else {
         bidBtnLbl.textContent =
-          s.status === 'SETTLING' ? 'SOLD ✓' : s.status === 'CLOSED' ? 'Auction ended' : 'Auction over';
+          s.status === 'SETTLING' ? 'SOLD' : s.status === 'CLOSED' ? 'Auction ended' : 'Auction over';
         bidBtnAmt.textContent = '';
       }
       bidBtn.disabled = !running;
@@ -559,7 +559,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       amount.disabled = true;
       const won = c.winnerHandle === myHandle && myHandle !== null;
       setStatus(
-        c.winnerHandle ? (won ? `You won for $${c.amount}! 🎉` : `Sold to ${c.winnerHandle} · $${c.amount}`) : 'Ended — no sale',
+        c.winnerHandle ? (won ? `You won for $${c.amount}!` : `Sold to ${c.winnerHandle} · $${c.amount}`) : 'Ended — no sale',
         won ? 'leading' : 'info',
       );
     },

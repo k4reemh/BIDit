@@ -22,26 +22,27 @@ export const FEATURED: LiveAuction[] = [
   { id: '6', seller: 'frostbyte', avatarHue: 95, title: 'Umbreon VMAX chase — wheel spin', category: 'Pokémon', tag: 'Wheel', viewers: 980, currentBid: 45, image: img('base1/14') },
 ];
 
+/** Category tiles — real imagery (Whatnot-style), no emoji. */
 export const CATEGORIES = [
-  { name: 'One Piece', glyph: '🏴‍☠️', soft: '#fdeceb', ink: '#c0392b' },
-  { name: 'Pokémon', glyph: '⚡', soft: '#fdf4dc', ink: '#a9760a' },
-  { name: 'Sports Cards', glyph: '🏀', soft: '#e8f0fd', ink: '#2563c0' },
-  { name: 'Sealed & Boxes', glyph: '📦', soft: '#e7f5ef', ink: '#0a7d56' },
-  { name: 'Graded Slabs', glyph: '💎', soft: '#e6f4fb', ink: '#1f7fb0' },
-  { name: 'Mystery & Breaks', glyph: '🎲', soft: '#f1ecfd', ink: '#6b46c1' },
+  { name: 'Pokémon', image: 'https://images.unsplash.com/photo-1607435097405-db48f377bff6?w=600&q=80&auto=format&fit=crop' },
+  { name: 'One Piece', image: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=600&q=80&auto=format&fit=crop' },
+  { name: 'Sports Cards', image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&q=80&auto=format&fit=crop' },
+  { name: 'Sealed & Boxes', image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=600&q=80&auto=format&fit=crop' },
+  { name: 'Graded Slabs', image: 'https://images.unsplash.com/photo-1608889825205-eebdb9fc5806?w=600&q=80&auto=format&fit=crop' },
+  { name: 'Mystery & Breaks', image: 'https://images.unsplash.com/photo-1595246140625-573b715d11dc?w=600&q=80&auto=format&fit=crop' },
 ];
 
-/** Interest options shown during onboarding. */
+/** Interest options shown during onboarding (labels only — no emoji). */
 export const INTERESTS = [
-  { id: 'one-piece', label: 'One Piece', glyph: '🏴‍☠️' },
-  { id: 'pokemon', label: 'Pokémon', glyph: '⚡' },
-  { id: 'sports', label: 'Sports Cards', glyph: '🏀' },
-  { id: 'sealed', label: 'Sealed & Boxes', glyph: '📦' },
-  { id: 'slabs', label: 'Graded Slabs', glyph: '💎' },
-  { id: 'breaks', label: 'Breaks & Rips', glyph: '🎲' },
-  { id: 'vintage', label: 'Vintage', glyph: '🕰️' },
-  { id: 'modern', label: 'Modern Chase', glyph: '✨' },
-  { id: 'magic', label: 'Magic: The Gathering', glyph: '🧙' },
+  { id: 'pokemon', label: 'Pokémon' },
+  { id: 'one-piece', label: 'One Piece' },
+  { id: 'sports', label: 'Sports Cards' },
+  { id: 'sealed', label: 'Sealed & Boxes' },
+  { id: 'slabs', label: 'Graded Slabs' },
+  { id: 'breaks', label: 'Breaks & Rips' },
+  { id: 'vintage', label: 'Vintage' },
+  { id: 'modern', label: 'Modern Chase' },
+  { id: 'magic', label: 'Magic: The Gathering' },
 ];
 
 export const WINS = [

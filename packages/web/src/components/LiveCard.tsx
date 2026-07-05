@@ -14,7 +14,7 @@ export default function LiveCard({ a }: { a: LiveAuction }) {
         <span className="live-card__viewers">
           <Eye width={13} height={13} /> {a.viewers.toLocaleString()}
         </span>
-        {a.hot && <span className="live-card__hot">🔥 Hot</span>}
+        {a.hot && <span className="live-card__hot">Hot</span>}
         <div className="live-card__bid">
           <span className="muted" style={{ fontSize: 11 }}>Current bid</span>
           <b>${a.currentBid}</b>

@@ -153,7 +153,7 @@ export function showWheel(opts: WheelSpinOpts): void {
     strip.style.transform = `translateY(${endY}px)`;
     band.classList.add('land');
     prizeEl.style.color = tierColor(prize.tier);
-    prizeEl.textContent = `🎉 ${prize.label}`;
+    prizeEl.textContent = `${prize.label}`;
     prizeEl.classList.add('show');
     window.setTimeout(() => opts.onLand(prize), 850);
     window.setTimeout(() => card.classList.add('out'), 1500);

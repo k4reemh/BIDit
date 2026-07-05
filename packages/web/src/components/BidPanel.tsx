@@ -115,10 +115,15 @@ export default function BidPanel({
     return () => c.close();
   }, [room, session?.userId]);
 
+  // Only tick while a live countdown is on screen (running auction or open
+  // giveaway). This stops the panel from re-rendering during the wheel/win/
+  // giveaway reveal animations, keeping them smooth.
+  const needTick = auction?.status === 'RUNNING' || giveaway != null;
   useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 150);
+    if (!needTick) return;
+    const t = setInterval(() => setTick((x) => x + 1), 100);
     return () => clearInterval(t);
-  }, []);
+  }, [needTick]);
 
   const running = auction && auction.status === 'RUNNING';
   const minNext = auction?.minNextBid ?? '0';
@@ -177,7 +182,7 @@ export default function BidPanel({
               {auction!.wheel && auction!.wheel.length > 0 && (
                 <div className="bp__prizes-wrap">
                   <button type="button" className="bp__prizes-toggle" onClick={() => setShowPrizes((v) => !v)}>
-                    🎡 {auction!.wheel!.length} prizes on the wheel <span className="bp__prizes-chev">{showPrizes ? '▲' : '▼'}</span>
+                    {auction!.wheel!.length} prizes on the wheel <span className="bp__prizes-chev">{showPrizes ? '▲' : '▼'}</span>
                   </button>
                   {showPrizes && (
                     <div className="bp__prizes">
@@ -248,7 +253,7 @@ export default function BidPanel({
                 {gCount > 7 && <span className="bp__gvmore">+{gCount - 7}</span>}
               </div>
               <button className={`btn ${gEntered ? 'btn-ghost' : 'btn-accent'} bp__gvbtn`} onClick={enter} disabled={gEntered}>
-                {gEntered ? "You're in ✓" : 'Enter giveaway'}
+                {gEntered ? "You're in" : 'Enter giveaway'}
               </button>
             </div>
           )}

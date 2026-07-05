@@ -72,7 +72,7 @@ export default function Overview() {
             <div className="rl__row" key={l.id}>
               <span className="rl__ic">{l.wheel ? <Dice width={16} height={16} /> : <Tag width={16} height={16} />}</span>
               <span className="rl__title">{l.title}</span>
-              {l.wheel && <span className="pill lc__wheelpill">🎡 {l.wheel.length}</span>}
+              {l.wheel && <span className="pill lc__wheelpill">{l.wheel.length} prizes</span>}
               <span className={`pill lc__status lc__status--${l.status.toLowerCase()}`}>{l.status}</span>
               <span className="rl__bid muted">${l.startingBid}</span>
             </div>

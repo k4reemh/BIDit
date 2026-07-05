@@ -80,7 +80,7 @@ export default function WheelReveal({
           <div className="wr__fade wr__fade--t" />
           <div className="wr__fade wr__fade--b" />
         </div>
-        <div className={`wr__prize${prize ? ' wr__prize--show' : ''}`}>{prize ? `🎉 ${prize.label}` : ''}</div>
+        <div className={`wr__prize${prize ? ' wr__prize--show' : ''}`}>{prize ? `${prize.label}` : ''}</div>
         <div className="wr__fair"><i /> Provably fair · seed <code>{spin.seedHash.slice(0, 10)}…</code></div>
       </div>
     </div>,

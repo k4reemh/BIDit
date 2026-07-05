@@ -77,7 +77,7 @@ export function showWinner(opts: WinnerOpts, holdMs = 4200): void {
   const kicker = el('div', 'kicker');
   kicker.textContent = opts.isMe ? 'You won' : 'Sold';
   const headline = el('div', 'headline');
-  headline.textContent = opts.isMe ? 'WINNER! 🎉' : `${opts.winnerHandle} won`;
+  headline.textContent = opts.isMe ? 'WINNER!' : `${opts.winnerHandle} won`;
 
   const item = el('div', 'item');
   if (opts.imageUrl) {
@@ -94,7 +94,7 @@ export function showWinner(opts: WinnerOpts, holdMs = 4200): void {
 
   const buyback = el('div', 'buyback');
   const pumped = (parseFloat(opts.amount) * 0.05 || 0).toFixed(2);
-  buyback.textContent = `+$${pumped} → $BID buyback 📈`;
+  buyback.textContent = `+$${pumped} → $BID buyback`;
 
   card.append(av, kicker, headline, item, price, buyback);
   scrim.append(canvas, card);

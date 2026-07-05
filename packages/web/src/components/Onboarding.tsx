@@ -5,9 +5,9 @@ import { completeOnboarding, type Session } from '../api';
 import { Bolt, Truck, Wallet, Copy, Check, ArrowRight } from '../icons';
 
 const HOW = [
-  { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s pump.fun break and place real bids in real time.' },
-  { ic: Truck, t: 'Win it, we ship it', d: 'Your funds sit safely in escrow until the card lands in your hands.' },
-  { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement — no chargebacks, no haggling.' },
+  { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
+  { ic: Truck, t: 'Win it, we ship it', d: 'Your funds stay put until you win — then the item ships straight to your door.' },
+  { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const LAST = 3;
@@ -108,7 +108,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
               <div className="ob__chips">
                 {INTERESTS.map((it) => (
                   <button key={it.id} className={`ob__chip${interests.has(it.id) ? ' on' : ''}`} onClick={() => toggle(it.id)} type="button">
-                    <span className="ob__chipg">{it.glyph}</span> {it.label}
+                    {interests.has(it.id) && <Check width={14} height={14} />}{it.label}
                   </button>
                 ))}
               </div>

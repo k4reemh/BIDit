@@ -55,9 +55,9 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="cat-grid">
           {CATEGORIES.map((c) => (
             <a className="cat" href="#" key={c.name}>
-              <span className="cat__glyph" style={{ background: c.soft, color: c.ink }}>{c.glyph}</span>
+              <img className="cat__img" src={c.image} alt="" loading="lazy" />
+              <span className="cat__grad" />
               <span className="cat__name">{c.name}</span>
-              <ArrowRight className="cat__arrow" width={16} height={16} />
             </a>
           ))}
         </div>
