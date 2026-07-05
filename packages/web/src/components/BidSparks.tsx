@@ -46,9 +46,9 @@ export default function BidSparks({ fill, active }: { fill: number; active: bool
         for (let i = 0; i < n; i++) {
           parts.push({
             x, y,
-            vx: (Math.random() - 0.5) * 2.4,
-            vy: -(1.4 + Math.random() * 3),
-            g: 0.06 + Math.random() * 0.05,
+            vx: (Math.random() - 0.5) * 2.2,
+            vy: -(1.2 + Math.random() * 2.4),
+            g: 0.08 + Math.random() * 0.05,
             life: 1,
             s: 0.7 + Math.random() * 1.6,
             c: COLORS[(Math.random() * COLORS.length) | 0]!,
@@ -58,7 +58,10 @@ export default function BidSparks({ fill, active }: { fill: number; active: bool
       for (const p of parts) {
         p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life -= 0.035;
         if (p.life <= 0) continue;
-        ctx.globalAlpha = Math.max(0, p.life);
+        // Fade toward every edge so the flame melts into the panel instead of being
+        // sliced off in a hard line where the canvas ends.
+        const edge = Math.min(1, p.x / 8, (w - p.x) / 8, p.y / 8, (h - p.y) / 8);
+        ctx.globalAlpha = Math.max(0, p.life) * Math.max(0, edge);
         ctx.fillStyle = p.c;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);

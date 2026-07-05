@@ -78,6 +78,9 @@ export interface RealtimeServerOptions {
   directPayout?: boolean;
 }
 
+/** How long after a close we'll replay its result to a (re)subscribing client. */
+const CLOSE_REPLAY_WINDOW_MS = 60_000;
+
 export class RealtimeServer {
   readonly httpServer: http.Server;
   readonly scheduler: AuctionScheduler;
@@ -338,7 +341,8 @@ export class RealtimeServer {
   // ---- message handlers ---------------------------------------------------
 
   private async handleSubscribe(conn: Conn, room: string): Promise<void> {
-    if (!conn.rooms.has(room)) {
+    const firstSubscribe = !conn.rooms.has(room);
+    if (firstSubscribe) {
       conn.rooms.add(room);
       this.addLocal(this.localRooms, room, conn.id);
       await this.ensureSub(roomChannel(room), (payload) => this.deliverToRoom(room, payload));
@@ -350,6 +354,43 @@ export class RealtimeServer {
     for (const { id } of auctions) {
       const state = await this.buildAuctionState(id);
       if (state) this.sendToConn(conn, state.message);
+    }
+    // Catch-up: a client whose socket blipped right as the clock hit zero reconnects
+    // on a NEW connection and won't see that auction above (it's no longer RUNNING) —
+    // it would sit on a frozen timer, never learning who won. On that connection's
+    // first subscribe, replay the most-recent close so it can sync the result. Gated
+    // to the first subscribe so the 12s heartbeat re-subscribes don't re-fire it.
+    // Flagged `replay` so the client surfaces the winner without re-firing the
+    // full-screen celebration meant for people who were actually watching.
+    if (firstSubscribe && auctions.length === 0) {
+      const cutoff = new Date(this.clock.now().getTime() - CLOSE_REPLAY_WINDOW_MS);
+      const recent = await this.prisma.auction.findFirst({
+        where: {
+          listing: { sellerId: room },
+          status: { in: [AuctionStatus.SETTLING, AuctionStatus.CLOSED] },
+          endsAt: { gte: cutoff },
+        },
+        orderBy: { endsAt: 'desc' },
+        select: { id: true, currentBid: true, currentLeaderUserId: true },
+      });
+      if (recent) {
+        const winnerHandle = recent.currentLeaderUserId
+          ? await this.handleOf(recent.currentLeaderUserId)
+          : null;
+        const amount =
+          winnerHandle && recent.currentBid !== null ? formatUsdc(recent.currentBid) : null;
+        const replay: AuctionClosedMessage = {
+          type: 'AUCTION_CLOSED',
+          room,
+          auctionId: recent.id,
+          winnerHandle,
+          amount,
+          wheel: false,
+          replay: true,
+          serverNow: this.clock.now().getTime(),
+        };
+        this.sendToConn(conn, replay);
+      }
     }
   }
 

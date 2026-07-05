@@ -199,6 +199,80 @@ describe('server-driven close broadcast', () => {
   });
 });
 
+describe('catch-up replay for a client that missed the live close', () => {
+  it('replays the recent result to a (re)subscriber so the timer never freezes', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 20 });
+    const a = await makeFundedUser('100');
+
+    // First client bids, then the auction closes with the live broadcast.
+    const ca = new TestClient(url(issueSession(a.userId)));
+    await ca.open();
+    await ca.waitFor('BALANCE_UPDATE');
+    ca.send({ type: 'SUBSCRIBE', room: auction.sellerId });
+    await ca.waitFor('AUCTION_STATE');
+    ca.send({ type: 'BID_INTENT', auctionId: auction.auctionId, amount: '10', clientNonce: 'x' });
+    await ca.waitFor('BID_ACCEPTED');
+    clock.advance(21_000);
+    await server.tickScheduler();
+    await ca.waitFor('AUCTION_CLOSED');
+    ca.close();
+
+    // A second client subscribes AFTER the close — as if it reconnected right as the
+    // clock hit zero and missed the one-shot event. It must still learn who won,
+    // flagged `replay` so the client syncs quietly (no full-screen celebration).
+    const b = await makeFundedUser('50');
+    const cb = new TestClient(url(issueSession(b.userId)));
+    await cb.open();
+    await cb.waitFor('BALANCE_UPDATE');
+    cb.send({ type: 'SUBSCRIBE', room: auction.sellerId });
+
+    const replay = await cb.waitFor('AUCTION_CLOSED');
+    expect(replay.replay).toBe(true);
+    expect(replay.wheel).toBe(false);
+    expect(replay.winnerHandle).toBe(a.handle);
+    expect(replay.amount).toBe('10');
+
+    // A heartbeat re-subscribe on the SAME connection must NOT re-fire the replay,
+    // or a viewer parked on a closed room would get spammed every 12s.
+    cb.send({ type: 'SUBSCRIBE', room: auction.sellerId });
+    await cb.expectNone('AUCTION_CLOSED');
+
+    cb.close();
+  });
+
+  it('does not replay a close that is older than the catch-up window', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 20 });
+    const a = await makeFundedUser('100');
+
+    const ca = new TestClient(url(issueSession(a.userId)));
+    await ca.open();
+    await ca.waitFor('BALANCE_UPDATE');
+    ca.send({ type: 'SUBSCRIBE', room: auction.sellerId });
+    await ca.waitFor('AUCTION_STATE');
+    ca.send({ type: 'BID_INTENT', auctionId: auction.auctionId, amount: '10', clientNonce: 'x' });
+    await ca.waitFor('BID_ACCEPTED');
+    clock.advance(21_000);
+    await server.tickScheduler();
+    await ca.waitFor('AUCTION_CLOSED');
+    ca.close();
+
+    // Long after the close, a fresh subscriber should NOT be popped with a stale win.
+    clock.advance(120_000);
+    const b = await makeFundedUser('50');
+    const cb = new TestClient(url(issueSession(b.userId)));
+    await cb.open();
+    await cb.waitFor('BALANCE_UPDATE');
+    cb.send({ type: 'SUBSCRIBE', room: auction.sellerId });
+    await cb.expectNone('AUCTION_CLOSED');
+
+    cb.close();
+  });
+});
+
 describe('wheel-spin randomizer (bid to win a roll)', () => {
   const WHEEL = [
     { label: 'Charizard ex — Alt Art', tier: 'Chase' },

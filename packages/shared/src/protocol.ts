@@ -129,6 +129,10 @@ export interface AuctionClosedMessage {
   /** True when a wheel spin will decide the prize — the client should defer the
    *  win celebration and wait for the RANDOMIZER_SPIN that follows. */
   wheel?: boolean;
+  /** True when this is a catch-up replay sent to a (re)subscribing client that
+   *  missed the live close (e.g. a dropped socket). The client should sync the
+   *  result quietly — surface the winner, but skip the full-screen celebration. */
+  replay?: boolean;
   serverNow: number;
 }
 /**

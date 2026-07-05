@@ -35,9 +35,13 @@ export interface BidAccepted {
 }
 
 export interface AuctionClosed {
+  auctionId: string;
   winnerHandle: string | null;
   amount: string | null;
   wheel?: boolean;
+  /** Catch-up replay for a client that missed the live close — sync the result
+   *  quietly (no full-screen celebration). */
+  replay?: boolean;
   serverNow: number;
 }
 
@@ -201,6 +205,9 @@ export interface RoomController {
   close: () => void;
   bid: (auctionId: string, amount: string) => void;
   enterGiveaway: (giveawayId: string) => void;
+  /** Force a re-subscribe to pull fresh state — used to recover a frozen timer
+   *  if a close broadcast was missed. */
+  resync: () => void;
 }
 
 /**
@@ -267,5 +274,6 @@ export function openRoom(room: string, h: Omit<Handlers, 'room'>): RoomControlle
     bid: (auctionId, amount) =>
       send({ type: 'BID_INTENT', auctionId, amount, clientNonce: Math.random().toString(36).slice(2) }),
     enterGiveaway: (giveawayId) => send({ type: 'GIVEAWAY_ENTER', giveawayId }),
+    resync: () => { if (ws && ws.readyState === WebSocket.OPEN) resync(); else open(); },
   };
 }

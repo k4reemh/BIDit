@@ -58,6 +58,7 @@ export default function BidPanel({
   const offset = useRef(0);
   const keyRef = useRef(0);
   const lastAuctionId = useRef<string | null>(null);
+  const celebratedId = useRef<string | null>(null);
   const item = useRef<{ title: string; image: string | null }>({ title: 'this item', image: null });
   const myHandle = session?.handle ?? null;
   const [, setTick] = useState(0);
@@ -88,8 +89,13 @@ export default function BidPanel({
       onClosed: (m) => {
         setSoldMsg(m.winnerHandle ? `Sold to @${m.winnerHandle} for $${m.amount}` : 'Auction ended — no sale');
         setAuction((a) => (a ? { ...a, status: 'SETTLING' } : a));
-        // A wheel auction defers its celebration to the spin; otherwise celebrate now.
-        if (!m.wheel && m.winnerHandle && m.amount) {
+        // A wheel auction defers its celebration to the spin; a `replay` is a
+        // catch-up for a missed close, so surface the winner but don't re-fire the
+        // full-screen celebration. Guard on auctionId so a duplicated close (a
+        // flaky socket can deliver it more than once) celebrates exactly once
+        // instead of remounting — and flickering — the overlay.
+        if (!m.wheel && !m.replay && m.winnerHandle && m.amount && celebratedId.current !== m.auctionId) {
+          celebratedId.current = m.auctionId;
           setWin({ winnerHandle: m.winnerHandle, amount: m.amount, title: item.current.title, imageUrl: item.current.image, isMe: m.winnerHandle === myHandle });
         }
       },
@@ -139,6 +145,16 @@ export default function BidPanel({
   const low = remaining !== null && remaining <= 10;
   const final = remaining !== null && remaining <= 5;
   const showExt = extended > 0 && Date.now() - extended < 1500;
+
+  // Self-heal a frozen timer: if the clock reaches 0 but no AUCTION_CLOSED lands
+  // (a dropped socket ate the one-shot event), nudge a re-sync every few seconds so
+  // the server replays the result and the panel unsticks instead of hanging at 0.
+  const stuck = !!running && remaining !== null && remaining <= 0;
+  useEffect(() => {
+    if (!stuck) return;
+    const t = setInterval(() => ctl.current?.resync(), 3000);
+    return () => clearInterval(t);
+  }, [stuck]);
 
   const placeBid = () => {
     setReject('');
@@ -205,7 +221,7 @@ export default function BidPanel({
               )}
               <div className="bp__bidrow">
                 <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : '—'}</b></div>
-                <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining!.toFixed(1)}s</div>
+                <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining! > 0 ? `${remaining!.toFixed(1)}s` : 'Settling…'}</div>
               </div>
               <div className="bp__barwrap">
                 <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
