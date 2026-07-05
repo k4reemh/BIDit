@@ -827,14 +827,18 @@ async function pumpStreamInfo(mint: string) {
   const m = mint.trim();
   if (!/^[A-Za-z0-9]{32,50}$/.test(m)) return { live: false as const };
   try {
-    const infoRes = await fetch(`https://livestream-api.pump.fun/livestream?mintId=${m}`, {
-      headers: { accept: 'application/json' },
+    // Title/thumbnail are best-effort. Cache-bust + no-cache: pump's GET /livestream
+    // is edge-cached and lags for ~a minute when a stream goes live, so we don't
+    // trust its isLive flag.
+    const infoRes = await fetch(`https://livestream-api.pump.fun/livestream?mintId=${m}&_=${Date.now()}`, {
+      headers: { accept: 'application/json', 'cache-control': 'no-cache' },
       signal: AbortSignal.timeout(6000),
-    });
-    const info = (infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
+    }).catch(() => null);
+    const info = (infoRes && infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
     const title = (info?.title as string) ?? null;
     const thumbnail = (info?.thumbnail as string) ?? null;
-    if (info?.isLive !== true) return { live: false as const, title, thumbnail };
+    // The join POST is uncached; a returned viewer token is the authoritative
+    // "live / joinable" signal (it comes back empty when nobody's streaming).
     const joinRes = await fetch('https://livestream-api.pump.fun/livestream/join', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },

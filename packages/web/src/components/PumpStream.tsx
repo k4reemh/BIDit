@@ -19,6 +19,7 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
   useEffect(() => {
     let cancelled = false;
     let room: Room | null = null;
+    let noVideo: ReturnType<typeof setTimeout> | undefined;
 
     (async () => {
       setStatus('loading');
@@ -32,6 +33,7 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
         room = new Room({ adaptiveStream: true, dynacast: true });
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
           if (track.kind === Track.Kind.Video && videoRef.current) {
+            clearTimeout(noVideo);
             track.attach(videoRef.current);
             setStatus('live');
           } else if (track.kind === Track.Kind.Audio && audioRef.current) {
@@ -41,7 +43,10 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
         });
         room.on(RoomEvent.Disconnected, () => !cancelled && setStatus('offline'));
         await room.connect(s.host, s.token);
-        if (cancelled) room.disconnect();
+        if (cancelled) { room.disconnect(); return; }
+        // Joined but no video track shows up (e.g. a room that lingers after the
+        // stream ended) → treat as offline instead of spinning forever.
+        noVideo = setTimeout(() => !cancelled && setStatus((st) => (st === 'live' ? st : 'offline')), 12_000);
       } catch {
         if (!cancelled) setStatus('error');
       }
@@ -49,6 +54,7 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
 
     return () => {
       cancelled = true;
+      clearTimeout(noVideo);
       room?.disconnect();
     };
   }, [mint]);
