@@ -759,6 +759,15 @@ async function main() {
       if (req.method === 'GET' && p === '/pump/coin') {
         return send(res, 200, await pumpCoinInfo(url.searchParams.get('mint') ?? ''));
       }
+      // Live stream token proxy: fetch a pump.fun viewer token so the browser can
+      // play the stream directly via LiveKit (no iframe, works past geo-blocks).
+      // Gated to coins linked to a BIDit seller.
+      if (req.method === 'GET' && p === '/pump/stream') {
+        const mint = url.searchParams.get('mint') ?? '';
+        const resolved = await resolveRoomByCoin(mint, prisma);
+        if (!resolved) return send(res, 200, { live: false, linked: false });
+        return send(res, 200, { linked: true, ...(await pumpStreamInfo(mint)) });
+      }
 
       // ---- dev conveniences (legacy dumb page + quick demos) ----
       if (req.method === 'POST' && p === '/dev/deposit') {
@@ -810,6 +819,36 @@ async function main() {
 // pump.fun coin metadata + live status, proxied server-side (their API sends no
 // CORS headers) and cached briefly so the homepage/watch page can't hammer it.
 const pumpCache = new Map<string, { at: number; data: unknown }>();
+// Pump.fun runs streams on LiveKit. `/livestream/join` mints a fresh watch-only
+// viewer token per call (unique identity) — never cache it, or viewers collide.
+const PUMP_LIVEKIT_HOST = process.env.BIDIT_PUMP_LIVEKIT_HOST ?? 'wss://pump-prod-tg2x8veh.livekit.cloud';
+
+async function pumpStreamInfo(mint: string) {
+  const m = mint.trim();
+  if (!/^[A-Za-z0-9]{32,50}$/.test(m)) return { live: false as const };
+  try {
+    const infoRes = await fetch(`https://livestream-api.pump.fun/livestream?mintId=${m}`, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
+    });
+    const info = (infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
+    const title = (info?.title as string) ?? null;
+    const thumbnail = (info?.thumbnail as string) ?? null;
+    if (info?.isLive !== true) return { live: false as const, title, thumbnail };
+    const joinRes = await fetch('https://livestream-api.pump.fun/livestream/join', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ mintId: m }),
+      signal: AbortSignal.timeout(6000),
+    });
+    const join = (joinRes.ok ? await joinRes.json() : null) as { token?: string } | null;
+    if (!join?.token) return { live: false as const, title, thumbnail };
+    return { live: true as const, title, thumbnail, host: PUMP_LIVEKIT_HOST, token: join.token };
+  } catch {
+    return { live: false as const };
+  }
+}
+
 async function pumpCoinInfo(mint: string) {
   const m = mint.trim();
   if (!/^[A-Za-z0-9]{32,50}$/.test(m)) return { unavailable: true, isLive: false };

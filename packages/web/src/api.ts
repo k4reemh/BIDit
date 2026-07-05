@@ -239,6 +239,16 @@ export interface ResolvedRoom {
 }
 export const getLive = () => req<LiveCoin[]>('/live');
 export const getPumpCoin = (mint: string) => req<PumpCoin>(`/pump/coin?mint=${encodeURIComponent(mint)}`);
+
+export interface PumpStream {
+  linked: boolean;
+  live: boolean;
+  title: string | null;
+  thumbnail: string | null;
+  host?: string;
+  token?: string;
+}
+export const getPumpStream = (mint: string) => req<PumpStream>(`/pump/stream?mint=${encodeURIComponent(mint)}`);
 /** Resolve a coin -> seller room. Returns null if no seller has linked it (404). */
 export async function resolveCoin(coin: string): Promise<ResolvedRoom | null> {
   try {

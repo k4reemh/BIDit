@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import BidPanel from '../components/BidPanel';
 import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
+
+// livekit-client is heavy — only load it on the watch page (and only this chunk).
+const PumpStream = lazy(() => import('../components/PumpStream'));
 import { resolveCoin, getPumpCoin, type ResolvedRoom, type PumpCoin, type Session } from '../api';
 
 /**
@@ -28,7 +31,6 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   }, [coin]);
 
   const pumpUrl = `https://pump.fun/coin/${coin}`;
-  const live = pump?.isLive === true;
   const title = pump?.name || 'Live stream';
   const sellerHandle = resolved?.sellerHandle;
 
@@ -37,28 +39,26 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
       <div className="watch__grid">
         <section className="watch__stage">
           <div className="theater">
-            {pump?.image
-              ? <img className="theater__art" src={pump.image} alt="" />
-              : <div className="theater__art theater__art--ph" />}
-            <div className="theater__scrim" />
+            <Suspense fallback={<div className="pstream__cover"><span className="muted">Loading stream…</span></div>}>
+            <PumpStream
+              mint={coin}
+              offline={
+                <>
+                  {pump?.image
+                    ? <img className="theater__art" src={pump.image} alt="" />
+                    : <div className="theater__art theater__art--ph" />}
+                  <div className="theater__scrim" />
+                  <div className="theater__center">
+                    <div className="theater__eyebrow">{sellerHandle ? `@${sellerHandle} isn’t streaming here right now` : 'Not streaming right now'}</div>
+                    <p className="theater__note">When they go live on pump.fun, the stream plays here automatically — no extension needed. Bidding happens in the panel →</p>
+                    <a className="btn btn-ghost" href={pumpUrl} target="_blank" rel="noreferrer">Open on pump.fun ↗</a>
+                  </div>
+                </>
+              }
+            />
+            </Suspense>
             <div className="theater__top">
-              <span className={`live-badge${live ? '' : ' off'}`}>{live ? <><span className="dot" /> LIVE</> : 'OFFLINE'}</span>
               {sellerHandle && <span className="theater__seller"><Avatar handle={sellerHandle} size={22} /> @{sellerHandle}</span>}
-            </div>
-            <div className="theater__center">
-              {live ? (
-                <>
-                  <div className="theater__eyebrow">● Streaming now on pump.fun</div>
-                  <a className="btn btn-primary btn-lg" href={pumpUrl} target="_blank" rel="noreferrer">Open the live video ↗</a>
-                  <p className="theater__note">Watch on pump.fun — bid right here on BIDit.</p>
-                </>
-              ) : (
-                <>
-                  <div className="theater__eyebrow">{sellerHandle ? `@${sellerHandle} isn’t live right now` : 'Not live right now'}</div>
-                  <p className="theater__note">When the seller goes live on pump.fun, it shows here. Bidding still happens in the panel →</p>
-                  <a className="btn btn-ghost" href={pumpUrl} target="_blank" rel="noreferrer">View coin on pump.fun ↗</a>
-                </>
-              )}
             </div>
           </div>
           <div className="watch__meta">
