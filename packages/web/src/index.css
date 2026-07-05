@@ -1137,6 +1137,11 @@ img { display: block; max-width: 100%; }
 .ord-pill--dispute_window { background: rgba(255, 106, 0, 0.16); color: var(--accent); }
 .ord-pill--disputed { background: rgba(239, 59, 78, 0.16); color: var(--red); }
 .ord-pill--released { background: rgba(34, 197, 138, 0.16); color: #1eb980; }
+.adm-pool { display: flex; gap: 28px; align-items: center; padding: 14px 18px; margin-bottom: 16px; }
+.adm-pool > div { display: flex; flex-direction: column; }
+.adm-pool b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.adm-pool .ok { color: #1eb980; }
+.adm-pool .bad { color: var(--red); }
 
 /* ---- embedded pump.fun stream (LiveKit) ---- */
 .pstream { position: absolute; inset: 0; background: #000; overflow: hidden; }

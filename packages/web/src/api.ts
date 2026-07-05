@@ -175,6 +175,13 @@ export interface AdminOrder {
 export const getAdminOrders = () => req<AdminOrder[]>('/admin/orders');
 export const adminOrderAction = (orderId: string, action: string, tracking?: string) =>
   req<{ status: string }>('/admin/order/action', { method: 'POST', body: JSON.stringify({ orderId, action, tracking }) });
+
+export interface LedgerAudit {
+  accounts: { id: string; kind: string; handle: string | null; balance: string }[];
+  systemTotal: string;
+  buybackPending: string;
+}
+export const getLedgerAudit = () => req<LedgerAudit>('/admin/audit');
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 

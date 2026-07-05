@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getAdminOrders, adminOrderAction, type AdminOrder, type Session } from '../../api';
+import { getAdminOrders, adminOrderAction, getLedgerAudit, type AdminOrder, type LedgerAudit, type Session } from '../../api';
 
 const fmt = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
@@ -22,10 +22,14 @@ function actionsFor(status: string): { label: string; action: string; danger?: b
 
 export default function AdminOrders({ session }: { session: Session | null }) {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
+  const [audit, setAudit] = useState<LedgerAudit | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = () => getAdminOrders().then(setOrders).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+  const load = () => {
+    getAdminOrders().then(setOrders).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getLedgerAudit().then(setAudit).catch(() => {});
+  };
   useEffect(() => {
     if (session?.isAdmin) void load();
   }, [session?.isAdmin]);
@@ -51,8 +55,14 @@ export default function AdminOrders({ session }: { session: Session | null }) {
       <div className="acct-head">
         <div className="adm-nav"><Link to="/admin/sellers">Sellers</Link> <span>·</span> <Link to="/admin/orders" className="active">Orders</Link></div>
         <h1 className="display acct-title">Orders</h1>
-        <p className="muted">Drive the escrow flow: shipped → delivered → released. Funds release once an order clears its dispute window (auto after the window, or release here).</p>
+        <p className="muted">Drive the escrow flow: shipped → delivered → released. Funds release once an order clears its dispute window (auto after the window, or release here). On release the seller gets 95%; 5% accrues below.</p>
       </div>
+      {audit && (
+        <div className="adm-pool card acct-card">
+          <div><span className="muted">Buyback + buyer-protection pool</span><b>${audit.buybackPending}</b></div>
+          <div><span className="muted">Ledger total (must be $0)</span><b className={audit.systemTotal === '0' ? 'ok' : 'bad'}>${audit.systemTotal}</b></div>
+        </div>
+      )}
       {error && <div className="auth__error">{error}</div>}
       {orders && orders.length === 0 && <p className="muted">No orders yet. (In direct-payout mode, sales settle instantly and won’t appear here as held orders.)</p>}
 
