@@ -822,6 +822,10 @@ const pumpCache = new Map<string, { at: number; data: unknown }>();
 // Pump.fun runs streams on LiveKit. `/livestream/join` mints a fresh watch-only
 // viewer token per call (unique identity) — never cache it, or viewers collide.
 const PUMP_LIVEKIT_HOST = process.env.BIDIT_PUMP_LIVEKIT_HOST ?? 'wss://pump-prod-tg2x8veh.livekit.cloud';
+// pump.fun's APIs sit behind Cloudflare, which 403s Node's default fetch UA
+// ("Just a moment…"). A real browser UA passes the bot check.
+const PUMP_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 async function pumpStreamInfo(mint: string) {
   const m = mint.trim();
@@ -831,7 +835,7 @@ async function pumpStreamInfo(mint: string) {
     // is edge-cached and lags for ~a minute when a stream goes live, so we don't
     // trust its isLive flag.
     const infoRes = await fetch(`https://livestream-api.pump.fun/livestream?mintId=${m}&_=${Date.now()}`, {
-      headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+      headers: { accept: 'application/json', 'cache-control': 'no-cache', 'user-agent': PUMP_UA },
       signal: AbortSignal.timeout(6000),
     }).catch(() => null);
     const info = (infoRes && infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
@@ -841,7 +845,7 @@ async function pumpStreamInfo(mint: string) {
     // "live / joinable" signal (it comes back empty when nobody's streaming).
     const joinRes = await fetch('https://livestream-api.pump.fun/livestream/join', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': PUMP_UA },
       body: JSON.stringify({ mintId: m }),
       signal: AbortSignal.timeout(6000),
     });
@@ -860,7 +864,7 @@ async function pumpCoinInfo(mint: string) {
   if (cached && Date.now() - cached.at < 15_000) return cached.data;
   try {
     const r = await fetch(`https://frontend-api-v3.pump.fun/coins/${m}`, {
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', 'user-agent': PUMP_UA },
       signal: AbortSignal.timeout(6000),
     });
     if (!r.ok) return { unavailable: true, isLive: false };
