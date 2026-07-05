@@ -13,7 +13,7 @@ import {
   type RandomizerSpin,
 } from '../realtime';
 import type { Session } from '../api';
-import { Gift, Bolt } from '../icons';
+import { Gift, Bolt, Dice, Chevron } from '../icons';
 
 interface Feed { who: string; amt: string; key: number }
 
@@ -182,7 +182,8 @@ export default function BidPanel({
               {auction!.wheel && auction!.wheel.length > 0 && (
                 <div className="bp__prizes-wrap">
                   <button type="button" className="bp__prizes-toggle" onClick={() => setShowPrizes((v) => !v)}>
-                    {auction!.wheel!.length} prizes on the wheel <span className="bp__prizes-chev">{showPrizes ? '▲' : '▼'}</span>
+                    <Dice width={14} height={14} /> {auction!.wheel!.length} prizes on the wheel
+                    <Chevron width={14} height={14} className={`bp__prizes-chev${showPrizes ? ' up' : ''}`} />
                   </button>
                   {showPrizes && (
                     <div className="bp__prizes">
@@ -206,6 +207,16 @@ export default function BidPanel({
                 {auction!.leaderHandle
                   ? <><Avatar handle={auction!.leaderHandle} size={18} /> <b>@{auction!.leaderHandle}</b> leading</>
                   : <>No bids yet</>}
+              </div>
+              <div className="bp__quick">
+                {[0, 5, 10].map((inc) => {
+                  const v = Math.round((Number(minNext) + inc) * 100) / 100;
+                  return (
+                    <button key={inc} type="button" className={`bp__quickbtn${Number(amount) === v ? ' on' : ''}`} onClick={() => setAmount(String(v))}>
+                      {inc === 0 ? `Min $${minNext}` : `+$${inc}`}
+                    </button>
+                  );
+                })}
               </div>
               <div className="bp__act">
                 <div className="bp__amt">

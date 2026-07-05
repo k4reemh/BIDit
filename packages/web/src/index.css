@@ -879,7 +879,12 @@ img { display: block; max-width: 100%; }
 .bp__leader { display: flex; align-items: center; gap: 7px; padding: 11px 16px 0; font-size: 13px; color: var(--muted); }
 .bp__leader b { color: var(--ink); font-weight: 600; }
 
-.bp__act { display: flex; gap: 9px; padding: 14px 16px 0; }
+.bp__quick { display: flex; gap: 7px; padding: 12px 16px 0; }
+.bp__quickbtn { flex: 1; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-size: 13px; font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums; transition: border-color 0.12s, background 0.12s, color 0.12s; }
+.bp__quickbtn:hover { border-color: rgba(255, 106, 0, 0.45); }
+.bp__quickbtn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.bp__act { display: flex; gap: 9px; padding: 12px 16px 0; }
 .bp__amt { display: flex; align-items: center; gap: 2px; width: 96px; height: 46px; padding: 0 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
 .bp__amt span { color: var(--muted); font-weight: 600; }
 .bp__amt input { width: 100%; border: 0; outline: none; background: none; font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -1027,7 +1032,9 @@ img { display: block; max-width: 100%; }
 .bp__prizes-toggle { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
   height: 34px; border-radius: 9px; background: var(--surface-3); font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .bp__prizes-toggle:hover { background: var(--line-2); }
-.bp__prizes-chev { color: var(--faint); font-size: 10px; }
+.bp__prizes-chev { color: var(--faint); transition: transform 0.16s ease; }
+.bp__prizes-chev.up { transform: rotate(180deg); }
+.bp__prizes-toggle svg:first-child { color: var(--accent); }
 .bp__prizes { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto;
   border: 1px solid var(--line-2); border-radius: 10px; padding: 4px; }
 .bp__prize { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 7px; font-size: 13.5px; }
