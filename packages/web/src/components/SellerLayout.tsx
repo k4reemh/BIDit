@@ -88,7 +88,7 @@ export default function SellerLayout({
     <main className="container sl">
       <aside className="sl__side">
         <div className="sl__brand">
-          <Avatar handle={session.handle} size={42} />
+          <Avatar handle={session.handle} src={session.avatarUrl} size={42} />
           <div className="sl__brandid">
             <b>{name}</b>
             {session.verified ? (

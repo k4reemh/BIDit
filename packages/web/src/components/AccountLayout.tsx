@@ -45,7 +45,7 @@ export default function AccountLayout({
     <main className="container acct">
       <aside className="acct__side">
         <div className="acct__me">
-          <Avatar handle={session.handle} size={46} />
+          <Avatar handle={session.handle} src={session.avatarUrl} size={46} />
           <div className="acct__meid">
             <b>{name}</b>
             <span className="muted">@{session.handle}</span>

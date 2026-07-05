@@ -3,6 +3,7 @@ import Avatar from './Avatar';
 import GiveawayReveal from './GiveawayReveal';
 import WinCelebration, { type WinInfo } from './WinCelebration';
 import WheelReveal from './WheelReveal';
+import BidSparks from './BidSparks';
 import {
   openRoom,
   type RoomController,
@@ -51,6 +52,7 @@ export default function BidPanel({
   const [spin, setSpin] = useState<RandomizerSpin | null>(null);
   const [win, setWin] = useState<WinInfo | null>(null);
   const [showPrizes, setShowPrizes] = useState(false);
+  const [extended, setExtended] = useState(0); // timestamp of the last anti-snipe extension
 
   const ctl = useRef<RoomController | null>(null);
   const offset = useRef(0);
@@ -81,6 +83,7 @@ export default function BidPanel({
         offset.current = m.serverNow - Date.now();
         setAuction((a) => (a ? { ...a, currentBid: m.amount, leaderHandle: m.leaderHandle, endsAt: m.endsAt } : a));
         setFeed((f) => [{ who: m.leaderHandle, amt: m.amount, key: keyRef.current++ }, ...f].slice(0, 6));
+        if (m.extended) setExtended(Date.now()); // late bid pushed the clock — flash EXTENDED
       },
       onClosed: (m) => {
         setSoldMsg(m.winnerHandle ? `Sold to @${m.winnerHandle} for $${m.amount}` : 'Auction ended — no sale');
@@ -134,6 +137,8 @@ export default function BidPanel({
   const remaining = running && auction!.endsAt ? Math.max(0, (auction!.endsAt - (Date.now() + offset.current)) / 1000) : null;
   const pct = remaining !== null && auction!.durationSeconds ? Math.max(0, Math.min(100, (remaining / auction!.durationSeconds) * 100)) : 0;
   const low = remaining !== null && remaining <= 10;
+  const final = remaining !== null && remaining <= 5;
+  const showExt = extended > 0 && Date.now() - extended < 1500;
 
   const placeBid = () => {
     setReject('');
@@ -155,7 +160,7 @@ export default function BidPanel({
   const gLow = gRemaining <= 5;
 
   return (
-    <aside className="bp">
+    <aside className={`bp${running && final ? ' bp--final' : ''}`}>
       <div className="bp__head">
         <span className="bp__brand"><Bolt width={15} height={15} /> Live bidding</span>
         {session && <span className="bp__bal" title="Your wallet balance">${balance}</span>}
@@ -200,9 +205,13 @@ export default function BidPanel({
               )}
               <div className="bp__bidrow">
                 <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : '—'}</b></div>
-                <div className={`bp__timer${low ? ' low' : ''}`}>{remaining!.toFixed(1)}s</div>
+                <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining!.toFixed(1)}s</div>
               </div>
-              <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
+              <div className="bp__barwrap">
+                <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
+                {low && <BidSparks fill={pct / 100} active={low} />}
+              </div>
+              {showExt && <div className="bp__ext" key={extended}>EXTENDED — clock reset!</div>}
               <div className="bp__leader">
                 {auction!.leaderHandle
                   ? <><Avatar handle={auction!.leaderHandle} size={18} /> <b>@{auction!.leaderHandle}</b> leading</>

@@ -55,7 +55,7 @@ export default function TopNav({
               <NotificationBell />
               <button className="icon-btn" aria-label="Rewards"><Gift /></button>
               <button className="nav__avatar" onClick={() => setMenu((v) => !v)} aria-label="Account">
-                <Avatar handle={user.handle} size={36} />
+                <Avatar handle={user.handle} src={user.avatarUrl} size={36} />
               </button>
             </>
           ) : (

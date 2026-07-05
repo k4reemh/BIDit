@@ -13,7 +13,9 @@ import type { GiveawayWinner } from '../realtime';
  */
 const TILE_W = 96;
 const CENTER_TILES = 2;
+const OVERSHOOT = 22; // px the strip sails past the winner before springing back
 const easeOutQuart = (p: number): number => 1 - Math.pow(1 - p, 4);
+const easeOutCubic = (p: number): number => 1 - Math.pow(1 - p, 3);
 
 export default function GiveawayReveal({
   win,
@@ -31,14 +33,28 @@ export default function GiveawayReveal({
 
   useEffect(() => {
     const offset = win.serverNow - Date.now();
+    const strip = stripRef.current;
     const startX = CENTER_TILES * TILE_W;
     const endX = (CENTER_TILES - win.targetIndex) * TILE_W;
+    const overshoot = win.targetIndex < win.roll.length - 1 ? OVERSHOOT : 0;
+    const sailX = endX - overshoot;
     let raf = 0;
     let done = false;
+    let prevX = startX;
+    let lastBlur = -1;
+    const setBlur = (v: number) => {
+      const b = Math.round(Math.min(7, v * 0.16) * 2) / 2; // dedupe to 0.5px steps
+      if (b === lastBlur || !strip) return;
+      lastBlur = b;
+      strip.style.filter = b > 0.4 ? `blur(${b}px)` : 'none';
+    };
     const finish = () => {
       if (done) return;
       done = true;
-      if (stripRef.current) stripRef.current.style.transform = `translateX(${endX}px)`;
+      if (strip) {
+        strip.style.transform = `translate3d(${endX}px, 0, 0)`;
+        strip.style.filter = 'none';
+      }
       setLanded(true);
       runConfetti(canvasRef.current);
       window.setTimeout(() => setLeaving(true), 5600);
@@ -47,8 +63,14 @@ export default function GiveawayReveal({
     const frame = () => {
       const elapsed = Date.now() + offset - win.startsAt;
       const p = Math.max(0, Math.min(1, elapsed / win.durationMs));
-      const x = startX + (endX - startX) * easeOutQuart(p);
-      if (stripRef.current) stripRef.current.style.transform = `translateX(${x}px)`;
+      // Sail just past the winner for the first 90%, then spring the last bit back.
+      const x =
+        p < 0.9
+          ? startX + (sailX - startX) * easeOutQuart(p / 0.9)
+          : sailX + (endX - sailX) * easeOutCubic((p - 0.9) / 0.1);
+      setBlur(Math.abs(x - prevX));
+      prevX = x;
+      if (strip) strip.style.transform = `translate3d(${x}px, 0, 0)`;
       if (p >= 1) finish();
       else raf = requestAnimationFrame(frame);
     };
@@ -73,7 +95,7 @@ export default function GiveawayReveal({
           <div className="gvr__spot" />
           <div className="gvr__strip" ref={stripRef}>
             {win.roll.map((e, i) => (
-              <div className="gvr__tile" key={i}>
+              <div className={`gvr__tile${landed && i === win.targetIndex ? ' gvr__tile--win' : ''}`} key={i}>
                 <Avatar handle={e.handle} size={66} />
                 <span className="gvr__h">@{e.handle}</span>
               </div>

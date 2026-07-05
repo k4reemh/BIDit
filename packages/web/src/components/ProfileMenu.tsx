@@ -30,7 +30,7 @@ export default function ProfileMenu({
       <div className="pm__backdrop" onClick={onClose} />
       <div className="pm card" role="menu">
         <Link to="/profile" className="pm__header" onClick={onClose}>
-          <Avatar handle={user.handle} size={52} />
+          <Avatar handle={user.handle} src={user.avatarUrl} size={52} />
           <div className="pm__id">
             <b>{user.handle}</b>
             <span className="muted">
