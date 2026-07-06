@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "BIDit backend — the authoritative engine. Chunk 1: data model + balance ledger.",
+  "description": "BIDit backend — the authoritative auction engine, real-time server, ledger, and USDC settlement rails.",
   "scripts": {
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate",

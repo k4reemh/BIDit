@@ -70,7 +70,6 @@ packages/
   backend/     Prisma schema · ledger · auction engine · WS server · Solana rails · tests
   web/         React + Vite consumer app (homepage, live page, dashboards, admin)
   extension/   Manifest V3 overlay for Pump.fun pages
-docs/          deploy notes + runbooks
 ```
 
 ## Run it locally
@@ -102,9 +101,7 @@ npm test
 ## Deployment
 
 The backend deploys to Render (blueprint in [`render.yaml`](render.yaml)) with a
-managed Postgres; the web app deploys to Vercel. See
-[`docs/DEPLOY.md`](docs/DEPLOY.md) and, for the live-USDC checklist,
-[`docs/MAINNET-TEST.md`](docs/MAINNET-TEST.md).
+managed Postgres; the web app deploys to Vercel.
 
 ## Status
 

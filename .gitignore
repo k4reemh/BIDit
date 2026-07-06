@@ -18,3 +18,8 @@ packages/backend/src/generated/
 # macOS + local tooling
 .DS_Store
 .claude/
+
+# internal operator runbooks — kept local, not for the public repo
+docs/DEPLOY.md
+docs/DEVNET.md
+docs/MAINNET-TEST.md
