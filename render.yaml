@@ -39,6 +39,8 @@ services:
         value: "yes"
       - key: USDC_MINT
         value: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v # mainnet USDC
+      - key: BIDIT_PROMO_START
+        value: "2026-07-14T00:00:00-06:00" # "$100 to sell" promo opens (3-day enrollment window). Remove/blank to disable.
       # ---- secrets: set these in the Render dashboard, never commit ----
       - key: SOLANA_RPC
         sync: false # your mainnet RPC (Helius/QuickNode)

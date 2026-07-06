@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getSellerApplications, verifySellerAdmin, type SellerApplication, type Session } from '../../api';
+import { getSellerApplications, verifySellerAdmin, getAdminPromo, markPromoPaid, type SellerApplication, type AdminPromo, type Session } from '../../api';
 import { Check } from '../../icons';
 
 const fmt = (ms: number | null) =>
@@ -8,14 +8,21 @@ const fmt = (ms: number | null) =>
 
 export default function AdminSellers({ session }: { session: Session | null }) {
   const [rows, setRows] = useState<SellerApplication[] | null>(null);
+  const [promo, setPromo] = useState<AdminPromo | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = () =>
     getSellerApplications().then(setRows).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+  const loadPromo = () => getAdminPromo().then(setPromo).catch(() => {});
   useEffect(() => {
-    if (session?.isAdmin) void load();
+    if (session?.isAdmin) { void load(); void loadPromo(); }
   }, [session?.isAdmin]);
+
+  const pay = async (userId: string) => {
+    setBusy('pay:' + userId);
+    try { await markPromoPaid(userId); await loadPromo(); } finally { setBusy(null); }
+  };
 
   if (!session) return <Gate>Sign in with an admin account.</Gate>;
   if (!session.isAdmin) return <Gate>Your account isn’t an admin. Add your email to <code>BIDIT_ADMIN_EMAILS</code> on the backend.</Gate>;
@@ -42,7 +49,49 @@ export default function AdminSellers({ session }: { session: Session | null }) {
       </div>
       {error && <div className="auth__error">{error}</div>}
 
-      <h2 className="acct-sub" style={{ fontSize: 16, marginTop: 8 }}>Unverified · {pending.length}</h2>
+      {promo?.configured && (
+        <section>
+          <h2 className="acct-sub" style={{ fontSize: 16, marginTop: 8 }}>
+            Launch ${promo.bonusUsd} promo · {promo.sellers.length} enrolled {promo.active ? '· signups open' : '· signups closed'}
+          </h2>
+          <p className="muted" style={{ marginBottom: 10 }}>
+            Sellers who joined in the first 3 days. Once someone hits ${promo.bonusUsd} fulfilled, send the ${promo.bonusUsd} USDC bonus <b>manually to their wallet</b>, then mark it paid. This list moves no treasury funds.
+          </p>
+          {promo.sellers.length === 0 && <p className="muted">No enrolled sellers yet.</p>}
+          {promo.sellers.map((s) => (
+            <div className="card acct-card adm-row" key={s.userId}>
+              <div className="adm-row__head">
+                <div className="adm-row__id">
+                  <b>@{s.handle}</b>
+                  {s.earned ? (
+                    s.paidAt ? (
+                      <span className="vbadge"><Check width={12} height={12} /> Bonus paid</span>
+                    ) : (
+                      <span className="vbadge vbadge--pending">Eligible — pay ${promo.bonusUsd}</span>
+                    )
+                  ) : (
+                    <span className="muted">${s.fulfilledUsd} / ${promo.bonusUsd} fulfilled</span>
+                  )}
+                </div>
+                {s.earned && !s.paidAt && (
+                  <button className="btn btn-primary btn-sm" onClick={() => pay(s.userId)} disabled={busy === 'pay:' + s.userId}>
+                    {busy === 'pay:' + s.userId ? 'Saving…' : `Mark $${promo.bonusUsd} paid`}
+                  </button>
+                )}
+              </div>
+              <div className="adm-row__grid">
+                <span><b>Fulfilled</b> ${s.fulfilledUsd} / ${promo.bonusUsd}</span>
+                <span><b>Joined</b> {fmt(s.joinedAt)}</span>
+                <span><b>Email</b> {s.email ?? '—'}</span>
+                <span><b>Payout wallet</b> {s.payoutWalletAddress ? `${s.payoutWalletAddress.slice(0, 10)}…` : '—'}</span>
+                <span><b>Bonus paid</b> {s.paidAt ? fmt(s.paidAt) : '—'}</span>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <h2 className="acct-sub" style={{ fontSize: 16, marginTop: 26 }}>Unverified · {pending.length}</h2>
       {rows && pending.length === 0 && <p className="muted">No unverified sellers.</p>}
       {pending.map((r) => <Row key={r.userId} r={r} onVerify={verify} busy={busy === r.userId} />)}
 

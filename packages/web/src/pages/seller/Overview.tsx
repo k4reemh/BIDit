@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeller } from '../../components/SellerLayout';
-import { getListings, getSellerOrders, type SellerListing, type SellerOrder } from '../../api';
+import { getListings, getSellerOrders, getSellerPromo, type SellerListing, type SellerOrder, type SellerPromoStatus } from '../../api';
 import { Tag, Dice, Truck, ArrowRight } from '../../icons';
 
 const sum = (xs: string[]) => xs.reduce((a, b) => a + (parseFloat(b) || 0), 0);
@@ -11,11 +11,17 @@ export default function Overview() {
   const { session } = useSeller();
   const [listings, setListings] = useState<SellerListing[]>([]);
   const [orders, setOrders] = useState<SellerOrder[]>([]);
+  const [promo, setPromo] = useState<SellerPromoStatus | null>(null);
 
   useEffect(() => {
     getListings().then(setListings).catch(() => {});
     getSellerOrders().then(setOrders).catch(() => {});
+    getSellerPromo().then(setPromo).catch(() => {});
   }, []);
+
+  const promoFulfilled = promo ? parseFloat(promo.fulfilledUsd) || 0 : 0;
+  const promoPct = promo ? Math.min(100, (promoFulfilled / promo.thresholdUsd) * 100) : 0;
+  const promoLeft = promo ? Math.max(0, promo.thresholdUsd - promoFulfilled) : 0;
 
   const gmv = sum(orders.map((o) => o.amount));
   const bid = sum(orders.map((o) => o.platformFee));
@@ -41,6 +47,35 @@ export default function Overview() {
         <h1 className="display acct-title">Welcome back, {session.displayName || session.handle}</h1>
         <p className="muted">Here’s your shop at a glance.</p>
       </div>
+
+      {promo?.enrolled && (
+        <div className={`promo-card${promo.earned ? ' promo-card--won' : ''}`}>
+          <div className="promo-card__head">
+            <span className="promo-card__badge">Launch bonus</span>
+            {promo.earned ? (
+              <span className="promo-card__amt">${promo.bonusUsd} USDC {promo.paid ? 'paid ✓' : 'earned 🎉'}</span>
+            ) : (
+              <span className="promo-card__amt">Earn ${promo.bonusUsd} USDC</span>
+            )}
+          </div>
+          {promo.earned ? (
+            <p className="promo-card__msg">
+              {promo.paid
+                ? `Your $${promo.bonusUsd} USDC bonus has been sent — thanks for selling on BIDit!`
+                : `You fulfilled $${promo.thresholdUsd} of orders — your $${promo.bonusUsd} USDC bonus is on its way to your wallet.`}
+            </p>
+          ) : (
+            <>
+              <p className="promo-card__msg">Fulfill <b>${promo.thresholdUsd}</b> of orders as a launch seller and we match it with <b>${promo.bonusUsd} USDC</b>, paid to your wallet.</p>
+              <div className="promo-card__bar"><div className="promo-card__fill" style={{ width: `${promoPct}%` }} /></div>
+              <div className="promo-card__meta">
+                <span><b>${promoFulfilled.toFixed(2)}</b> of ${promo.thresholdUsd} fulfilled</span>
+                <span className="muted">${promoLeft.toFixed(2)} to go</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="stat-grid">
         {stats.map((s) => (

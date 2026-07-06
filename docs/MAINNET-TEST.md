@@ -50,12 +50,19 @@ BIDIT_PAYOUT_MODE="direct"
 # sessions — set a strong random value (not the dev default)
 AUTH_SECRET="<long random string>"
 
+# OPTIONAL: launch "$100 to sell" promo. Set to your launch moment (ISO-8601 or
+# ms). Sellers who JOIN within 3 days of this and then fulfil $100 of orders earn
+# a $100 USDC match (paid MANUALLY, off-platform — nothing here moves treasury).
+# Unset ⇒ promo hidden everywhere. Track who earned it in Admin → Sellers.
+BIDIT_PROMO_START="2026-07-10T17:00:00Z"
+
 PORT="8787"
 ```
 
 Notes:
 - `ESCROW_SECRET` / `BUYBACK_SECRET` are **not needed** in direct mode — they fall back to the treasury wallet and are never used.
 - The backend **refuses to start on mainnet** if `BIDIT_ALLOW_MAINNET` isn't `yes` or if `BIDIT_WALLET_SEED` is weak/default. That's intentional.
+- The **$100 seller promo** shows a banner on the homepage + a progress card on the seller dashboard while the 3-day window is open. Pay each earner's $100 USDC yourself, then **Admin → Sellers → Mark $100 paid** so it stays off the to-pay list. (Adds a `promoBonusPaidAt` column — `prisma db push` picks it up.)
 
 ## Run it
 Point the backend at your managed Postgres and run the server **directly** (not through the embedded-DB wrapper):

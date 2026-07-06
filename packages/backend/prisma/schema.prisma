@@ -147,6 +147,10 @@ model SellerProfile {
   weeklyBundling      Boolean   @default(false)
   shipLater           Boolean   @default(false)
   privateShipping     Boolean   @default(false)
+  // Launch "$100 to sell" promo: set once the seller's $100 bonus has been paid
+  // out manually (off-platform). Enrollment is derived from createdAt vs the
+  // promo window, so no flag is needed for that.
+  promoBonusPaidAt    DateTime?
   createdAt           DateTime  @default(now())
 }
 

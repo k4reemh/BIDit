@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import LiveCard from '../components/LiveCard';
 import LiveCoinCard from '../components/LiveCoinCard';
 import { FEATURED, CATEGORIES } from '../data';
-import { getLive, type LiveCoin } from '../api';
+import { getLive, getPromo, type LiveCoin, type PromoState } from '../api';
 import { ArrowRight, Bolt, Truck, Wallet } from '../icons';
 
 export default function Home({ onAuth }: { onAuth: () => void }) {
   const [live, setLive] = useState<LiveCoin[] | null>(null);
+  const [promo, setPromo] = useState<PromoState | null>(null);
   useEffect(() => {
     getLive().then(setLive).catch(() => setLive([]));
+    getPromo().then(setPromo).catch(() => setPromo(null));
   }, []);
   return (
     <main>
@@ -32,6 +34,22 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
           </div>
         </div>
       </section>
+
+      {/* ---- launch seller promo ---- */}
+      {promo?.active && (
+        <section className="container promo-wrap">
+          <a href="/sell" className="promo-band">
+            <span className="promo-band__badge"><Bolt width={13} height={13} /> Launch offer · first 3 days</span>
+            <div className="promo-band__body">
+              <b className="promo-band__title">Start selling on BIDit — earn a ${promo.bonusUsd} USDC bonus</b>
+              <span className="promo-band__sub">
+                Become a seller, fulfill <b>${promo.thresholdUsd}</b> of orders, and we match it with <b>${promo.bonusUsd} USDC</b> — paid straight to your wallet.
+              </span>
+            </div>
+            <span className="promo-band__cta">Start selling <ArrowRight width={18} height={18} /></span>
+          </a>
+        </section>
+      )}
 
       {/* ---- featured live ---- */}
       <section id="featured" className="section container">
