@@ -24,12 +24,12 @@ export const FEATURED: LiveAuction[] = [
 
 /** Category tiles — real imagery (Whatnot-style), no emoji. */
 export const CATEGORIES = [
-  { name: 'Pokémon', image: 'https://images.unsplash.com/photo-1607435097405-db48f377bff6?w=600&q=80&auto=format&fit=crop' },
-  { name: 'One Piece', image: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=600&q=80&auto=format&fit=crop' },
-  { name: 'Sports Cards', image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&q=80&auto=format&fit=crop' },
-  { name: 'Sealed & Boxes', image: 'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?w=600&q=80&auto=format&fit=crop' },
-  { name: 'Graded Slabs', image: 'https://images.unsplash.com/photo-1608889825205-eebdb9fc5806?w=600&q=80&auto=format&fit=crop' },
-  { name: 'Mystery & Breaks', image: 'https://images.unsplash.com/photo-1595246140625-573b715d11dc?w=600&q=80&auto=format&fit=crop' },
+  { name: 'Pokémon', image: '/categories/pokemon.jpg' },
+  { name: 'One Piece', image: '/categories/one-piece.jpg' },
+  { name: 'Sports Cards', image: '/categories/sports-cards.jpg' },
+  { name: 'Sealed Items', image: '/categories/sealed.jpg' },
+  { name: 'Technology', image: '/categories/technology.jpg' },
+  { name: 'Clothes', image: '/categories/clothes.jpg' },
 ];
 
 /** Interest options shown during onboarding (labels only — no emoji). */
