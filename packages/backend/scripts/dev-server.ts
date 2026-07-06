@@ -38,6 +38,7 @@ import {
   AuthError,
 } from '../src/authz.js';
 import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
+import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '../src/promo.js';
 import {
   resolveRoomByCoin,
   linkCoinToSeller,
@@ -480,6 +481,16 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await sellerOrdersDto(userId));
       }
+      // Public: launch "$100 to sell" promo state (drives the homepage banner).
+      if (req.method === 'GET' && p === '/promo') {
+        return send(res, 200, promoState());
+      }
+      // This seller's promo progress ($ fulfilled toward the $100 bonus).
+      if (req.method === 'GET' && p === '/seller/promo') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await sellerPromoStatus(userId, prisma));
+      }
       if (req.method === 'POST' && p === '/seller/coin') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -675,6 +686,22 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await listSellers(userId, prisma));
+      }
+      // Admin: enrolled sellers + $ fulfilled, so you know who to pay the $100.
+      if (req.method === 'GET' && p === '/admin/promo') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        return send(res, 200, await listPromoSellers(prisma));
+      }
+      // Admin: mark a seller's $100 bonus as paid (records it; moves no funds).
+      if (req.method === 'POST' && p === '/admin/promo/mark-paid') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        await markPromoPaid(String(b.sellerUserId), prisma);
+        return send(res, 200, { ok: true });
       }
       if (req.method === 'POST' && p === '/admin/verify-seller') {
         const userId = authUser(req);

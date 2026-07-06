@@ -158,6 +158,49 @@ export const getSellerApplications = () => req<SellerApplication[]>('/admin/sell
 export const verifySellerAdmin = (sellerUserId: string) =>
   req<{ ok: boolean }>('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
 
+// ---- launch "$100 to sell" promo ----
+export interface PromoState {
+  active: boolean;
+  bonusUsd: number;
+  thresholdUsd: number;
+  startMs: number | null;
+  enrollEndsMs: number | null;
+}
+export const getPromo = () => req<PromoState>('/promo');
+
+export interface SellerPromoStatus {
+  promoActive: boolean;
+  enrolled: boolean;
+  fulfilledUsd: string;
+  thresholdUsd: number;
+  bonusUsd: number;
+  earned: boolean;
+  paid: boolean;
+}
+export const getSellerPromo = () => req<SellerPromoStatus>('/seller/promo');
+
+export interface PromoSellerRow {
+  userId: string;
+  handle: string;
+  email: string | null;
+  joinedAt: number;
+  fulfilledUsd: string;
+  earned: boolean;
+  paidAt: number | null;
+  payoutWalletAddress: string | null;
+}
+export interface AdminPromo {
+  configured: boolean;
+  startMs: number | null;
+  enrollEndsMs: number | null;
+  bonusUsd: number;
+  active: boolean;
+  sellers: PromoSellerRow[];
+}
+export const getAdminPromo = () => req<AdminPromo>('/admin/promo');
+export const markPromoPaid = (sellerUserId: string) =>
+  req<{ ok: boolean }>('/admin/promo/mark-paid', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
+
 export interface AdminOrder {
   id: string;
   status: string;
