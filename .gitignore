@@ -14,3 +14,7 @@ packages/backend/.pgdata*/
 
 # Prisma generated client (regenerated from schema)
 packages/backend/src/generated/
+
+# macOS + local tooling
+.DS_Store
+.claude/
