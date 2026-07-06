@@ -239,7 +239,7 @@ img { display: block; max-width: 100%; }
 
 /* seller cta */
 .cta-band { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 40px 44px;
-  border-radius: var(--r-xl); background: var(--ink); color: #fff; }
+  border-radius: var(--r-xl); background: var(--navy); color: #fff; }
 .cta-band__title { font-size: 28px; margin-bottom: 7px; }
 .cta-band p { color: rgba(255, 255, 255, 0.66); font-size: 15px; max-width: 520px; }
 
