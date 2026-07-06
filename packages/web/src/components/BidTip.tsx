@@ -16,9 +16,9 @@ export default function BidTip() {
       </button>
       <div className="bidtip__h"><Bolt width={16} height={16} /> New here? How bidding works</div>
       <ul className="bidtip__list">
-        <li><Check width={14} height={14} /> Tap to bid — you’re only charged if you <b>win</b>. Bids just reserve funds.</li>
-        <li><Check width={14} height={14} /> A late bid <b>extends the clock</b> — no last-second snipes.</li>
-        <li><Check width={14} height={14} /> Win it and it lands in <b>Ready to ship</b>.</li>
+        <li><Check width={14} height={14} /><span>Tap to bid — you’re only charged if you <b>win</b>. Bids just reserve funds.</span></li>
+        <li><Check width={14} height={14} /><span>A late bid <b>extends the clock</b> — no last-second snipes.</span></li>
+        <li><Check width={14} height={14} /><span>Win it and it lands in <b>Ready to ship</b>.</span></li>
       </ul>
     </div>
   );

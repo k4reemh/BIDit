@@ -7,6 +7,7 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
   const [title, setTitle] = useState('');
   const [image, setImage] = useState('');
   const [startingBid, setStartingBid] = useState('1');
+  const [buyNow, setBuyNow] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [weight, setWeight] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,6 +22,7 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
         title: title.trim(),
         imageUrl: image || undefined,
         startingBid,
+        buyNowPrice: buyNow.trim() || undefined,
         quantity: Math.max(1, Number(quantity) || 1),
         weightGrams: weight ? Math.max(1, Math.round(Number(weight))) : undefined,
       });
@@ -58,6 +60,10 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
               <input type="number" min="1" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
             </label>
           </div>
+          <label className="auth__field">
+            <span>Store price (USDC) <em className="muted">— optional: lets viewers buy it now, no auction</em></span>
+            <input type="number" min="0.01" step="0.01" value={buyNow} onChange={(e) => setBuyNow(e.target.value)} placeholder="e.g. 30 — appears in your shop" />
+          </label>
           <label className="auth__field">
             <span>Est. weight in grams <em className="muted">— for shipping quotes</em></span>
             <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 60 (a sleeved card + mailer)" />

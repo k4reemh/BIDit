@@ -224,6 +224,9 @@ model Listing {
   description String?
   photos      String[]
   startingBid BigInt
+  /** Store "buy now" price (micro-USDC). When set, the listing also appears in
+   *  the seller's shop and can be bought outright — no auction needed. */
+  buyNowPrice BigInt?
   /** Units the seller has of this item. Each sale decrements it; while > 0 the
    *  listing can be auctioned again. */
   quantity    Int           @default(1)
@@ -237,6 +240,7 @@ model Listing {
   wheel       Json?
 
   auctions Auction[]
+  orders   Order[]
 
   @@index([sellerId])
   @@index([status])
@@ -305,8 +309,13 @@ model Hold {
 
 model Order {
   id             String      @id @default(cuid())
-  auctionId      String      @unique
-  auction        Auction     @relation(fields: [auctionId], references: [id])
+  /** The auction this order settles — null for store ("buy now") purchases. */
+  auctionId      String?     @unique
+  auction        Auction?    @relation(fields: [auctionId], references: [id])
+  /** Direct listing link for store purchases (auction orders reach the listing
+   *  through the auction instead). */
+  listingId      String?
+  listing        Listing?    @relation(fields: [listingId], references: [id])
   buyerId        String
   buyer          User        @relation("BuyerOrders", fields: [buyerId], references: [id])
   sellerId       String

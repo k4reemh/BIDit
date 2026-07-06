@@ -111,6 +111,7 @@ export interface SellerListing {
   id: string;
   title: string;
   startingBid: string;
+  buyNowPrice: string | null;
   status: string;
   quantity: number;
   imageUrl: string | null;
@@ -234,9 +235,37 @@ export const createListing = (body: {
   title: string;
   imageUrl?: string;
   startingBid: string;
+  buyNowPrice?: string;
   quantity?: number;
   weightGrams?: number;
 }) => req<SellerListing>('/seller/listings', { method: 'POST', body: JSON.stringify(body) });
+
+export const setStorePrice = (listingId: string, buyNowPrice: string | null) =>
+  req<SellerListing>('/seller/listing/store-price', {
+    method: 'POST',
+    body: JSON.stringify({ listingId, buyNowPrice }),
+  });
+
+// ---- seller store (buy now) -------------------------------------------------
+export interface ShopItem {
+  id: string;
+  title: string;
+  description: string | null;
+  price: string;
+  image: string | null;
+  quantity: number;
+}
+export interface ShopData {
+  linked: boolean;
+  sellerHandle: string | null;
+  items: ShopItem[];
+}
+export const getShop = (coin: string) => req<ShopData>(`/shop?coin=${encodeURIComponent(coin)}`);
+export const buyShopItem = (listingId: string) =>
+  req<{ ok: boolean; orderId: string; amount: string }>('/shop/buy', {
+    method: 'POST',
+    body: JSON.stringify({ listingId }),
+  });
 
 export const saveShippingSettings = (s: ShippingSettings) =>
   req<Session>('/seller/shipping-settings', { method: 'POST', body: JSON.stringify(s) });

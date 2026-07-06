@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import TopNav from './components/TopNav';
+import MobileTabBar from './components/MobileTabBar';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Onboarding from './components/Onboarding';
@@ -134,6 +135,8 @@ export default function App() {
         </Routes>
         <Footer />
       </div>
+
+      <MobileTabBar user={user} onAuth={setAuth} />
 
       {auth && <AuthModal mode={auth} onClose={() => setAuth(null)} onSuccess={onAuthed} />}
       {onboarding && (

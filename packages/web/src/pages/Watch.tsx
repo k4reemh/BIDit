@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import BidPanel from '../components/BidPanel';
 import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
+import ShopOverlay from '../components/ShopOverlay';
+import { Bag } from '../icons';
 
 // livekit-client is heavy — only load it on the watch page (and only this chunk).
 const PumpStream = lazy(() => import('../components/PumpStream'));
@@ -20,6 +22,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   const { coin = '' } = useParams();
   const [resolved, setResolved] = useState<ResolvedRoom | null | undefined>(undefined); // undefined = loading
   const [pump, setPump] = useState<PumpCoin | null>(null);
+  const [shopOpen, setShopOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -59,6 +62,11 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
             </Suspense>
             <div className="theater__top">
               {sellerHandle && <span className="theater__seller"><Avatar handle={sellerHandle} size={22} /> @{sellerHandle}</span>}
+              {sellerHandle && (
+                <button className="theater__shop" onClick={() => setShopOpen(true)} aria-label="Open the seller's shop" title="Shop — buy without bidding">
+                  <Bag width={16} height={16} /> Shop
+                </button>
+              )}
             </div>
           </div>
           <div className="watch__meta">
@@ -90,6 +98,10 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
           )}
         </div>
       </div>
+
+      {shopOpen && sellerHandle && (
+        <ShopOverlay coin={coin} sellerHandle={sellerHandle} session={session} onAuth={onAuth} onClose={() => setShopOpen(false)} />
+      )}
     </main>
   );
 }

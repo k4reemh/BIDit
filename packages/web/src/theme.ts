@@ -11,6 +11,9 @@ export function getTheme(): Theme {
 
 export function applyTheme(t: Theme): void {
   document.documentElement.dataset.theme = t;
+  // Keep the mobile browser / status-bar chrome color in sync with the theme.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#f4f6fa' : '#050a14');
 }
 
 export function setTheme(t: Theme): void {

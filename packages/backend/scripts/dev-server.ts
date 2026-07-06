@@ -46,7 +46,8 @@ import {
   setSellerCoin,
   startAuctionFromListing,
 } from '../src/sellers.js';
-import { createListing, listSellerListings, setListingWheel } from '../src/listings.js';
+import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
+import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { DevWalletEscrow } from '../src/escrow.js';
@@ -603,12 +604,22 @@ async function main() {
             description: b.description ? String(b.description) : undefined,
             photos: typeof b.imageUrl === 'string' && b.imageUrl ? [b.imageUrl] : [],
             startingBid: usdc(String(b.startingBid ?? '1')),
+            buyNowPrice: b.buyNowPrice != null && String(b.buyNowPrice).trim() !== '' ? usdc(String(b.buyNowPrice)) : undefined,
             quantity: b.quantity ? Number(b.quantity) : undefined,
             weightGrams: b.weightGrams ? Number(b.weightGrams) : undefined,
             category: b.category ? String(b.category) : undefined,
           },
           prisma,
         );
+        return send(res, 200, listingDto(listing));
+      }
+      // Set or clear (null) the store buy-now price on an existing listing.
+      if (req.method === 'POST' && p === '/seller/listing/store-price') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const price = b.buyNowPrice != null && String(b.buyNowPrice).trim() !== '' ? usdc(String(b.buyNowPrice)) : null;
+        const listing = await setListingStorePrice(userId, String(b.listingId ?? ''), price, prisma);
         return send(res, 200, listingDto(listing));
       }
       if (req.method === 'POST' && p === '/seller/listing/wheel') {
@@ -812,6 +823,43 @@ async function main() {
       if (req.method === 'GET' && p === '/live') {
         return send(res, 200, await liveCoins());
       }
+      // Public storefront for a linked coin: the seller's buy-now items.
+      if (req.method === 'GET' && p === '/shop') {
+        const mint = url.searchParams.get('coin') ?? '';
+        const resolved = await resolveRoomByCoin(mint, prisma);
+        if (!resolved) return send(res, 200, { linked: false, sellerHandle: null, items: [] });
+        const items = await listStoreItems(resolved.room, prisma);
+        return send(res, 200, {
+          linked: true,
+          sellerHandle: resolved.sellerHandle,
+          items: items.map((l) => ({
+            id: l.id,
+            title: l.title,
+            description: l.description,
+            price: formatUsdc(l.buyNowPrice!),
+            image: l.photos[0] ?? null,
+            quantity: l.quantity,
+          })),
+        });
+      }
+      // Buy one unit of a store listing outright (charged from available balance).
+      if (req.method === 'POST' && p === '/shop/buy') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          const order = await purchaseListing(userId, String(b.listingId ?? ''), { directPayout, escrow }, prisma);
+          await realtime.notifyBalance(userId).catch(() => {});
+          await realtime.notifyBalance(order.sellerId).catch(() => {});
+          return send(res, 200, { ok: true, orderId: order.id, amount: formatUsdc(order.amount) });
+        } catch (err) {
+          if (err instanceof ItemUnavailableError) return send(res, 409, { error: err.message });
+          if (err instanceof InsufficientFundsError) {
+            return send(res, 400, { error: 'Insufficient balance — add funds to buy this item' });
+          }
+          throw err;
+        }
+      }
       // Server-side proxy for a pump.fun coin's public metadata + live status.
       // (Their API sends no CORS headers, so the browser can't call it directly.)
       if (req.method === 'GET' && p === '/pump/coin') {
@@ -1006,6 +1054,7 @@ function listingDto(l: {
   id: string;
   title: string;
   startingBid: bigint;
+  buyNowPrice?: bigint | null;
   status: string;
   quantity: number;
   photos: string[];
@@ -1016,6 +1065,7 @@ function listingDto(l: {
     id: l.id,
     title: l.title,
     startingBid: formatUsdc(l.startingBid),
+    buyNowPrice: l.buyNowPrice != null ? formatUsdc(l.buyNowPrice) : null,
     status: l.status,
     quantity: l.quantity,
     imageUrl: l.photos[0] ?? null,
@@ -1075,20 +1125,25 @@ async function sellerOrdersDto(sellerId: string) {
     include: {
       buyer: { select: { handle: true } },
       auction: { select: { listing: { select: { title: true, photos: true } } } },
+      listing: { select: { title: true, photos: true } }, // store orders link the listing directly
     },
   });
-  return orders.map((o) => ({
-    id: o.id,
-    status: o.status,
-    amount: formatUsdc(o.amount),
-    sellerProceeds: formatUsdc(o.sellerProceeds),
-    platformFee: formatUsdc(o.platformFee),
-    buyer: o.buyer.handle,
-    title: o.auction.listing.title,
-    image: o.auction.listing.photos[0] ?? null,
-    trackingNumber: o.trackingNumber,
-    createdAt: o.createdAt.getTime(),
-  }));
+  return orders.map((o) => {
+    const listing = o.auction?.listing ?? o.listing;
+    return {
+      id: o.id,
+      status: o.status,
+      kind: o.auctionId ? 'auction' : 'store',
+      amount: formatUsdc(o.amount),
+      sellerProceeds: formatUsdc(o.sellerProceeds),
+      platformFee: formatUsdc(o.platformFee),
+      buyer: o.buyer.handle,
+      title: listing?.title ?? 'Item',
+      image: listing?.photos[0] ?? null,
+      trackingNumber: o.trackingNumber,
+      createdAt: o.createdAt.getTime(),
+    };
+  });
 }
 
 async function ordersDto() {
@@ -1099,12 +1154,13 @@ async function ordersDto() {
       buyer: { select: { handle: true } },
       seller: { select: { handle: true } },
       auction: { select: { listing: { select: { title: true } } } },
+      listing: { select: { title: true } }, // store orders link the listing directly
     },
   });
   return orders.map((o) => ({
     id: o.id,
     status: o.status,
-    title: o.auction.listing.title,
+    title: o.auction?.listing.title ?? o.listing?.title ?? 'Item',
     amount: formatUsdc(o.amount),
     platformFee: formatUsdc(o.platformFee),
     sellerProceeds: formatUsdc(o.sellerProceeds),

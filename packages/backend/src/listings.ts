@@ -10,6 +10,8 @@ export interface CreateListingInput {
   description?: string;
   photos?: string[];
   startingBid: Micros;
+  /** Optional store "buy now" price — puts the item in the seller's shop. */
+  buyNowPrice?: Micros;
   quantity?: number;
   weightGrams?: number;
   category?: string;
@@ -30,6 +32,7 @@ export async function createListing(
       description: input.description ?? null,
       photos: input.photos ?? [],
       startingBid: input.startingBid,
+      buyNowPrice: input.buyNowPrice ?? null,
       quantity,
       weightGrams: input.weightGrams ?? null,
       category: input.category ?? null,
@@ -72,4 +75,26 @@ export async function setListingWheel(
     },
   });
   return entries;
+}
+
+/**
+ * Set (or clear, with null) the store "buy now" price on one of the seller's
+ * listings. Ownership gated; allowed any time before the listing is SOLD — the
+ * store only ever *shows* QUEUED listings, so pricing a LIVE one just takes
+ * effect after its auction closes.
+ */
+export async function setListingStorePrice(
+  sellerId: string,
+  listingId: string,
+  buyNowPrice: Micros | null,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<Listing> {
+  await requireSeller(sellerId, prisma);
+  const listing = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
+  if (listing.sellerId !== sellerId) throw new Error('not your listing');
+  if (buyNowPrice !== null && buyNowPrice <= 0n) throw new Error('store price must be positive');
+  return prisma.listing.update({
+    where: { id: listingId },
+    data: { buyNowPrice },
+  });
 }

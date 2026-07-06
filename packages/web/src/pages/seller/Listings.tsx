@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useSeller } from '../../components/SellerLayout';
 import { openSocket } from '../../realtime';
-import { getListings, startAuction, type SellerListing } from '../../api';
+import { getListings, startAuction, setStorePrice, type SellerListing } from '../../api';
 import AddItemModal from '../../components/seller/AddItemModal';
 import AddWheelModal from '../../components/seller/AddWheelModal';
 import EmptyState from '../../components/EmptyState';
-import { Tag, Dice, Plus } from '../../icons';
+import { Tag, Dice, Plus, Bag } from '../../icons';
 
 function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void }) {
   const [dur, setDur] = useState('30');
   const [busy, setBusy] = useState(false);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [price, setPrice] = useState(l.buyNowPrice ?? '');
+  const [priceBusy, setPriceBusy] = useState(false);
   const isWheel = !!l.wheel;
 
   const start = async () => {
@@ -19,6 +22,17 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
       onStarted();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const savePrice = async (next: string | null) => {
+    setPriceBusy(true);
+    try {
+      await setStorePrice(l.id, next);
+      setPriceOpen(false);
+      onStarted(); // reload listings
+    } finally {
+      setPriceBusy(false);
     }
   };
 
@@ -36,8 +50,29 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
           <span className={`pill lc__status lc__status--${l.status.toLowerCase()}`}>{l.status}</span>
           {!isWheel && l.quantity > 1 && <span className="pill lc__qty">×{l.quantity} left</span>}
           {isWheel && <span className="pill lc__wheelpill">{l.wheel!.length} prizes</span>}
+          {!isWheel && l.buyNowPrice && <span className="pill lc__store"><Bag width={12} height={12} /> ${l.buyNowPrice}</span>}
           <span className="lc__start">Start ${l.startingBid}</span>
         </div>
+        {/* Store (buy now) price — items only, until sold out */}
+        {!isWheel && l.status !== 'SOLD' && (
+          priceOpen ? (
+            <div className="lc__priceform">
+              <input
+                type="number" min="0.01" step="0.01" value={price} autoFocus
+                onChange={(e) => setPrice(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && price.trim() && savePrice(price.trim())}
+                placeholder="USDC"
+              />
+              <button className="btn btn-primary btn-sm" disabled={priceBusy || !price.trim()} onClick={() => savePrice(price.trim())}>Save</button>
+              {l.buyNowPrice && <button className="btn btn-ghost btn-sm" disabled={priceBusy} onClick={() => savePrice(null)}>Remove</button>}
+              <button className="btn btn-ghost btn-sm" disabled={priceBusy} onClick={() => setPriceOpen(false)}>Cancel</button>
+            </div>
+          ) : (
+            <button className="lc__storelink" onClick={() => { setPrice(l.buyNowPrice ?? ''); setPriceOpen(true); }}>
+              <Bag width={13} height={13} /> {l.buyNowPrice ? `In your shop at $${l.buyNowPrice} — edit` : 'Sell in your shop (buy now)'}
+            </button>
+          )
+        )}
         {l.status === 'QUEUED' && l.quantity > 0 && (
           <div className="lc__go">
             <div className="lc__dur"><input type="number" min="5" value={dur} onChange={(e) => setDur(e.target.value)} /><span>sec</span></div>

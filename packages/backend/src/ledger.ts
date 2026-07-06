@@ -357,7 +357,7 @@ export async function settlePurchase(
  * directly instead of routing through the ESCROW account.
  */
 export async function settleDirectSale(
-  params: { buyerAccountId: string; sellerAccountId: string; amount: Micros; orderId: string; auctionId: string },
+  params: { buyerAccountId: string; sellerAccountId: string; amount: Micros; orderId: string; auctionId: string | null },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
@@ -366,18 +366,29 @@ export async function settleDirectSale(
   try {
     await prisma.$transaction(async (tx) => {
       await lockAccount(tx, params.buyerAccountId);
-      // Capture the winner's hold so their funds are actually spent (not just reserved).
-      await tx.hold.updateMany({
-        where: {
-          auctionId: params.auctionId,
-          accountId: params.buyerAccountId,
-          status: HoldStatus.ACTIVE,
-        },
-        data: { status: HoldStatus.CAPTURED, releasedAt: new Date() },
-      });
-      const settled = await getSettledBalance(params.buyerAccountId, tx);
-      if (settled < params.amount) {
-        throw new InsufficientFundsError(params.buyerAccountId, settled, params.amount);
+      if (params.auctionId !== null) {
+        // Auction win: capture the winner's hold so their funds are actually
+        // spent (not just reserved) — the hold itself covered this amount.
+        await tx.hold.updateMany({
+          where: {
+            auctionId: params.auctionId,
+            accountId: params.buyerAccountId,
+            status: HoldStatus.ACTIVE,
+          },
+          data: { status: HoldStatus.CAPTURED, releasedAt: new Date() },
+        });
+        const settled = await getSettledBalance(params.buyerAccountId, tx);
+        if (settled < params.amount) {
+          throw new InsufficientFundsError(params.buyerAccountId, settled, params.amount);
+        }
+      } else {
+        // Store purchase (no auction → no hold to capture): pay from AVAILABLE
+        // balance only — funds reserved under live bids stay untouchable, or a
+        // buyer could spend the same dollars twice.
+        const available = await getAvailableBalance(params.buyerAccountId, tx);
+        if (available < params.amount) {
+          throw new InsufficientFundsError(params.buyerAccountId, available, params.amount);
+        }
       }
       await postEntries(tx, [
         {
@@ -475,7 +486,7 @@ export async function settleShipping(
  * release, so a refund can return 100%. Idempotent per order.
  */
 export async function escrowLock(
-  params: { buyerAccountId: string; amount: Micros; orderId: string; auctionId: string },
+  params: { buyerAccountId: string; amount: Micros; orderId: string; auctionId: string | null },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
@@ -484,17 +495,27 @@ export async function escrowLock(
   try {
     await prisma.$transaction(async (tx) => {
       await lockAccount(tx, params.buyerAccountId);
-      await tx.hold.updateMany({
-        where: {
-          auctionId: params.auctionId,
-          accountId: params.buyerAccountId,
-          status: HoldStatus.ACTIVE,
-        },
-        data: { status: HoldStatus.CAPTURED, releasedAt: new Date() },
-      });
-      const settled = await getSettledBalance(params.buyerAccountId, tx);
-      if (settled < params.amount) {
-        throw new InsufficientFundsError(params.buyerAccountId, settled, params.amount);
+      if (params.auctionId !== null) {
+        // Auction win: the winner's hold covers the amount — capture it.
+        await tx.hold.updateMany({
+          where: {
+            auctionId: params.auctionId,
+            accountId: params.buyerAccountId,
+            status: HoldStatus.ACTIVE,
+          },
+          data: { status: HoldStatus.CAPTURED, releasedAt: new Date() },
+        });
+        const settled = await getSettledBalance(params.buyerAccountId, tx);
+        if (settled < params.amount) {
+          throw new InsufficientFundsError(params.buyerAccountId, settled, params.amount);
+        }
+      } else {
+        // Store purchase (no hold): AVAILABLE balance only — live-bid holds
+        // stay untouchable so the same dollars can't be spent twice.
+        const available = await getAvailableBalance(params.buyerAccountId, tx);
+        if (available < params.amount) {
+          throw new InsufficientFundsError(params.buyerAccountId, available, params.amount);
+        }
       }
       await postEntries(tx, [
         {
