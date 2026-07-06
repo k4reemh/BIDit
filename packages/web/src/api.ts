@@ -44,6 +44,8 @@ export interface Session {
   fulfilledCount?: number;
   verifyThreshold?: number;
   pumpCoinAddress: string | null;
+  streamTitle?: string | null;
+  streamCategory?: string | null;
   website?: string | null;
   socials?: Record<string, string> | null;
   pitch?: string | null;
@@ -257,6 +259,8 @@ export const deliverOrder = (orderId: string) =>
   req('/seller/order/deliver', { method: 'POST', body: JSON.stringify({ orderId }) });
 export const setSellerCoin = (coinAddress: string) =>
   req<{ ok: boolean }>('/seller/coin', { method: 'POST', body: JSON.stringify({ coinAddress }) });
+export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null }) =>
+  req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
 
 // ---- giveaways -------------------------------------------------------------
 export type GiveawayKind = 'PUBLIC' | 'BUYER_ONLY';
@@ -288,6 +292,9 @@ export interface LiveCoin {
   hasGiveaway: boolean;
   streamLive: boolean;
   coinName: string | null;
+  streamTitle: string | null;
+  category: string | null;
+  country: string | null;
   title: string | null;
   image: string | null;
   currentBid: string | null;

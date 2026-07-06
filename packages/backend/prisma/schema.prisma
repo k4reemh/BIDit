@@ -137,6 +137,11 @@ model SellerProfile {
   socials             Json?     // { x?, instagram?, tiktok?, youtube? }
   pitch               String?   // what they sell, in their words
   pumpCoinAddress     String?
+  // Livestream identity shown on the "Live right now" cards. `streamTitle` lets a
+  // seller name their stream instead of falling back to the coin name;
+  // `streamCategory` drives the small category tag on the card.
+  streamTitle         String?
+  streamCategory      String?
   payoutWalletAddress String?
   // Ship-from origin (drives weight/zone rate quotes) + which shipping modes the
   // seller offers on their page.

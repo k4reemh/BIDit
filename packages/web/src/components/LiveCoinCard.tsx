@@ -1,13 +1,17 @@
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import { Gift, Bolt } from '../icons';
+import { countryFlag } from '../flag';
 import type { LiveCoin } from '../api';
 
 /** A real linked-coin card in "Live right now" → links to the in-site watch page. */
 export default function LiveCoinCard({ c }: { c: LiveCoin }) {
   const live = c.streamLive || c.hasAuction || c.hasGiveaway;
-  const heading = c.title || c.prize || c.coinName || 'Live auctions';
+  // A seller-set stream title wins over the coin name; the running item still
+  // shows through when no custom title is set.
+  const heading = c.streamTitle || c.title || c.prize || c.coinName || 'Live auctions';
   const short = `${c.coin.slice(0, 4)}…${c.coin.slice(-4)}`;
+  const flag = countryFlag(c.country);
   return (
     <Link className="live-card" to={`/live/${c.coin}`}>
       <div className="live-card__thumb">
@@ -16,6 +20,7 @@ export default function LiveCoinCard({ c }: { c: LiveCoin }) {
         <span className={`live-badge${live ? '' : ' off'}`} style={{ position: 'absolute', top: 12, left: 12 }}>
           {live ? <><span className="dot" /> LIVE</> : 'OFFLINE'}
         </span>
+        {c.category && <span className="live-card__cat">{c.category}</span>}
         {c.hasGiveaway && <span className="live-card__hot"><Gift width={12} height={12} style={{ verticalAlign: '-2px' }} /> Giveaway</span>}
         {c.currentBid && (
           <div className="live-card__bid">
@@ -28,6 +33,7 @@ export default function LiveCoinCard({ c }: { c: LiveCoin }) {
         <div className="live-card__seller">
           <Avatar handle={c.sellerHandle} size={22} />
           <span>@{c.sellerHandle}</span>
+          {flag && <span className="live-card__flag" title={`Ships from ${flag.code}`}>{flag.flag}</span>}
         </div>
         <div className="live-card__title">{heading}</div>
         <div className="live-card__tags">

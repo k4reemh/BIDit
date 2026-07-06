@@ -206,6 +206,8 @@ async function main() {
       fulfilledCount: profile ? await sellerFulfilledCount(userId, prisma) : 0,
       verifyThreshold: VERIFY_THRESHOLD,
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
+      streamTitle: profile?.streamTitle ?? null,
+      streamCategory: profile?.streamCategory ?? null,
       website: profile?.website ?? null,
       socials: (profile?.socials as Record<string, string> | null) ?? null,
       pitch: profile?.pitch ?? null,
@@ -497,6 +499,25 @@ async function main() {
         const b = await readJson(req);
         await setSellerCoin(userId, String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
+      }
+      // Livestream identity: a custom stream title (shown on the live cards instead
+      // of the coin name) and the category tag for the stream.
+      if (req.method === 'POST' && p === '/seller/stream-settings') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const clip = (v: unknown, max: number) =>
+          typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+        const data = {
+          streamTitle: clip(b.streamTitle, 80),
+          streamCategory: clip(b.streamCategory, 40),
+        };
+        await prisma.sellerProfile.upsert({
+          where: { userId },
+          update: data,
+          create: { userId, ...data },
+        });
+        return send(res, 200, await sessionPayload(userId));
       }
       if (req.method === 'POST' && p === '/seller/shipping-settings') {
         const userId = authUser(req);
@@ -945,6 +966,9 @@ async function liveCoins() {
         hasGiveaway: giveaway !== null,
         streamLive: pump?.isLive === true,
         coinName: pump?.name ?? null,
+        streamTitle: pf.streamTitle ?? null,
+        category: pf.streamCategory ?? null,
+        country: pf.originCountry ?? null,
         title: auction?.listing.title ?? null,
         image: auction?.listing.photos[0] ?? pump?.image ?? null,
         currentBid: auction?.currentBid != null ? formatUsdc(auction.currentBid) : null,
