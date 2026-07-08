@@ -5,6 +5,7 @@ import MobileTabBar from './components/MobileTabBar';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Onboarding from './components/Onboarding';
+import Tutorial, { hasSeenTutorial } from './components/Tutorial';
 import AccountLayout from './components/AccountLayout';
 import SellerLayout from './components/SellerLayout';
 import Home from './pages/Home';
@@ -58,6 +59,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [auth, setAuth] = useState<'signup' | 'signin' | null>(null);
   const [onboarding, setOnboarding] = useState<Session | null>(null);
+  const [tutorial, setTutorial] = useState(false);
   const user = session ? toUser(session) : null;
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function App() {
   return (
     <div className="app">
       <div className="shell">
-        <TopNav user={user} onAuth={setAuth} onLogout={() => { clearToken(); setSession(null); }} />
+        <TopNav user={user} onAuth={setAuth} onLogout={() => { clearToken(); setSession(null); }} onReplayTutorial={() => setTutorial(true)} />
         <Routes>
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
           <Route path="/docs" element={<Docs />} />
@@ -140,8 +142,16 @@ export default function App() {
 
       {auth && <AuthModal mode={auth} onClose={() => setAuth(null)} onSuccess={onAuthed} />}
       {onboarding && (
-        <Onboarding session={onboarding} onDone={(s) => { setSession(s); setOnboarding(null); }} />
+        <Onboarding
+          session={onboarding}
+          onDone={(s) => {
+            setSession(s);
+            setOnboarding(null);
+            if (!hasSeenTutorial()) setTutorial(true); // first-run interactive tour
+          }}
+        />
       )}
+      {tutorial && <Tutorial onDone={() => setTutorial(false)} />}
     </div>
   );
 }

@@ -120,11 +120,16 @@ export async function loginWithEmail(
 }
 
 /** Update a user's editable profile fields. */
+const SHIP_MODES = ['WEEKLY_BUNDLE', 'SHIP_LATER', 'PRIVATE'] as const;
+
 export async function updateProfile(
   userId: string,
-  patch: { displayName?: string; avatarUrl?: string; bio?: string; shippingAddress?: unknown; bundleShipping?: boolean },
+  patch: { displayName?: string; avatarUrl?: string; bio?: string; shippingAddress?: unknown; bundleShipping?: boolean; shippingMode?: string },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User> {
+  // A chosen shipping mode also drives the weekly-bundle opt-in (kept in sync so
+  // the fulfillment path — which keys off bundleShipping — stays consistent).
+  const mode = patch.shippingMode && (SHIP_MODES as readonly string[]).includes(patch.shippingMode) ? patch.shippingMode : undefined;
   return prisma.user.update({
     where: { id: userId },
     data: {
@@ -134,7 +139,8 @@ export async function updateProfile(
       ...(patch.shippingAddress !== undefined
         ? { shippingAddress: (patch.shippingAddress ?? null) as Prisma.InputJsonValue }
         : {}),
-      ...(patch.bundleShipping !== undefined ? { bundleShipping: patch.bundleShipping } : {}),
+      ...(mode !== undefined ? { shippingMode: mode, bundleShipping: mode === 'WEEKLY_BUNDLE' } : {}),
+      ...(patch.bundleShipping !== undefined && mode === undefined ? { bundleShipping: patch.bundleShipping } : {}),
     },
   });
 }

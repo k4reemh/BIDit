@@ -16,7 +16,7 @@ import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
 
 const DAY_MS = 86_400_000;
-export const SHIP_LATER_HOLD_MS = 7 * DAY_MS;
+export const SHIP_LATER_HOLD_MS = 14 * DAY_MS; // seller holds a "ship later" win up to 2 weeks
 /** Fallback weight for a sleeved card + mailer when the seller didn't estimate. */
 const DEFAULT_WEIGHT_G = 60;
 

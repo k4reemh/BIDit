@@ -4,6 +4,7 @@ import GiveawayReveal from './GiveawayReveal';
 import WinCelebration, { type WinInfo } from './WinCelebration';
 import WheelReveal from './WheelReveal';
 import BidSparks from './BidSparks';
+import ShippingMenu from './ShippingMenu';
 import {
   openRoom,
   type RoomController,
@@ -13,8 +14,8 @@ import {
   type GiveawayWinner,
   type RandomizerSpin,
 } from '../realtime';
-import type { Session } from '../api';
-import { Gift, Bolt, Dice, Chevron } from '../icons';
+import type { Session, ShippingMode } from '../api';
+import { Gift, Bolt, Dice, Chevron, Truck } from '../icons';
 
 interface Feed { who: string; amt: string; key: number }
 
@@ -62,6 +63,8 @@ export default function BidPanel({
   const item = useRef<{ title: string; image: string | null }>({ title: 'this item', image: null });
   const myHandle = session?.handle ?? null;
   const [, setTick] = useState(0);
+  const [shipOpen, setShipOpen] = useState(false);
+  const [shipMode, setShipMode] = useState<ShippingMode>((session?.shippingMode as ShippingMode) ?? 'SHIP_LATER');
 
   useEffect(() => {
     if (!session) return; // socket is token-gated; signed-out shows the CTA below
@@ -179,7 +182,14 @@ export default function BidPanel({
     <aside className={`bp${running && final ? ' bp--final' : ''}`}>
       <div className="bp__head">
         <span className="bp__brand"><Bolt width={15} height={15} /> Live bidding</span>
-        {session && <span className="bp__bal" title="Your wallet balance">${balance}</span>}
+        <div className="bp__headright">
+          {session && (
+            <button className="bp__ship" onClick={() => setShipOpen(true)} title="Shipping options" aria-label="Shipping options">
+              <Truck width={16} height={16} />
+            </button>
+          )}
+          {session && <span className="bp__bal" title="Your wallet balance">${balance}</span>}
+        </div>
       </div>
 
       {!session ? (
@@ -307,6 +317,7 @@ export default function BidPanel({
       )}
       {win && <WinCelebration win={win} onDone={() => setWin(null)} />}
       {gWinner && <GiveawayReveal win={gWinner} isMe={!!session && gWinner.winnerUserId === session.userId} onDone={() => setGWinner(null)} />}
+      {shipOpen && <ShippingMenu value={shipMode} onClose={() => setShipOpen(false)} onChange={setShipMode} />}
     </aside>
   );
 }

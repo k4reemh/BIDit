@@ -6,12 +6,12 @@ import { Bolt, Truck, Wallet, Shield, Copy, Check, ArrowRight } from '../icons';
 
 const HOW = [
   { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
-  { ic: Truck, t: 'Win it, we ship it', d: 'Your funds stay put until you win — then the item ships straight to your door.' },
+  { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds stay put until you win — then the seller ships it straight to your door.' },
   { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
 ];
 const VALUES = [
   { ic: Bolt, t: 'Real-time live auctions' },
-  { ic: Truck, t: 'Win it — we ship it' },
+  { ic: Truck, t: 'Win it — seller ships it' },
   { ic: Shield, t: 'USDC settled · buyer protection' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;

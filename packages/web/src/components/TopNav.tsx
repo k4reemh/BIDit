@@ -12,10 +12,12 @@ export default function TopNav({
   user,
   onAuth,
   onLogout,
+  onReplayTutorial,
 }: {
   user: User | null;
   onAuth: (mode: 'signup' | 'signin') => void;
   onLogout: () => void;
+  onReplayTutorial?: () => void;
 }) {
   const [menu, setMenu] = useState(false);
 
@@ -69,7 +71,7 @@ export default function TopNav({
         </div>
       </div>
 
-      {user && menu && <ProfileMenu user={user} onClose={() => setMenu(false)} onLogout={onLogout} />}
+      {user && menu && <ProfileMenu user={user} onClose={() => setMenu(false)} onLogout={onLogout} onReplayTutorial={onReplayTutorial} />}
     </header>
   );
 }

@@ -60,7 +60,7 @@ export default function ShipItems() {
         <EmptyState
           icon={Truck}
           title="Nothing waiting to ship"
-          sub="Win an auction and the card lands here, held for up to 7 days until you choose to ship it."
+          sub="Win an auction and the card lands here, held for up to 14 days until you choose to ship it."
           ctaText="Find something to win"
           ctaTo="/"
         />

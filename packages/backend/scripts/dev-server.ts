@@ -194,6 +194,7 @@ async function main() {
       bio: user.bio,
       shippingAddress: user.shippingAddress,
       bundleShipping: user.bundleShipping,
+      shippingMode: user.shippingMode,
       interests: user.interests,
       onboarded: user.onboarded,
       role: user.role,
@@ -302,6 +303,7 @@ async function main() {
             bio: typeof b.bio === 'string' ? b.bio : undefined,
             shippingAddress: 'shippingAddress' in b ? b.shippingAddress : undefined,
             bundleShipping: typeof b.bundleShipping === 'boolean' ? b.bundleShipping : undefined,
+            shippingMode: typeof b.shippingMode === 'string' ? b.shippingMode : undefined,
           },
           prisma,
         );

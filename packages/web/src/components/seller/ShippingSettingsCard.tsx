@@ -63,7 +63,7 @@ export default function ShippingSettingsCard({
         </label>
         <label className="ship-priv">
           <input type="checkbox" checked={shipLater} onChange={(e) => setShipLater(e.target.checked)} />
-          <span><b>Buy now, ship later</b> — hold buyers’ wins up to 7 days so they can bundle before shipping.</span>
+          <span><b>Buy now, ship later</b> — hold buyers’ wins up to 14 days so they can bundle before shipping.</span>
         </label>
         <label className="ship-priv">
           <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />

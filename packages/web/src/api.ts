@@ -12,6 +12,8 @@ export interface ShippingAddress {
   country: string;
 }
 
+export type ShippingMode = 'WEEKLY_BUNDLE' | 'SHIP_LATER' | 'PRIVATE';
+
 export interface ShippingSettings {
   originCountry: string | null;
   originRegion: string | null;
@@ -32,6 +34,7 @@ export interface Session {
   bio: string | null;
   shippingAddress: ShippingAddress | null;
   bundleShipping?: boolean;
+  shippingMode?: ShippingMode;
   depositAddress: string | null;
   cluster?: 'mock' | 'devnet' | 'mainnet-beta';
   interests: string[];
@@ -86,6 +89,7 @@ export async function updateMe(patch: {
   bio?: string;
   shippingAddress?: ShippingAddress | null;
   bundleShipping?: boolean;
+  shippingMode?: ShippingMode;
 }): Promise<Session> {
   return req<Session>('/me', { method: 'PATCH', body: JSON.stringify(patch) });
 }

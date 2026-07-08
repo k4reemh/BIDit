@@ -92,7 +92,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="how">
           {[
             { ic: Bolt, t: 'Bid live on stream', d: 'Place real USDC bids during the break. Anti-snipe keeps every auction fair to the buzzer.' },
-            { ic: Truck, t: 'Win it, we ship it', d: 'Your funds sit in escrow until the seller ships and the item lands in your hands.' },
+            { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds sit in escrow until the seller ships and the item lands in your hands.' },
             { ic: Wallet, t: '4% buys back $BID', d: <>Every shipped sale routes <b>4%</b> to the $BID buyback and <b>1%</b> to a buyer-protection treasury — the more items move, the more it pumps.</> },
           ].map((s) => (
             <div className="how__step" key={s.t}>

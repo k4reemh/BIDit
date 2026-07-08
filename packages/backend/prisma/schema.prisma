@@ -105,6 +105,9 @@ model User {
   bio           String?
   shippingAddress Json?
   bundleShipping Boolean @default(false) // opt-in: bundle shipping weekly per seller (where offered)
+  // Buyer's preferred shipping option, chosen from the bid panel. Drives the
+  // default at ship time. WEEKLY_BUNDLE keeps bundleShipping in sync.
+  shippingMode  String  @default("SHIP_LATER") // WEEKLY_BUNDLE | SHIP_LATER | PRIVATE
   interests     String[] @default([])
   onboarded     Boolean  @default(false)
   walletAddress String?  @unique
