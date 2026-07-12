@@ -70,6 +70,8 @@ import {
   listPrivateShipments,
   shipmentItems,
   createAndPayShipment,
+  estimateShipment,
+  estimateListingShipping,
   markShipmentShipped,
   markShipmentDelivered,
   discardItem,
@@ -405,6 +407,44 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await buyerFulfillmentDto(userId));
+      }
+      if (req.method === 'POST' && p === '/shipping/quote-listing') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          const est = await estimateListingShipping(userId, String(b.listingId ?? ''), prisma);
+          return send(res, 200, {
+            shippingFee: formatUsdc(est.shippingFee),
+            carrierRetail: formatUsdc(est.carrierRetail),
+            discountPct: est.discountPct,
+            privacyFee: formatUsdc(est.privacyFee),
+            hasAddress: est.hasAddress,
+          });
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/shipments/estimate') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const itemIds = Array.isArray(b.itemIds) ? (b.itemIds as unknown[]).map(String) : [];
+        try {
+          const est = await estimateShipment({ buyerId: userId, itemIds, private: b.private === true }, prisma);
+          return send(res, 200, {
+            shippingFee: formatUsdc(est.shippingFee),
+            carrierRetail: formatUsdc(est.carrierRetail),
+            discountPct: est.discountPct,
+            privacyFee: formatUsdc(est.privacyFee),
+            total: formatUsdc(est.total),
+            hasAddress: est.hasAddress,
+          });
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
       }
       if (req.method === 'POST' && p === '/shipments') {
         const userId = authUser(req);

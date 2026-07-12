@@ -565,6 +565,7 @@ export class RealtimeServer {
       type: 'AUCTION_STATE',
       room,
       auctionId,
+      listingId: auction.listingId,
       title: auction.listing.title,
       imageUrl: auction.listing.photos[0] ?? null,
       status: auction.status,

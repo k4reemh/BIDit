@@ -14,7 +14,7 @@ import {
   type GiveawayWinner,
   type RandomizerSpin,
 } from '../realtime';
-import type { Session, ShippingMode } from '../api';
+import { estimateListingShipping, type Session, type ShippingMode, type ListingShipEstimate } from '../api';
 import { Gift, Bolt, Dice, Chevron, Truck } from '../icons';
 
 interface Feed { who: string; amt: string; key: number }
@@ -65,6 +65,19 @@ export default function BidPanel({
   const [, setTick] = useState(0);
   const [shipOpen, setShipOpen] = useState(false);
   const [shipMode, setShipMode] = useState<ShippingMode>((session?.shippingMode as ShippingMode) ?? 'SHIP_LATER');
+  const [shipEst, setShipEst] = useState<ListingShipEstimate | null>(null);
+
+  // Live shipping estimate for the item on the block — for the "~$ est. shipping"
+  // note under the bid. Refetches whenever the auctioned listing changes.
+  const listingId = auction?.listingId ?? null;
+  useEffect(() => {
+    if (!session || !listingId) { setShipEst(null); return; }
+    let live = true;
+    estimateListingShipping(listingId)
+      .then((e) => { if (live) setShipEst(e); })
+      .catch(() => { if (live) setShipEst(null); });
+    return () => { live = false; };
+  }, [session, listingId]);
 
   useEffect(() => {
     if (!session) return; // socket is token-gated; signed-out shows the CTA below
@@ -148,6 +161,20 @@ export default function BidPanel({
   const low = remaining !== null && remaining <= 10;
   const final = remaining !== null && remaining <= 5;
   const showExt = extended > 0 && Date.now() - extended < 1500;
+
+  // The grey "~$ est. shipping" note under the bid, worded for the buyer's chosen
+  // shipping mode. Ship-to-address charges shipping on win; the others bill later.
+  const shipNote: { text: string; warn?: boolean } | null = (() => {
+    if (!session || !shipEst) return null;
+    if (!shipEst.hasAddress) return { text: 'Add a shipping address to see shipping cost', warn: true };
+    const fee = shipEst.shippingFee;
+    if (shipMode === 'WEEKLY_BUNDLE') return { text: `~$${fee} est. shipping · charged when you win` };
+    if (shipMode === 'PRIVATE') {
+      const total = (parseFloat(fee) + parseFloat(shipEst.privacyFee)).toFixed(2);
+      return { text: `~$${total} est. shipping (incl. $${shipEst.privacyFee} private) · when you ship` };
+    }
+    return { text: `~$${fee} est. shipping · pay later when you ship` }; // SHIP_LATER
+  })();
 
   // Self-heal a frozen timer: if the clock reaches 0 but no AUCTION_CLOSED lands
   // (a dropped socket ate the one-shot event), nudge a re-sync every few seconds so
@@ -233,6 +260,7 @@ export default function BidPanel({
                 <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : '—'}</b></div>
                 <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining! > 0 ? `${remaining!.toFixed(1)}s` : 'Settling…'}</div>
               </div>
+              {shipNote && <button type="button" className={`bp__shipnote${shipNote.warn ? ' warn' : ''}`} onClick={() => setShipOpen(true)} title="Change shipping option">{shipNote.text}</button>}
               <div className="bp__barwrap">
                 <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
                 {low && <BidSparks fill={pct / 100} active={low} />}

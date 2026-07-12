@@ -65,8 +65,8 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
             <input type="number" min="0.01" step="0.01" value={buyNow} onChange={(e) => setBuyNow(e.target.value)} placeholder="e.g. 30 — appears in your shop" />
           </label>
           <label className="auth__field">
-            <span>Est. weight in grams <em className="muted">— for shipping quotes</em></span>
-            <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 60 (a sleeved card + mailer)" />
+            <span>Est. shipping weight in grams <em className="muted">— used to quote UPS shipping</em></span>
+            <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 30 (a sleeved card + mailer)" />
           </label>
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={busy}>
             {busy ? 'Adding…' : 'Add to listings'}

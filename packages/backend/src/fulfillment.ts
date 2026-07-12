@@ -11,7 +11,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
-import { quoteShipping, privacyPremium, type ShipLocation } from './shipping.js';
+import { quoteShipping, quoteShippingBreakdown, multiItemSurcharge, privacyPremium, type ShipLocation } from './shipping.js';
 import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
 
@@ -107,32 +107,37 @@ export async function applyWeeklyBundling(
     prisma.sellerProfile.findUnique({ where: { userId: params.sellerId } }),
     prisma.fulfillmentItem.findUnique({ where: { orderId: params.orderId } }),
   ]);
-  if (!buyer?.bundleShipping || !sellerProfile?.weeklyBundling) return;
+  // "Ship to my address" (bundleShipping) is the buyer's choice to auto-ship each
+  // win immediately. If the SELLER also offers weekly bundling, wins that week ride
+  // one paid shipment for free; otherwise each win just ships and pays on its own.
+  if (!buyer?.bundleShipping) return;
   if (!item || item.status !== 'READY_TO_SHIP') return;
+  const offersBundling = !!sellerProfile?.weeklyBundling;
 
   const now = clock.now();
-  const open = await prisma.weeklyShippingPass.findFirst({
-    where: { buyerId: params.buyerId, sellerId: params.sellerId, closedAt: null, expiresAt: { gt: now } },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  if (open) {
-    // Ride the existing week free.
-    await prisma.fulfillmentItem.update({
-      where: { id: item.id },
-      data: { status: 'IN_SHIPMENT', shipmentId: open.shipmentId },
+  if (offersBundling) {
+    const open = await prisma.weeklyShippingPass.findFirst({
+      where: { buyerId: params.buyerId, sellerId: params.sellerId, closedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
     });
-    return;
+    if (open) {
+      // Ride the existing week free.
+      await prisma.fulfillmentItem.update({
+        where: { id: item.id },
+        data: { status: 'IN_SHIPMENT', shipmentId: open.shipmentId },
+      });
+      return;
+    }
   }
 
-  // First win of the week — needs an address to ship to and funds for shipping.
+  // Auto-ship this win — needs an address to ship to and funds for shipping.
   const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
-  if (!dest || !dest.line1 || !dest.country) return; // fall back to Standard
+  if (!dest || !dest.line1 || !dest.country) return; // no address → fall back to Ready-to-ship
   const origin: ShipLocation = {
-    country: sellerProfile.originCountry,
-    region: sellerProfile.originRegion,
-    city: sellerProfile.originCity,
-    postal: sellerProfile.originPostal,
+    country: sellerProfile?.originCountry,
+    region: sellerProfile?.originRegion,
+    city: sellerProfile?.originCity,
+    postal: sellerProfile?.originPostal,
   };
   const fee = quoteShipping(origin, dest, item.weightGrams ?? DEFAULT_WEIGHT_G);
 
@@ -153,7 +158,8 @@ export async function applyWeeklyBundling(
   try {
     await settleShipping({ buyerAccountId, sellerAccountId, sellerAmount: fee, shipmentId: shipment.id }, prisma);
   } catch {
-    // Can't afford shipping right now — undo and fall back to Standard.
+    // Can't afford shipping right now — undo and fall back to Ready-to-ship (buy
+    // now, ship later): the buyer keeps the win, the item just waits to be shipped.
     await prisma.shipment.delete({ where: { id: shipment.id } }).catch(() => {});
     return;
   }
@@ -162,15 +168,18 @@ export async function applyWeeklyBundling(
     where: { id: item.id },
     data: { status: 'IN_SHIPMENT', shipmentId: shipment.id },
   });
-  await prisma.weeklyShippingPass.create({
-    data: {
-      buyerId: params.buyerId,
-      sellerId: params.sellerId,
-      shipmentId: shipment.id,
-      weekStart: now,
-      expiresAt: new Date(now.getTime() + SHIP_LATER_HOLD_MS),
-    },
-  });
+  if (offersBundling) {
+    // Open the week so the buyer's later wins from this seller ride free.
+    await prisma.weeklyShippingPass.create({
+      data: {
+        buyerId: params.buyerId,
+        sellerId: params.sellerId,
+        shipmentId: shipment.id,
+        weekStart: now,
+        expiresAt: new Date(now.getTime() + SHIP_LATER_HOLD_MS),
+      },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +272,8 @@ export async function createAndPayShipment(
 
   const isPrivate = params.mode === 'PRIVATE' || params.private === true;
   const weight = items.reduce((g, it) => g + (it.weightGrams ?? DEFAULT_WEIGHT_G), 0);
-  const shippingFee = quoteShipping(origin, dest, weight);
+  // +3% per additional item in the shipment (matches the estimate shown to the buyer).
+  const shippingFee = multiItemSurcharge(quoteShipping(origin, dest, weight), items.length);
   const privacyFee = isPrivate ? privacyPremium() : 0n;
 
   const shipment = await prisma.shipment.create({
@@ -299,6 +309,98 @@ export async function createAndPayShipment(
   });
 
   return prisma.shipment.findUniqueOrThrow({ where: { id: shipment.id } });
+}
+
+/**
+ * Read-only shipping estimate for a set of ready-to-ship items — same origin,
+ * destination and weight the real charge would use, so the buyer sees the fee
+ * before committing. Charges nothing and creates nothing.
+ */
+export async function estimateShipment(
+  params: { buyerId: string; itemIds: string[]; private?: boolean },
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{
+  shippingFee: bigint;
+  carrierRetail: bigint;
+  discountPct: number;
+  privacyFee: bigint;
+  total: bigint;
+  hasAddress: boolean;
+}> {
+  const ids = [...new Set(params.itemIds)].filter(Boolean);
+  if (ids.length === 0) throw new ShippingError('Select at least one item to estimate.');
+
+  const items = await prisma.fulfillmentItem.findMany({ where: { id: { in: ids } } });
+  if (items.length === 0) throw new ShippingError('Those items were not found.');
+  for (const it of items) {
+    if (it.buyerId !== params.buyerId) throw new ShippingError('Those items aren’t yours.');
+  }
+  const sellerId = items[0]!.sellerId;
+  if (items.some((it) => it.sellerId !== sellerId)) {
+    throw new ShippingError('A shipment can only contain items from one seller.');
+  }
+
+  const [buyer, seller] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: params.buyerId } }),
+    prisma.sellerProfile.findUnique({ where: { userId: sellerId } }),
+  ]);
+  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const hasAddress = !!(dest && dest.line1 && dest.country);
+  const origin: ShipLocation = {
+    country: seller?.originCountry,
+    region: seller?.originRegion,
+    city: seller?.originCity,
+    postal: seller?.originPostal,
+  };
+
+  const weight = items.reduce((g, it) => g + (it.weightGrams ?? DEFAULT_WEIGHT_G), 0);
+  const b = quoteShippingBreakdown(origin, dest ?? {}, weight);
+  // +3% per additional item in the shipment (multi-item handling).
+  const shippingFee = multiItemSurcharge(b.final, items.length);
+  const carrierRetail = multiItemSurcharge(b.carrierRetail, items.length);
+  const privacyFee = params.private === true ? privacyPremium() : 0n;
+  return {
+    shippingFee,
+    carrierRetail,
+    discountPct: b.discountPct,
+    privacyFee,
+    total: shippingFee + privacyFee,
+    hasAddress,
+  };
+}
+
+/**
+ * Read-only shipping estimate for a single listing (not yet won) — for the bid
+ * panel, so a buyer sees what shipping will cost before bidding. Uses the seller's
+ * ship-from, the listing weight and the buyer's saved address.
+ */
+export async function estimateListingShipping(
+  buyerId: string,
+  listingId: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{ shippingFee: bigint; carrierRetail: bigint; discountPct: number; privacyFee: bigint; hasAddress: boolean }> {
+  const listing = await prisma.listing.findUnique({ where: { id: listingId }, select: { sellerId: true, weightGrams: true } });
+  if (!listing) throw new ShippingError('Listing not found.');
+  const [buyer, seller] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: buyerId } }),
+    prisma.sellerProfile.findUnique({ where: { userId: listing.sellerId } }),
+  ]);
+  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const hasAddress = !!(dest && dest.line1 && dest.country);
+  const origin: ShipLocation = {
+    country: seller?.originCountry,
+    region: seller?.originRegion,
+    city: seller?.originCity,
+    postal: seller?.originPostal,
+  };
+  const b = quoteShippingBreakdown(origin, dest ?? {}, listing.weightGrams ?? DEFAULT_WEIGHT_G);
+  return {
+    shippingFee: b.final,
+    carrierRetail: b.carrierRetail,
+    discountPct: b.discountPct,
+    privacyFee: privacyPremium(),
+    hasAddress,
+  };
 }
 
 // ---------------------------------------------------------------------------

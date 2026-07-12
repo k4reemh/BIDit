@@ -403,7 +403,28 @@ export interface Fulfillment {
   shipments: Shipment[];
 }
 
+export interface ShipEstimate {
+  shippingFee: string;
+  carrierRetail: string;
+  discountPct: number;
+  privacyFee: string;
+  total: string;
+  hasAddress: boolean;
+}
+
+export interface ListingShipEstimate {
+  shippingFee: string;
+  carrierRetail: string;
+  discountPct: number;
+  privacyFee: string;
+  hasAddress: boolean;
+}
+
 export const getFulfillment = () => req<Fulfillment>('/me/fulfillment');
+export const estimateShipment = (itemIds: string[], opts?: { private?: boolean }) =>
+  req<ShipEstimate>('/shipments/estimate', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
+export const estimateListingShipping = (listingId: string) =>
+  req<ListingShipEstimate>('/shipping/quote-listing', { method: 'POST', body: JSON.stringify({ listingId }) });
 export const createShipment = (itemIds: string[], opts?: { mode?: string; private?: boolean }) =>
   req<Shipment>('/shipments', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
 export const discardFulfillmentItem = (itemId: string) =>

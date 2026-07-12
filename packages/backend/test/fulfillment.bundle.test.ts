@@ -95,4 +95,25 @@ describe('weekly bundling', () => {
     expect(item.status).toBe('READY_TO_SHIP');
     expect(await prisma.shipment.count({ where: { buyerId: buyer.userId } })).toBe(0);
   });
+
+  it('auto-ships each win for a ship-to-address buyer even when the seller does not bundle', async () => {
+    const clock = new ManualClock(T0);
+    const seller = await makeUser('seller');
+    await prisma.sellerProfile.create({
+      data: { userId: seller.userId, verified: true, weeklyBundling: false, originCountry: 'CA', originRegion: 'AB', originPostal: 'T2P' },
+    });
+    const listing = await prisma.listing.create({
+      data: { sellerId: seller.userId, title: 'Pikachu', photos: [], startingBid: usdc('1'), quantity: 20, weightGrams: 60, status: 'QUEUED' },
+    });
+    const buyer = await makeFundedUser('100');
+    await prisma.user.update({ where: { id: buyer.userId }, data: { bundleShipping: true, shippingAddress: ADDRESS } });
+
+    const item = await sale(listing.id, buyer.userId, '5', clock);
+    expect(item.status).toBe('IN_SHIPMENT'); // shipped immediately on win
+    const shipments = await prisma.shipment.findMany({ where: { buyerId: buyer.userId } });
+    expect(shipments).toHaveLength(1);
+    expect(shipments[0]!.status).toBe('PAID');
+    // Non-bundling seller → no weekly pass; each win pays its own shipping.
+    expect(await prisma.weeklyShippingPass.count({ where: { buyerId: buyer.userId } })).toBe(0);
+  });
 });

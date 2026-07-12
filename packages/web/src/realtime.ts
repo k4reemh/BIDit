@@ -14,6 +14,7 @@ export interface WheelPrize {
 }
 export interface AuctionState {
   auctionId: string;
+  listingId?: string;
   title: string;
   imageUrl: string | null;
   status: string;

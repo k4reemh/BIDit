@@ -86,6 +86,8 @@ export interface AuctionStateMessage {
   type: 'AUCTION_STATE';
   room: string;
   auctionId: string;
+  /** The listing behind this auction — lets the client fetch a shipping estimate. */
+  listingId: string;
   /** The item being auctioned, for the panel's current-item card. */
   title: string;
   imageUrl: string | null;
