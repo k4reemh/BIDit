@@ -49,6 +49,7 @@ import {
 import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
+import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
@@ -400,6 +401,33 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         await markAllRead(userId, prisma);
         return send(res, 200, await listNotifications(userId, prisma));
+      }
+
+      // ---- BIDit Points ----
+      if (req.method === 'GET' && p === '/points') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const s = await getPointsSummary(userId, prisma);
+        return send(res, 200, {
+          points: Number(s.points),
+          missions: s.missions.map((m) => ({ ...m, points: Number(m.points) })),
+        });
+      }
+      if (req.method === 'POST' && p === '/points/claim') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          const r = await claimMission(userId, String(b.missionId ?? ''), prisma);
+          return send(res, 200, { points: Number(r.points), total: Number(r.total) });
+        } catch (err) {
+          if (err instanceof PointsError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'GET' && p === '/points/leaderboard') {
+        const rows = await getLeaderboard(25, prisma);
+        return send(res, 200, rows.map((r) => ({ ...r, points: Number(r.points) })));
       }
 
       // ---- fulfillment (buyer) ----

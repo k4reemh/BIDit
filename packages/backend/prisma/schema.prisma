@@ -112,6 +112,9 @@ model User {
   onboarded     Boolean  @default(false)
   walletAddress String?  @unique
   role          Role     @default(buyer)
+  // BIDit Points — activity rewards redeemed against future community airdrops.
+  // Denormalized sum of PointsEvents, kept in step for fast leaderboard reads.
+  points        BigInt   @default(0)
   createdAt     DateTime @default(now())
 
   account       Account?
@@ -121,6 +124,7 @@ model User {
   ordersBought  Order[]      @relation("BuyerOrders")
   ordersSold    Order[]      @relation("SellerOrders")
   withdrawals   Withdrawal[]
+  pointsEvents  PointsEvent[]
 }
 
 model SellerProfile {
@@ -462,4 +466,20 @@ model GiveawayEntry {
 
   @@unique([giveawayId, userId])
   @@index([giveawayId])
+}
+
+/// One points grant — the append-only audit trail behind User.points. `kind` is
+/// 'buy'/'sell' for automatic accrual (ref = orderId) or 'mission:<id>' for a
+/// claimed one-time bonus (ref = ''). The unique key makes every award idempotent.
+model PointsEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  kind      String
+  ref       String   @default("")
+  points    BigInt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, kind, ref])
+  @@index([userId, createdAt])
 }

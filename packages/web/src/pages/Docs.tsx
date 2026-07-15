@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: 'shipping', label: 'Shipping & delivery', icon: Truck },
   { id: 'fees', label: 'Fees', icon: Tag },
   { id: 'tokenomics', label: '$BID tokenomics', icon: Gift },
+  { id: 'points', label: 'BIDit Points & airdrops', icon: Gift },
   { id: 'randomizer', label: 'The randomizer', icon: Dice },
   { id: 'selling', label: 'Selling on BIDit', icon: UserCheck },
   { id: 'safety', label: 'Safety & trust', icon: Info },
@@ -334,11 +335,57 @@ export default function Docs() {
             <li><b>Fee-funded, not inflationary.</b> Buybacks are paid from real revenue (the 4% buyback), not by minting new supply.</li>
             <li><b>On-chain & auditable.</b> Buyback spends are recorded so the flywheel is transparent, not a promise.</li>
             <li><b>Volume-linked.</b> The more real items move through BIDit, the more $BID gets bought back.</li>
+            <li><b>5% locked for the community.</b> At launch, 5% of $BID supply is locked in a community reserve and
+            distributed as airdrops to platform users — allocated by <a href="#points">BIDit Points</a>. The first
+            airdrop lands <b>1 month after launch</b>, the next <b>3 months after launch</b>.</li>
           </ul>
           <div className="docs__note">
             <Info width={18} height={18} />
             <p>BIDit is in <b>beta on Solana devnet</b>. Balances and buybacks run against test USDC while the flow is
             hardened; the live-token DEX swap turns on with mainnet. Nothing here is investment advice.</p>
+          </div>
+        </section>
+
+        {/* POINTS */}
+        <section id="points" className="docs__sec">
+          <h2 className="docs__h2"><Gift width={22} height={22} /> BIDit Points &amp; airdrops</h2>
+          <p>
+            <b className="accent">BIDit Points</b> reward the people who actually use the platform. The more you buy and
+            sell, the more points you stack — and points decide your share of the <b>$BID community airdrops</b> funded
+            by the 5% reserve locked at launch.
+          </p>
+          <div className="docs__fly">
+            {[
+              ['Buyers earn 100×', 'Every $1 you spend on wins or store buys earns 100 points. Win a $10 auction → 1,000 points, automatically.'],
+              ['Sellers earn 20×', 'Every $1 you sell earns 20 points. Sell $1,000 on stream → 20,000 points across those sales.'],
+              ['Claim bonus missions', 'One-time bonuses for firsts: deposits, bids, wins, sales. Complete them and press claim.'],
+              ['Catch the airdrops', 'Airdrop #1 lands 1 month after launch; the next follows 3 months after. Your share scales with your points.'],
+            ].map(([t, d], i) => (
+              <div key={t} className="docs__fly-step card">
+                <span className="docs__fly-n">{i + 1}</span>
+                <b>{t}</b>
+                <p className="muted">{d}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ marginTop: 18 }}><b>Point bonuses</b> — one-time missions you claim from your <Link to="/points">BIDit Points</Link> page:</p>
+          <ul className="docs__ul">
+            <li><b>+1,000</b> — Deposit USDC into your BIDit wallet.</li>
+            <li><b>+1,000</b> — Place your first bid.</li>
+            <li><b>+3,000</b> — Win your first auction.</li>
+            <li><b>+1,000</b> — Win a live giveaway.</li>
+            <li><b>+5,000</b> — Refer a friend who purchases an item <i>(coming soon)</i>.</li>
+            <li><b>+3,000</b> — Sell and fulfill your first item on BIDit.</li>
+            <li><b>+3,000</b> — Sell and fulfill 10 items.</li>
+            <li><b>+10,000</b> — Become a Verified Seller (sell and fulfill $500 worth of items).</li>
+          </ul>
+          <p>
+            See where you stand on the <Link to="/leaderboard">Points Leaderboard</Link>.
+          </p>
+          <div className="docs__note">
+            <Info width={18} height={18} />
+            <p>Points are a loyalty score for community airdrops and prizes. They are <b>not</b> a currency, a deposit,
+            or an investment, and they can’t be bought, transferred or withdrawn.</p>
           </div>
         </section>
 

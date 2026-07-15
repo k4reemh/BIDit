@@ -11,6 +11,8 @@ import SellerLayout from './components/SellerLayout';
 import Home from './pages/Home';
 import Docs from './pages/Docs';
 import Help from './pages/Help';
+import Points from './pages/Points';
+import Leaderboard from './pages/Leaderboard';
 import AdminSellers from './pages/admin/Sellers';
 import AdminOrders from './pages/admin/Orders';
 import Watch from './pages/Watch';
@@ -105,6 +107,8 @@ export default function App() {
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/points" element={<Points session={session} onAuth={() => setAuth('signup')} />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/admin/sellers" element={<AdminSellers session={session} />} />
           <Route path="/admin/orders" element={<AdminOrders session={session} />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />

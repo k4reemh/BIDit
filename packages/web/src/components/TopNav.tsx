@@ -35,6 +35,9 @@ export default function TopNav({
               Categories <Chevron width={15} height={15} />
             </button>
             <Link to="/sell">Sell</Link>
+            <NavLink to="/leaderboard" className={({ isActive }) => `nav__lb${isActive ? ' active' : ''}`}>
+              Leaderboard
+            </NavLink>
           </nav>
         </div>
 

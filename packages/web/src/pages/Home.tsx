@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import LiveCard from '../components/LiveCard';
 import LiveCoinCard from '../components/LiveCoinCard';
 import { FEATURED, CATEGORIES } from '../data';
 import { getLive, getPromo, type LiveCoin, type PromoState } from '../api';
-import { ArrowRight, Bolt, Truck, Wallet } from '../icons';
+import { ArrowRight, Bolt, Truck, Wallet, Gift } from '../icons';
 
 export default function Home({ onAuth }: { onAuth: () => void }) {
   const [live, setLive] = useState<LiveCoin[] | null>(null);
@@ -101,6 +102,32 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
               <p>{s.d}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ---- BIDit Points ---- */}
+      <section className="section container">
+        <div className="pts-band">
+          <div className="pts-band__glow" aria-hidden />
+          <div className="pts-band__body">
+            <span className="pts-band__eyebrow"><Gift width={14} height={14} /> BIDit Points · Community airdrops</span>
+            <h2 className="display pts-band__title">Every bid earns a bigger slice of the airdrop.</h2>
+            <p className="pts-band__sub">
+              Earn <b>100 points for every $1</b> you spend and <b>20 per $1</b> you sell — plus bonus drops for your
+              first bid, first win and more. <b>5% of $BID supply</b> is locked for community airdrops, and your points
+              decide your share.
+            </p>
+            <div className="pts-band__cta">
+              <Link className="btn btn-primary btn-lg" to="/points">Start earning points <ArrowRight width={17} height={17} /></Link>
+              <Link className="btn btn-ghost btn-lg" to="/leaderboard">View leaderboard</Link>
+            </div>
+          </div>
+          <div className="pts-band__chips" aria-hidden>
+            <div className="pts-band__chip"><b>+100 pts</b><span>per $1 spent</span></div>
+            <div className="pts-band__chip"><b>+3,000 pts</b><span>win your first auction</span></div>
+            <div className="pts-band__chip"><b>+20 pts</b><span>per $1 sold</span></div>
+            <div className="pts-band__chip pts-band__chip--hot"><b>Airdrop #1</b><span>1 month after launch</span></div>
+          </div>
         </div>
       </section>
 

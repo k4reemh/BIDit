@@ -16,6 +16,7 @@ import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
 import { InsufficientFundsError } from './errors.js';
 import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
+import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
@@ -171,6 +172,9 @@ export async function purchaseListing(
     );
     await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
   }
+
+  // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
+  await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
   const price = `$${formatUsdc(amount)}`;
   await notify(

@@ -16,6 +16,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
 import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
+import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
@@ -94,6 +95,9 @@ export async function settleAuction(
     where: { id: auction.listing.id },
     data: { status: listing.quantity > 0 ? ListingStatus.QUEUED : ListingStatus.SOLD },
   });
+
+  // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
+  await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
   return order;
 }
@@ -180,6 +184,9 @@ export async function settleAuctionDirect(
   // If both sides opted into weekly bundling, fold it into this week's shipment
   // (charging shipping once, on the first win of the week).
   await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
+
+  // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
+  await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
   const price = `$${formatUsdc(amount)}`;
   const title = auction.listing.title;

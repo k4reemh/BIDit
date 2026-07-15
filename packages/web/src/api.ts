@@ -445,6 +445,33 @@ export interface HeldItem {
 }
 export const getSellerHeld = () => req<HeldItem[]>('/seller/held');
 
+// ---- BIDit Points ----------------------------------------------------------
+export type MissionStatus = 'locked' | 'claimable' | 'claimed';
+export interface Mission {
+  id: string;
+  title: string;
+  desc: string;
+  points: number;
+  status: MissionStatus;
+  comingSoon: boolean;
+}
+export interface PointsSummary {
+  points: number;
+  missions: Mission[];
+}
+export interface LeaderboardRow {
+  rank: number;
+  handle: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  points: number;
+}
+
+export const getPoints = () => req<PointsSummary>('/points');
+export const claimMission = (missionId: string) =>
+  req<{ points: number; total: number }>('/points/claim', { method: 'POST', body: JSON.stringify({ missionId }) });
+export const getLeaderboard = () => req<LeaderboardRow[]>('/points/leaderboard');
+
 // ---- notifications ---------------------------------------------------------
 export interface Notif {
   id: string;

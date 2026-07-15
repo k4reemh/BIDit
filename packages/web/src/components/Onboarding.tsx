@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Logo from './Logo';
 import { INTERESTS, CATEGORIES } from '../data';
 import { completeOnboarding, type Session } from '../api';
-import { Bolt, Truck, Wallet, Shield, Copy, Check, ArrowRight } from '../icons';
+import { Bolt, Truck, Wallet, Shield, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
   { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
@@ -15,8 +15,14 @@ const VALUES = [
   { ic: Shield, t: 'USDC settled · buyer protection' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
-const LAST = 3;
-const TITLES = ['Welcome to BIDit', 'Claim your username', 'What do you collect?', 'Fund your first bid'];
+const LAST = 4;
+const TITLES = ['Welcome to BIDit', 'Claim your username', 'What do you collect?', 'Fund your first bid', 'Earn points, catch airdrops'];
+const POINTS_PERKS = [
+  { pts: '100×', t: 'points on every $1 you spend' },
+  { pts: '20×', t: 'points on every $1 you sell' },
+  { pts: '+1,000', t: 'deposit USDC into your wallet' },
+  { pts: '+3,000', t: 'win your first auction' },
+];
 
 export default function Onboarding({ session, onDone }: { session: Session; onDone: (s: Session) => void }) {
   const [step, setStep] = useState(0);
@@ -84,7 +90,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
       <main className="obx__panel">
         <div className="obx__head">
           <div className="obx__steps">
-            {[0, 1, 2, 3].map((i) => <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />)}
+            {[0, 1, 2, 3, 4].map((i) => <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />)}
           </div>
           <button className="obx__skip" onClick={() => finish(true)} disabled={busy}>Skip for now</button>
         </div>
@@ -144,6 +150,27 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
                 </div>
                 <div className="obx__wallet-note">Send only USDC or SOL on Solana to this address. Funds appear in your balance once the transfer confirms.</div>
               </div>
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <p className="obx__sub">
+                Everything you do on BIDit earns <b>BIDit Points</b> — and points decide your share of the
+                <b> $BID community airdrops</b> (5% of supply is locked for them, first drop one month after launch).
+              </p>
+              <div className="obx__how">
+                {POINTS_PERKS.map((p) => (
+                  <div className="obx__howrow" key={p.t}>
+                    <span className="obx__howic obx__howic--pts">{p.pts}</span>
+                    <div><b>{p.pts} points</b><span>{p.t}</span></div>
+                  </div>
+                ))}
+              </div>
+              <p className="obx__sub" style={{ marginTop: 12 }}>
+                <Gift width={14} height={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+                Find your missions anytime under <b>BIDit Points</b> in your profile menu.
+              </p>
             </>
           )}
 

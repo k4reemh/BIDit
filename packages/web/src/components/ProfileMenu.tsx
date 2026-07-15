@@ -7,6 +7,7 @@ import {
 } from '../icons';
 
 const TILES = [
+  { icon: Gift, label: 'BIDit Points', to: '/points' },
   { icon: Gift, label: 'Refer Friends', to: '/refer' },
   { icon: UserCheck, label: 'Become a Seller', to: '/sell' },
   { icon: Truck, label: 'Payments & Shipping', to: '/shipping' },
