@@ -86,13 +86,45 @@ export function parseBearer(header: string | null | undefined): string | null {
 // ---------------------------------------------------------------------------
 
 const challenges = new Map<string, { message: string; exp: number }>();
+// Hard cap so an attacker spamming /auth/challenge with distinct addresses can't
+// grow this Map without bound (a single-instance in-memory store; Redis w/ TTL in
+// a multi-instance deploy). Combined with per-IP rate limiting on the route.
+const MAX_CHALLENGES = 10_000;
 
-/** Issue a challenge for the wallet to sign. (In-memory; Redis in a real deploy.) */
+/** True if `addr` is a base58-encoded 32-byte ed25519 public key (a Solana address). */
+export function isValidWalletAddress(addr: string): boolean {
+  try {
+    return bs58.decode(addr).length === 32;
+  } catch {
+    return false;
+  }
+}
+
+/** Drop expired challenges, then evict oldest until under the hard cap. */
+function pruneChallenges(now: number): void {
+  for (const [k, v] of challenges) {
+    if (v.exp <= now) challenges.delete(k);
+  }
+  while (challenges.size >= MAX_CHALLENGES) {
+    const oldest = challenges.keys().next().value;
+    if (oldest === undefined) break;
+    challenges.delete(oldest);
+  }
+}
+
+/** Issue a challenge for the wallet to sign. (In-memory; Redis in a real deploy.)
+ *  Callers must pre-validate the address with isValidWalletAddress(). */
 export function buildLoginChallenge(walletAddress: string): string {
+  pruneChallenges(Date.now());
   const nonce = randomBytes(16).toString('hex');
   const message = `BIDit login\nwallet: ${walletAddress}\nnonce: ${nonce}\nissued: ${new Date().toISOString()}`;
   challenges.set(walletAddress, { message, exp: Date.now() + CHALLENGE_TTL_MS });
   return message;
+}
+
+/** Test/introspection helper: current number of outstanding challenges. */
+export function outstandingChallengeCount(): number {
+  return challenges.size;
 }
 
 /** Verify a base58 ed25519 signature of the wallet's outstanding challenge. */

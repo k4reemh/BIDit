@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
+import { randomBytes } from 'node:crypto';
 import {
   issueSession,
   verifySession,
   parseBearer,
   buildLoginChallenge,
   verifyWalletSignature,
+  isValidWalletAddress,
+  outstandingChallengeCount,
 } from '../src/auth.js';
+
+const randomAddress = () => bs58.encode(randomBytes(32));
 
 describe('session tokens', () => {
   it('round-trips a userId', () => {
@@ -66,5 +71,27 @@ describe('wallet-signature login', () => {
     const address = bs58.encode(kp.publicKey);
     const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode('x'), kp.secretKey));
     expect(verifyWalletSignature(address, signature)).toBe(false);
+  });
+});
+
+describe('wallet address validation', () => {
+  it('accepts a real 32-byte base58 Solana address', () => {
+    expect(isValidWalletAddress(randomAddress())).toBe(true);
+    expect(isValidWalletAddress(bs58.encode(nacl.sign.keyPair().publicKey))).toBe(true);
+  });
+
+  it('rejects empty, non-base58, and wrong-length input', () => {
+    expect(isValidWalletAddress('')).toBe(false);
+    expect(isValidWalletAddress('   ')).toBe(false);
+    expect(isValidWalletAddress('not-base58-because-of-these!@#')).toBe(false);
+    expect(isValidWalletAddress(bs58.encode(randomBytes(16)))).toBe(false); // 16 bytes, too short
+    expect(isValidWalletAddress(bs58.encode(randomBytes(64)))).toBe(false); // 64 bytes, too long
+  });
+});
+
+describe('challenge map bounding', () => {
+  it('never grows past the hard cap even under a flood of distinct addresses', () => {
+    for (let i = 0; i < 10_200; i++) buildLoginChallenge(randomAddress());
+    expect(outstandingChallengeCount()).toBeLessThanOrEqual(10_000);
   });
 });

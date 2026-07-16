@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
 import { simulateDeposit, withdraw, refreshMe } from '../../api';
-import { Copy, Check, Wallet } from '../../icons';
+import { Copy, Check, Wallet, Shield } from '../../icons';
 
 export default function Deposit() {
   const { session, setSession } = useAccount();
@@ -98,6 +98,10 @@ export default function Deposit() {
       <div className="card acct-card">
         <h3 className="acct-sub">Withdraw</h3>
         <p className="muted acct-note">Send USDC from your wallet to any Solana address. Funds reserved by active bids stay put until those auctions end.</p>
+        <div className="beta-cap">
+          <Shield width={16} height={16} />
+          <span><b>Beta safety limit:</b> withdrawals are capped at <b>$1,000 per day</b> per account while we harden the payout system during BIDit beta. This is a temporary measure and will be lifted.</span>
+        </div>
         {wErr && <div className="auth__error">{wErr}</div>}
         {wOk && <div className="dep-ok"><Check width={15} height={15} /> {wOk}</div>}
         <div className="fld-row">

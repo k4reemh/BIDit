@@ -27,6 +27,9 @@ export interface ChainClient {
   pollDeposits(cursor: string | null): Promise<{ events: DepositEvent[]; cursor: string | null }>;
   /** Transfer USDC from a backend wallet to an address. Returns the tx signature. */
   transfer(from: WalletName, to: string, amountMicros: bigint, memo?: string): Promise<string>;
+  /** True if `address` is a well-formed destination for this chain (checked before
+   *  any withdrawal is recorded, so funds never target a malformed address). */
+  isValidAddress(address: string): boolean;
   /** USDC balance (micro-units) of a named wallet or a raw address. */
   balance(target: WalletName | string): Promise<bigint>;
 }

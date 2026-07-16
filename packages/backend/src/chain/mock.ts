@@ -45,6 +45,10 @@ export class MockChain implements ChainClient {
     return this.bal.get(addr) ?? 0n;
   }
 
+  isValidAddress(address: string): boolean {
+    return typeof address === 'string' && address.trim().length > 0;
+  }
+
   // ---- test helpers --------------------------------------------------------
 
   /** Simulate a confirmed inbound USDC deposit; funds are swept into treasury. */

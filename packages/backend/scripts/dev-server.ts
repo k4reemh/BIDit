@@ -15,6 +15,8 @@ import { Role, AuctionStatus, usdc, formatUsdc, normalizeWheelEntries } from '@b
 import { InsufficientFundsError } from '../src/errors.js';
 import { prisma } from '../src/db.js';
 import { ensureSystemAccounts } from '../src/bootstrap.js';
+import { assertStartupConfig, usingDefaultAuthSecret } from '../src/config.js';
+import { corsAllowOrigin } from '../src/http.js';
 import { getOrCreateUserAccount, deposit, getAvailableBalance, getSettledBalance } from '../src/ledger.js';
 import { RealtimeServer } from '../src/realtime/server.js';
 import {
@@ -23,6 +25,7 @@ import {
   parseBearer,
   buildLoginChallenge,
   verifyWalletSignature,
+  isValidWalletAddress,
 } from '../src/auth.js';
 import {
   findOrCreateByWallet,
@@ -54,7 +57,7 @@ import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
 import { ensureDepositAddress, DepositWatcher, registerAllDeposits } from '../src/deposits.js';
-import { requestWithdrawal } from '../src/withdrawals.js';
+import { requestWithdrawal, WithdrawalError } from '../src/withdrawals.js';
 import {
   markShipped,
   markDelivered,
@@ -93,11 +96,17 @@ process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]
 process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
 const DEMO_SELLER_HANDLE = 'demo_seller';
 
-const CORS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-  'access-control-allow-headers': 'content-type, authorization',
-};
+// ---- CORS: reflect the caller in dev; strict allowlist in production (src/http.ts) ----
+/** Set CORS headers for this request. Called once at the top of route() so every
+ *  response (including error + preflight) carries them via res.setHeader. */
+function applyCors(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+  const allow = corsAllowOrigin(origin);
+  if (allow) res.setHeader('access-control-allow-origin', allow);
+  res.setHeader('vary', 'Origin');
+  res.setHeader('access-control-allow-methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type, authorization');
+}
 
 // Throttle auth endpoints per-IP to blunt credential-stuffing / brute force.
 const authHits = new Map<string, number[]>();
@@ -112,19 +121,47 @@ function authRateLimited(req: http.IncomingMessage): boolean {
 
 function send(res: http.ServerResponse, status: number, body: unknown, type = 'application/json') {
   const payload = type === 'application/json' ? JSON.stringify(body) : String(body);
-  res.writeHead(status, { 'content-type': type, ...CORS });
+  res.writeHead(status, { 'content-type': type }); // CORS headers already set via applyCors()
   res.end(payload);
 }
 
-async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
-  if (chunks.length === 0) return {};
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>;
-  } catch {
-    return {};
+/** Body-size / malformed-JSON error, mapped to its HTTP status by the route catch. */
+class RequestBodyError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'RequestBodyError';
   }
+}
+
+// 4 MB — comfortably fits the app's largest legitimate body (a listing with a few
+// downscaled JPEG data-URL photos) while bounding memory per request. Override
+// with BIDIT_MAX_BODY_BYTES.
+const MAX_BODY_BYTES = (() => {
+  const raw = Number(process.env.BIDIT_MAX_BODY_BYTES);
+  return Number.isFinite(raw) && raw > 0 ? raw : 4_000_000;
+})();
+
+async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  const declared = Number(req.headers['content-length']);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new RequestBodyError(413, 'Request body too large.');
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += (chunk as Buffer).length;
+    if (total > MAX_BODY_BYTES) throw new RequestBodyError(413, 'Request body too large.');
+    chunks.push(chunk as Buffer);
+  }
+  if (total === 0) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.concat(chunks).toString());
+  } catch {
+    throw new RequestBodyError(400, 'Malformed JSON body.');
+  }
+  // Every endpoint expects a JSON object; anything else is treated as empty.
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
 }
 
 const authUser = (req: http.IncomingMessage): string | null =>
@@ -144,6 +181,13 @@ async function main() {
   const directPayout = process.env.BIDIT_PAYOUT_MODE === 'direct';
   const escrow = new DevWalletEscrow(prisma);
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
+  // Fail fast on an unsafe production/real-money configuration (missing/weak
+  // AUTH_SECRET, a mock chain in prod, force-enabled dev endpoints, missing
+  // custody secrets). Throws → main().catch → process.exit(1).
+  const { isProd } = assertStartupConfig(chain.cluster);
+  if (usingDefaultAuthSecret() && chain.cluster !== 'mock') {
+    console.warn('[config] ⚠️  AUTH_SECRET is the insecure default on a real chain — set a strong value before exposing this deploy.');
+  }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
   const httpServer = http.createServer((req, res) => void route(req, res));
@@ -174,8 +218,10 @@ async function main() {
   orderTimer.unref?.();
 
   // Dev endpoints (password-less login, balance minting, seeders) are ON only for
-  // the local mock chain, OFF on any real chain unless explicitly forced.
-  const devEndpoints = chain.cluster === 'mock' || process.env.BIDIT_ENABLE_DEV_ENDPOINTS === 'yes';
+  // the local mock chain, OFF on any real chain unless explicitly forced — and
+  // ALWAYS off in production (assertStartupConfig already rejected the force flag,
+  // but this is defence-in-depth on the money-endpoint gate).
+  const devEndpoints = !isProd && (chain.cluster === 'mock' || process.env.BIDIT_ENABLE_DEV_ENDPOINTS === 'yes');
 
   console.log(`[chain] cluster=${chain.cluster} · payout=${directPayout ? 'DIRECT (no escrow, no fee)' : 'escrow (95/5)'} · dev-endpoints=${devEndpoints ? 'on' : 'off'}`);
   if (chain.cluster === 'mainnet-beta') {
@@ -234,12 +280,26 @@ async function main() {
 
   async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
+    applyCors(req, res); // set CORS on every response (incl. preflight + errors)
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, CORS);
+      res.writeHead(204);
       res.end();
       return;
     }
     const p = url.pathname;
+    // Operational transparency: which chain/payout/dev mode is this process in.
+    // Unauthenticated + cheap; exposes only mode flags, never secrets or balances.
+    if (req.method === 'GET' && p === '/health') {
+      return send(res, 200, {
+        ok: true,
+        chain: chain.cluster,
+        mainnet: chain.cluster === 'mainnet-beta',
+        payout: directPayout ? 'direct' : 'escrow',
+        devEndpoints,
+        production: isProd,
+        time: new Date().toISOString(),
+      });
+    }
     // SECURITY: dev conveniences (password-less /dev/login, /dev/deposit that
     // mints free balance, seeders, etc.) are DISABLED on a real chain unless
     // explicitly re-enabled. Never expose these on a public real-money deploy.
@@ -254,12 +314,14 @@ async function main() {
 
       // ---- auth ----
       if (req.method === 'POST' && p === '/auth/challenge') {
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
         const b = await readJson(req);
         const wallet = String(b.walletAddress ?? '').trim();
-        if (!wallet) return send(res, 400, { error: 'walletAddress required' });
+        if (!isValidWalletAddress(wallet)) return send(res, 400, { error: 'Enter a valid Solana wallet address.' });
         return send(res, 200, { message: buildLoginChallenge(wallet) });
       }
       if (req.method === 'POST' && p === '/auth/verify') {
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
         const b = await readJson(req);
         const wallet = String(b.walletAddress ?? '').trim();
         const signature = String(b.signature ?? '').trim();
@@ -333,21 +395,17 @@ async function main() {
         }
       }
 
-      // ---- authenticated: me / deposit ----
+      // ---- authenticated: me / withdraw ----
       if (req.method === 'GET' && p === '/me') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await sessionPayload(userId));
       }
-      if (req.method === 'POST' && p === '/deposit') {
-        const userId = authUser(req);
-        if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const b = await readJson(req);
-        const accountId = await getOrCreateUserAccount(userId, prisma);
-        await deposit({ accountId, amount: usdc(String(b.amount ?? '0')) }, prisma);
-        await realtime.notifyBalance(userId);
-        return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
-      }
+      // NOTE: there is deliberately NO authenticated POST /deposit route. Real
+      // deposits are credited ONLY by the on-chain DepositWatcher after USDC lands
+      // and is swept; the mock-only simulator lives at /dev/simulate-deposit (gated
+      // by devEndpoints + MockChain). A body-driven credit endpoint here would let
+      // any signed-in user mint balance, so it must never exist.
       if (req.method === 'POST' && p === '/withdraw') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -366,6 +424,7 @@ async function main() {
             available: formatUsdc(await getAvailableBalance(accountId, prisma)),
           });
         } catch (err) {
+          if (err instanceof WithdrawalError) return send(res, 400, { error: err.message });
           if (err instanceof InsufficientFundsError) {
             return send(res, 400, { error: 'Not enough available balance (funds in active bids are locked).' });
           }

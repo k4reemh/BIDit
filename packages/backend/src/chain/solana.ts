@@ -128,6 +128,16 @@ export class SolanaChain implements ChainClient {
     return splTransfer(this.conn, owner, fromAta.address, toAta.address, owner, amountMicros);
   }
 
+  isValidAddress(address: string): boolean {
+    try {
+      // Rejects wrong length, bad base58, and off-curve junk before we ever debit.
+      new PublicKey(address);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Naive poll: any positive balance on a known deposit address is a new deposit;
    * we sweep it into treasury (treasury pays fees) and emit an event keyed by the

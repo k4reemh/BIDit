@@ -39,14 +39,21 @@ services:
         value: "yes"
       - key: USDC_MINT
         value: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v # mainnet USDC
+      # In production the API only accepts browser requests from these origins
+      # (comma-separated). MUST include your Vercel web origin or the site can't
+      # call the API. Example: https://bidit.vercel.app,https://www.bidit.app
+      - key: BIDIT_ALLOWED_ORIGINS
+        sync: false
       - key: BIDIT_PROMO_START
         value: "2026-07-14T00:00:00-06:00" # "$100 to sell" promo opens (3-day enrollment window). Remove/blank to disable.
       # ---- secrets: set these in the Render dashboard, never commit ----
+      # The server REFUSES TO BOOT on mainnet (or BIDIT_ENV=production) if any of
+      # these are missing/weak — see src/config.ts (assertStartupConfig).
       - key: SOLANA_RPC
-        sync: false # your mainnet RPC (Helius/QuickNode)
+        sync: false # your mainnet RPC (Helius/QuickNode). If unset, a mock chain is used — which the guard rejects in prod.
       - key: TREASURY_SECRET
         sync: false # treasury keypair (base58 or JSON array) — hot wallet
       - key: BIDIT_WALLET_SEED
-        sync: false # strong, unique, backed up — controls all deposit addresses
+        sync: false # strong, unique, backed up (≥24 chars) — controls all deposit addresses
       - key: AUTH_SECRET
-        sync: false # strong random string for session tokens
+        sync: false # REQUIRED: strong random string (≥32 chars) for session tokens. Generate: `openssl rand -base64 48`
