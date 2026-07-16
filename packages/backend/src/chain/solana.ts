@@ -11,15 +11,16 @@
  * address is swept to treasury after crediting); a production deploy would use a
  * webhook/indexer (e.g. Helius) instead of polling.
  */
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
   getAssociatedTokenAddress,
   getAccount,
+  createTransferInstruction,
   transfer as splTransfer,
 } from '@solana/spl-token';
 import bs58 from 'bs58';
-import type { ChainClient, DepositEvent, WalletName } from './types.js';
+import type { ChainClient, DepositEvent, SendResult, TransferStatus, WalletName } from './types.js';
 import { deriveDepositKeypair as walletDeriveDepositKeypair } from '../wallet.js';
 
 function loadKeypair(envVar: string): Keypair {
@@ -126,6 +127,52 @@ export class SolanaChain implements ChainClient {
     const fromAta = await getOrCreateAssociatedTokenAccount(this.conn, owner, this.usdcMint, owner.publicKey);
     const toAta = await getOrCreateAssociatedTokenAccount(this.conn, owner, this.usdcMint, new PublicKey(to));
     return splTransfer(this.conn, owner, fromAta.address, toAta.address, owner, amountMicros);
+  }
+
+  /**
+   * Broadcast a transfer WITHOUT waiting for confirmation (withdrawal rail).
+   *
+   * All fallible pre-broadcast work — ensuring the ATAs, fetching the blockhash,
+   * building and signing — happens first; if any of it throws, the value transfer
+   * never went out and the caller can safely reverse. Once we've signed, the
+   * signature is fixed (a property of the signed bytes), so we return it even if
+   * the `sendRawTransaction` ack is lost to a timeout: the tx may still land, and
+   * getTransferStatus is the only thing allowed to declare it dead.
+   */
+  async sendTransfer(from: WalletName, to: string, amountMicros: bigint): Promise<SendResult> {
+    const owner = this.wallets[from];
+    // Pre-broadcast setup (throwing here means no value moved → safe to reverse).
+    const fromAta = await getOrCreateAssociatedTokenAccount(this.conn, owner, this.usdcMint, owner.publicKey);
+    const toAta = await getOrCreateAssociatedTokenAccount(this.conn, owner, this.usdcMint, new PublicKey(to));
+    const { blockhash, lastValidBlockHeight } = await this.conn.getLatestBlockhash('confirmed');
+    const tx = new Transaction({ feePayer: owner.publicKey, blockhash, lastValidBlockHeight });
+    tx.add(createTransferInstruction(fromAta.address, toAta.address, owner.publicKey, amountMicros));
+    tx.sign(owner);
+    const sig = bs58.encode(tx.signature!); // signature is fixed once signed
+    // From here the tx exists and may land; a send error must NOT be treated as
+    // failure (that is the double-spend trap). Swallow it and resolve fate later.
+    try {
+      await this.conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 5 });
+    } catch (err) {
+      console.warn(`[withdraw] send ack lost for ${sig} (will reconcile):`, (err as Error)?.message ?? err);
+    }
+    return { sig, lastValidBlockHeight: BigInt(lastValidBlockHeight) };
+  }
+
+  async getTransferStatus(sig: string, lastValidBlockHeight?: bigint | null): Promise<TransferStatus> {
+    const { value } = await this.conn.getSignatureStatuses([sig], { searchTransactionHistory: true });
+    const st = value[0];
+    if (st) {
+      if (st.err) return 'failed'; // processed but reverted — the transfer did not move funds
+      if (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized') return 'confirmed';
+      return 'unknown'; // 'processed' only — not yet safely confirmed
+    }
+    // Not found on-chain. If its blockhash has expired, it can never land → dead.
+    if (lastValidBlockHeight != null) {
+      const height = await this.conn.getBlockHeight('confirmed');
+      if (BigInt(height) > lastValidBlockHeight) return 'failed';
+    }
+    return 'unknown'; // still within the validity window (or unknown expiry) — keep waiting
   }
 
   isValidAddress(address: string): boolean {

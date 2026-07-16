@@ -186,15 +186,39 @@ model Account {
 }
 
 /// On-chain withdrawal record (USDC sent from treasury to a user's address).
+///
+/// Durable settlement state machine (see withdrawals.ts). The ledger debit is
+/// posted once, up front; the row then tracks the on-chain transfer's fate so we
+/// only ever reverse the debit when the chain *proves* the transfer is dead —
+/// never on an ambiguous send timeout (which could otherwise double-credit a user
+/// whose USDC actually left the treasury).
+///   PENDING      — created + debited, not yet broadcast.
+///   SUBMITTED    — broadcast; signature known; awaiting confirmation.
+///   CONFIRMED    — transfer finalized on-chain (terminal).
+///   FAILED       — transfer permanently dead; debit reversed exactly once (terminal).
+///   NEEDS_REVIEW — fate still indeterminate after a long time (RPC outage); debit
+///                  retained (NOT reversed) and surfaced for an operator.
 model Withdrawal {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   toAddress String
   amount    BigInt
-  status    String   @default("PENDING") // PENDING | CONFIRMED | FAILED
+  status    String   @default("PENDING") // PENDING | SUBMITTED | CONFIRMED | FAILED | NEEDS_REVIEW
   txSig     String?
+  /// Solana blockhash expiry height captured at broadcast. Once the chain's block
+  /// height passes this and the signature is still not found, the transfer can
+  /// never land → safe to reverse. Null for chains without the concept (mock).
+  lastValidBlockHeight BigInt?
+  /// Set the instant the debit is reversed (credited back). Guards against ever
+  /// reversing twice; the ledger reversal is also idempotency-keyed as a backstop.
+  reversedAt DateTime?
+  /// Last transition reason / error, for operator visibility on stuck rows.
+  lastError String?
   createdAt DateTime @default(now())
+  // @default(now()) gives the column a DB-level default so `prisma db push` can
+  // add it to a table that already has rows on deploy (no --accept-data-loss).
+  updatedAt DateTime @updatedAt @default(now())
 
   @@index([userId])
   @@index([status])

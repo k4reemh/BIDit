@@ -62,7 +62,7 @@ import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
 import { ensureDepositAddress, DepositWatcher, registerAllDeposits } from '../src/deposits.js';
-import { requestWithdrawal, WithdrawalError } from '../src/withdrawals.js';
+import { requestWithdrawal, WithdrawalError, WithdrawalReconciler } from '../src/withdrawals.js';
 import {
   markShipped,
   markDelivered,
@@ -224,6 +224,18 @@ async function main() {
     (e) => console.error('[deposits] startup reconcile failed:', e),
   );
   depositWatcher.start();
+  // Finalize any withdrawal left mid-flight (SUBMITTED) by a prior crash/restart:
+  // confirm it, or reverse the debit if the chain proves it never landed. Then
+  // keep polling so in-flight withdrawals settle durably out of band. On each
+  // terminal transition, push a live BALANCE_UPDATE (a reversal restores balance).
+  const withdrawalReconciler = new WithdrawalReconciler(chain, prisma, 15_000, (userId) =>
+    void realtime.notifyBalance(userId).catch(() => {}),
+  );
+  await withdrawalReconciler.reconcile().then(
+    (n) => n > 0 && console.log(`[withdrawals] settled ${n} in-flight withdrawal(s) on startup`),
+    (e) => console.error('[withdrawals] startup reconcile failed:', e),
+  );
+  withdrawalReconciler.start();
   // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
   const fulfillmentTimer = setInterval(() => {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
@@ -462,7 +474,16 @@ async function main() {
           const w = await requestWithdrawal(userId, toAddress, amount, chain, prisma);
           await realtime.notifyBalance(userId);
           const accountId = await getOrCreateUserAccount(userId, prisma);
+          // A FAILED row means the transfer never went out and the debit was
+          // reversed — surface it as an error (funds are back) rather than success.
+          if (w.status === 'FAILED') {
+            return send(res, 502, {
+              error: 'The on-chain transfer could not be sent. Your balance was not charged — please try again.',
+            });
+          }
           return send(res, 200, {
+            // CONFIRMED = landed on-chain; SUBMITTED = broadcast, confirming (the
+            // reconciler finalizes it, and pushes a balance update either way).
             status: w.status,
             txSig: w.txSig,
             available: formatUsdc(await getAvailableBalance(accountId, prisma)),

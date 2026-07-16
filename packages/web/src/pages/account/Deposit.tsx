@@ -49,7 +49,8 @@ export default function Deposit() {
     try {
       const r = await withdraw(wAmt, wTo.trim());
       await refresh();
-      setWOk(`Withdrawal ${r.status.toLowerCase()}${r.txSig ? ` · ${r.txSig.slice(0, 10)}…` : ''}`);
+      const label = r.status === 'SUBMITTED' ? 'sent — confirming on-chain' : r.status.toLowerCase();
+      setWOk(`Withdrawal ${label}${r.txSig ? ` · ${r.txSig.slice(0, 10)}…` : ''}`);
       setWAmt('');
       setTimeout(() => setWOk(''), 4000);
     } catch (err) {

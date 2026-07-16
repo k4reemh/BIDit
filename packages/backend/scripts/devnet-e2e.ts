@@ -41,7 +41,7 @@ const { ensureSystemAccounts } = await import('../src/bootstrap.js');
 const { getChainClient } = await import('../src/chain/index.js');
 const { ProgramEscrow } = await import('../src/escrow.js');
 const { DepositWatcher, ensureDepositAddress } = await import('../src/deposits.js');
-const { requestWithdrawal } = await import('../src/withdrawals.js');
+const { requestWithdrawal, WithdrawalReconciler } = await import('../src/withdrawals.js');
 const { BuybackWorker, MockSwapper } = await import('../src/buyback.js');
 const { createListing } = await import('../src/listings.js');
 const { startAuctionFromListing } = await import('../src/sellers.js');
@@ -128,6 +128,19 @@ async function main() {
   console.log(`6) seller withdraws ${fmt(usdc('19'))} to ${sellerWallet}`);
   const w = await requestWithdrawal(seller.id, sellerWallet, usdc('19'), chain, prisma);
   console.log(`   withdrawal ${w.status}${w.txSig ? `; on-chain: ${explorer(w.txSig)}` : ''}`);
+  // On a real chain the transfer is broadcast (SUBMITTED) and settles out of band;
+  // drive the reconciler until it reaches a terminal state, exactly as the server
+  // does on its interval — proving the durable settlement path end to end.
+  const reconciler = new WithdrawalReconciler(chain, prisma);
+  for (let i = 0; i < 20; i++) {
+    const fresh = await prisma.withdrawal.findUniqueOrThrow({ where: { id: w.id } });
+    if (fresh.status === 'CONFIRMED' || fresh.status === 'FAILED') {
+      console.log(`   withdrawal settled: ${fresh.status}`);
+      break;
+    }
+    await reconciler.tick();
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   console.log(`   seller ledger balance now: ${fmt(await getSettledBalance(sellerAcct, prisma))}\n`);
 
   console.log('Done — deposit -> win -> escrow -> release -> buyback -> withdraw, on real devnet USDC.\n');
