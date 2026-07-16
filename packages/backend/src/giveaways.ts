@@ -118,6 +118,7 @@ export async function listEntrants(
     where: { giveawayId },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { userId: true },
+    take: 5000,
   });
   if (entries.length === 0) return [];
   const users = await prisma.user.findMany({

@@ -80,6 +80,8 @@ export interface RealtimeServerOptions {
 
 /** How long after a close we'll replay its result to a (re)subscribing client. */
 const CLOSE_REPLAY_WINDOW_MS = 60_000;
+/** A single socket can't subscribe to more than this many rooms (abuse bound). */
+const MAX_ROOMS_PER_CONN = 50;
 
 export class RealtimeServer {
   readonly httpServer: http.Server;
@@ -342,9 +344,26 @@ export class RealtimeServer {
 
   // ---- message handlers ---------------------------------------------------
 
+  /** A room is a seller's id — only real sellers have broadcast channels. Rejecting
+   *  anything else stops a client from spinning up subscriptions to arbitrary
+   *  strings (unbounded bus-subscription growth). */
+  private async isValidRoom(room: string): Promise<boolean> {
+    if (typeof room !== 'string' || room.length === 0 || room.length > 64) return false;
+    // Real if the user is a seller (applied → sellerProfile) or has ever listed an
+    // item (covers sellers who list/auction without a full profile row).
+    const [profile, listing] = await Promise.all([
+      this.prisma.sellerProfile.findUnique({ where: { userId: room }, select: { userId: true } }),
+      this.prisma.listing.findFirst({ where: { sellerId: room }, select: { id: true } }),
+    ]);
+    return !!(profile || listing);
+  }
+
   private async handleSubscribe(conn: Conn, room: string): Promise<void> {
     const firstSubscribe = !conn.rooms.has(room);
     if (firstSubscribe) {
+      // Reject unknown rooms and cap fan-out per socket before creating any state.
+      if (conn.rooms.size >= MAX_ROOMS_PER_CONN) return;
+      if (!(await this.isValidRoom(room))) return;
       conn.rooms.add(room);
       this.addLocal(this.localRooms, room, conn.id);
       await this.ensureSub(roomChannel(room), (payload) => this.deliverToRoom(room, payload));

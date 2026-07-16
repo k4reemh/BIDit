@@ -46,7 +46,7 @@ export function listSellerListings(
   sellerId: string,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Listing[]> {
-  return prisma.listing.findMany({ where: { sellerId }, orderBy: { createdAt: 'asc' } });
+  return prisma.listing.findMany({ where: { sellerId }, orderBy: { createdAt: 'asc' }, take: 500 });
 }
 
 /**

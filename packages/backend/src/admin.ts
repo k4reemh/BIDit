@@ -52,6 +52,7 @@ export async function listSellers(
   const profiles = await prisma.sellerProfile.findMany({
     include: { user: { select: { handle: true, displayName: true, email: true } } },
     orderBy: [{ verified: 'asc' }, { appliedAt: 'desc' }],
+    take: 500,
   });
   return Promise.all(
     profiles.map(async (p) => ({

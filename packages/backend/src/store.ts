@@ -44,6 +44,7 @@ export function listStoreItems(
       quantity: { gt: 0 },
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], // id tiebreak keeps same-ms rows stable
+    take: 500,
   });
 }
 
