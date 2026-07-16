@@ -1,0 +1,66 @@
+name: CI
+
+# Gate every push/PR to main: it must typecheck, pass the full backend test
+# suite (real embedded Postgres), build the web app, and have a valid Prisma
+# schema before it can be merged/deployed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Installs all workspaces from the lockfile; the backend postinstall
+      # generates the Prisma client.
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: Typecheck (shared + backend)
+        run: npm run typecheck
+
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema packages/backend/prisma/schema.prisma
+
+      # Boots an embedded Postgres and runs vitest against it (scripts/with-db.ts).
+      - name: Backend tests
+        run: npm test
+
+      # `tsc -b && vite build` — also typechecks the web package.
+      - name: Web build
+        run: npm run build -w @bidit/web
+
+      # Informational: surface high/critical advisories without failing the gate
+      # (the Solana dependency tree carries known, unpatched transitive advisories —
+      # tracked in docs/DEPENDENCY-AUDIT.md, not blindly auto-fixed).
+      - name: Dependency audit (high+)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  secret-scan:
+    name: secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so a secret in any commit is caught
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
