@@ -222,6 +222,16 @@ export function getSellerHeldItems(sellerId: string, prisma: PrismaClient = defa
   });
 }
 
+/** Operator queue: packages a seller has confirmed that need a label generated
+ *  (LABEL_PENDING). The operator makes the label, then calls createShipmentLabel. */
+export function listLabelQueue(prisma: PrismaClient = defaultPrisma) {
+  return prisma.shipment.findMany({
+    where: { status: 'LABEL_PENDING' },
+    orderBy: { confirmedAt: 'asc' },
+    take: 100,
+  });
+}
+
 /** Operator view: Private shipments awaiting the hub→buyer reship leg. Includes the
  *  buyer's real address (privateLeg2), which is intentionally never exposed to sellers. */
 export function listPrivateShipments(prisma: PrismaClient = defaultPrisma) {

@@ -235,6 +235,21 @@ export const getAdminOrders = () => req<AdminOrder[]>('/admin/orders');
 export const adminOrderAction = (orderId: string, action: string, tracking?: string) =>
   req<{ status: string }>('/admin/order/action', { method: 'POST', body: JSON.stringify({ orderId, action, tracking }) });
 
+export interface OriginAddr { originCity: string | null; originRegion: string | null; originPostal: string | null; originCountry: string | null }
+export interface LabelQueueRow {
+  id: string;
+  mode: string;
+  shippingPaid: string;
+  dims: { lengthCm: number | null; widthCm: number | null; heightCm: number | null; weightGrams: number | null };
+  seller: { handle: string | null; name: string | null; origin: OriginAddr | null };
+  buyer: { handle: string | null; address: Record<string, unknown> | null };
+  items: { id: string; title: string; image: string | null }[];
+  confirmedAt: number | null;
+}
+export const getLabelQueue = () => req<LabelQueueRow[]>('/admin/label-queue');
+export const createLabel = (shipmentId: string, labelUrl: string, trackingNumber: string, carrier?: string) =>
+  req<Shipment>('/admin/shipment/label', { method: 'POST', body: JSON.stringify({ shipmentId, labelUrl, trackingNumber, carrier }) });
+
 export interface LedgerAudit {
   accounts: { id: string; kind: string; handle: string | null; balance: string }[];
   systemTotal: string;

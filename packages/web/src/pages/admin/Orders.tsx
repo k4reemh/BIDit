@@ -53,7 +53,7 @@ export default function AdminOrders({ session }: { session: Session | null }) {
   return (
     <main className="admin">
       <div className="acct-head">
-        <div className="adm-nav"><Link to="/admin/sellers">Sellers</Link> <span>·</span> <Link to="/admin/orders" className="active">Orders</Link></div>
+        <div className="adm-nav"><Link to="/admin/sellers">Sellers</Link> <span>·</span> <Link to="/admin/orders" className="active">Orders</Link> <span>·</span> <Link to="/admin/shipments">Shipping</Link></div>
         <h1 className="display acct-title">Orders</h1>
         <p className="muted">Drive the escrow flow: shipped → delivered → released. Funds release once an order clears its dispute window (auto after the window, or release here). On release the seller gets 95%; 5% accrues below.</p>
       </div>

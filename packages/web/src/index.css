@@ -1303,6 +1303,24 @@ img { display: block; max-width: 100%; }
 .adm-nav { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 10px; }
 .adm-nav a { color: var(--muted); font-weight: 600; text-decoration: none; }
 .adm-nav a.active { color: var(--accent); }
+
+/* ---- admin: shipping-label queue ---- */
+.adm-lbl { padding: 0; overflow: hidden; margin-bottom: 12px; }
+.adm-lbl__head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 15px 17px; background: none; border: none; cursor: pointer; text-align: left; color: inherit; }
+.adm-lbl__head:hover { background: var(--surface-2); }
+.adm-lbl__sum { flex: 1; min-width: 0; }
+.adm-lbl__sum b { font-size: 14.5px; }
+.adm-lbl__sum .muted { font-size: 12.5px; }
+.adm-lbl__paid { flex: none; font-size: 12px; font-weight: 700; color: #1a9d54; background: rgba(34, 197, 94, 0.14); padding: 4px 10px; border-radius: 999px; }
+.adm-lbl__chev { flex: none; color: var(--muted); transition: transform 0.18s; }
+.adm-lbl__chev.is-open { transform: rotate(180deg); }
+.adm-lbl__body { padding: 4px 17px 17px; border-top: 1px solid var(--line); }
+.adm-lbl__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; margin: 14px 0; }
+.adm-lbl__lbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.adm-lbl__body p { font-size: 13.5px; line-height: 1.45; margin: 0; }
+.adm-lbl__items { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
+.adm-lbl__form { border-top: 1px dashed var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 560px) { .adm-lbl__grid { grid-template-columns: 1fr; } }
 .adm-nav span { color: var(--faint); }
 .adm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .ord-pill { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; vertical-align: middle; background: rgba(127, 127, 127, 0.16); color: var(--muted); }

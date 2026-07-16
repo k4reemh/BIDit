@@ -77,6 +77,7 @@ import {
   getSellerShipments,
   getSellerHeldItems,
   listPrivateShipments,
+  listLabelQueue,
   shipmentItems,
   createAndPayShipment,
   estimateShipment,
@@ -991,8 +992,42 @@ async function main() {
         );
         return send(res, 200, out);
       }
+      // Operator label queue: every package a seller has confirmed that needs a
+      // label made. Includes items, package size, both parties' addresses, and the
+      // shipping the buyer paid — everything needed to buy the carrier label.
+      if (req.method === 'GET' && p === '/admin/label-queue') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const queue = await listLabelQueue(prisma);
+        const out = await Promise.all(
+          queue.map(async (s) => {
+            const [items, seller, buyer, sellerProfile] = await Promise.all([
+              shipmentItems(s.id, prisma),
+              prisma.user.findUnique({ where: { id: s.sellerId }, select: { handle: true, displayName: true } }),
+              prisma.user.findUnique({ where: { id: s.buyerId }, select: { handle: true } }),
+              prisma.sellerProfile.findUnique({
+                where: { userId: s.sellerId },
+                select: { originCity: true, originRegion: true, originPostal: true, originCountry: true },
+              }),
+            ]);
+            return {
+              id: s.id,
+              mode: s.mode,
+              shippingPaid: formatUsdc(s.shippingFee + s.privacyFee),
+              dims: { lengthCm: s.lengthCm, widthCm: s.widthCm, heightCm: s.heightCm, weightGrams: s.packageWeightG },
+              seller: { handle: seller?.handle ?? null, name: seller?.displayName ?? null, origin: sellerProfile },
+              // Address BIDit ships to (buyer's real address, or the hub for Private).
+              buyer: { handle: buyer?.handle ?? null, address: decryptPii(s.shipTo) },
+              items: items.map((it) => ({ id: it.id, title: it.title, image: it.photo })),
+              confirmedAt: s.confirmedAt ? s.confirmedAt.getTime() : null,
+            };
+          }),
+        );
+        return send(res, 200, out);
+      }
       // Operator attaches a generated label + tracking to a confirmed package.
-      // (Minimal endpoint — the full label queue UI is step 5.) LABEL_PENDING -> LABEL_CREATED.
+      // LABEL_PENDING -> LABEL_CREATED (emails the seller it's ready to print).
       if (req.method === 'POST' && p === '/admin/shipment/label') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });

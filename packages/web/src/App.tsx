@@ -15,6 +15,7 @@ import Points from './pages/Points';
 import Leaderboard from './pages/Leaderboard';
 import AdminSellers from './pages/admin/Sellers';
 import AdminOrders from './pages/admin/Orders';
+import AdminShipments from './pages/admin/Shipments';
 import Watch from './pages/Watch';
 import StubPage from './pages/StubPage';
 import Profile from './pages/account/Profile';
@@ -111,6 +112,7 @@ export default function App() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/admin/sellers" element={<AdminSellers session={session} />} />
           <Route path="/admin/orders" element={<AdminOrders session={session} />} />
+          <Route path="/admin/shipments" element={<AdminShipments session={session} />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />
 
           <Route element={<AccountLayout session={session} setSession={setSession} onAuth={() => setAuth('signin')} />}>
