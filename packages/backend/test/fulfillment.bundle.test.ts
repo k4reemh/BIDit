@@ -3,7 +3,14 @@ import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { createAuction, startAuction, placeBid, closeDueAuctions } from '../src/auction.js';
 import { settleAuctionDirect } from '../src/orders.js';
-import { markShipmentShipped } from '../src/fulfillment.js';
+import { confirmShipmentForLabel, createShipmentLabel, markShipmentShipped } from '../src/fulfillment.js';
+
+/** Walk a PAID shipment through the platform-label flow to SHIPPED. */
+async function shipViaLabel(shipmentId: string, sellerId: string, clock: ManualClock, tracking = 'T1') {
+  await confirmShipmentForLabel({ shipmentId, sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
+  await createShipmentLabel({ shipmentId, labelUrl: 'https://labels.test/x.pdf', trackingNumber: tracking }, clock, prisma);
+  return markShipmentShipped({ shipmentId, sellerId }, clock, prisma);
+}
 import { usdc } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeUser } from './setup.js';
 
@@ -67,7 +74,7 @@ describe('weekly bundling', () => {
     await prisma.user.update({ where: { id: buyer.userId }, data: { bundleShipping: true, shippingAddress: ADDRESS } });
 
     const item1 = await sale(listingId, buyer.userId, '5', clock);
-    await markShipmentShipped({ shipmentId: item1.shipmentId!, sellerId, trackingNumber: 'T1' }, clock, prisma);
+    await shipViaLabel(item1.shipmentId!, sellerId, clock);
     const pass = await prisma.weeklyShippingPass.findFirstOrThrow({ where: { shipmentId: item1.shipmentId! } });
     expect(pass.closedAt).not.toBeNull();
 

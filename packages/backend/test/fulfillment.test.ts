@@ -5,6 +5,8 @@ import { placeBid, closeDueAuctions } from '../src/auction.js';
 import { settleAuctionDirect } from '../src/orders.js';
 import {
   createAndPayShipment,
+  confirmShipmentForLabel,
+  createShipmentLabel,
   markShipmentShipped,
   markShipmentDelivered,
   discardItem,
@@ -89,7 +91,10 @@ describe('fulfillment', () => {
     await setAddress(buyer.userId);
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
 
-    const shipped = await markShipmentShipped({ shipmentId: shipment.id, sellerId, trackingNumber: '1Z999', carrier: 'UPS' }, clock, prisma);
+    // Platform-label flow: seller confirms size → BIDit makes the label → seller ships.
+    await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
+    await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z999', carrier: 'UPS' }, clock, prisma);
+    const shipped = await markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma);
     expect(shipped.status).toBe('SHIPPED');
     expect(shipped.trackingNumber).toBe('1Z999');
     expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('SHIPPED');
@@ -97,6 +102,33 @@ describe('fulfillment', () => {
     const delivered = await markShipmentDelivered(shipment.id, clock, prisma);
     expect(delivered.status).toBe('DELIVERED');
     expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DELIVERED');
+  });
+
+  it('label pipeline: confirm size → BIDit makes label → seller ships (guards enforced)', async () => {
+    const clock = new ManualClock(T0);
+    const { item, buyer, sellerId } = await wonAndSettled(clock);
+    await setAddress(buyer.userId);
+    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+    expect(shipment.status).toBe('PAID');
+
+    // Can't ship before BIDit has generated a label.
+    await expect(markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma)).rejects.toThrow(ShippingError);
+
+    // Seller confirms the package size → LABEL_PENDING (BIDit is making the label).
+    const pending = await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId, lengthCm: 12, widthCm: 9, heightCm: 3, weightGrams: 45 }, clock, prisma);
+    expect(pending.status).toBe('LABEL_PENDING');
+    expect(pending.packageWeightG).toBe(45);
+
+    // Operator attaches the label → LABEL_CREATED, and the seller is notified.
+    const created = await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z-CONFIRM', carrier: 'UPS' }, clock, prisma);
+    expect(created.status).toBe('LABEL_CREATED');
+    expect(created.labelUrl).toContain('labels.test');
+    expect(await prisma.notification.count({ where: { userId: sellerId, kind: 'label_ready' } })).toBe(1);
+
+    // Now the seller can ship; tracking comes from the label, not the seller.
+    const shipped = await markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma);
+    expect(shipped.status).toBe('SHIPPED');
+    expect(shipped.trackingNumber).toBe('1Z-CONFIRM');
   });
 
   it('discard forfeits the item and moves no money', async () => {

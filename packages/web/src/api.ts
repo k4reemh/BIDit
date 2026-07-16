@@ -395,15 +395,23 @@ export interface ShipmentItem {
 export interface Shipment {
   id: string;
   mode: string;
-  status: string;
+  status: string; // PENDING_PAYMENT | PAID | LABEL_PENDING | LABEL_CREATED | SHIPPED | DELIVERED | CANCELED
   shippingFee: string;
   privacyFee: string;
   trackingNumber: string | null;
   carrier: string | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
+  packageWeightG: number | null;
+  labelUrl: string | null;
   shipTo: unknown;
   sellerHandle: string | null;
   buyerHandle: string | null;
   createdAt: number;
+  paidAt: number | null;
+  confirmedAt: number | null;
+  labelCreatedAt: number | null;
   shippedAt: number | null;
   items: ShipmentItem[];
 }
@@ -442,8 +450,13 @@ export const confirmReceived = (shipmentId: string) =>
   req<Fulfillment>('/shipment/confirm-received', { method: 'POST', body: JSON.stringify({ shipmentId }) });
 
 export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
-export const shipShipment = (shipmentId: string, trackingNumber?: string, carrier?: string) =>
-  req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId, trackingNumber, carrier }) });
+export interface PackageDims { lengthCm: number; widthCm: number; heightCm: number; weightGrams: number }
+/** Seller confirms the package size → BIDit generates the shipping label. */
+export const confirmShipmentLabel = (shipmentId: string, dims: PackageDims) =>
+  req<Shipment>('/seller/shipment/confirm-label', { method: 'POST', body: JSON.stringify({ shipmentId, ...dims }) });
+/** Seller marks the (labelled) package dropped off with the carrier. */
+export const shipShipment = (shipmentId: string) =>
+  req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId }) });
 
 export interface HeldItem {
   id: string;

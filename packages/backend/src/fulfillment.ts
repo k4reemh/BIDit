@@ -202,7 +202,7 @@ export async function getBuyerFulfillment(buyerId: string, prisma: PrismaClient 
 
 export function getSellerShipments(sellerId: string, prisma: PrismaClient = defaultPrisma) {
   return prisma.shipment.findMany({
-    where: { sellerId, status: { in: ['PAID', 'SHIPPED'] } },
+    where: { sellerId, status: { in: ['PAID', 'LABEL_PENDING', 'LABEL_CREATED', 'SHIPPED'] } },
     orderBy: { createdAt: 'asc' },
     take: 60,
   });
@@ -404,15 +404,57 @@ export async function estimateListingShipping(
 // Seller / buyer transitions
 // ---------------------------------------------------------------------------
 
-/** Seller submits tracking. PAID -> SHIPPED. */
-export async function markShipmentShipped(
-  params: { shipmentId: string; sellerId: string; trackingNumber?: string; carrier?: string },
+/**
+ * Seller confirms the package they'll send for a PAID shipment (dimensions in cm +
+ * estimated weight in grams); BIDit then generates the label. PAID -> LABEL_PENDING.
+ * Multiple items already grouped in this shipment ship together in one package.
+ */
+export async function confirmShipmentForLabel(
+  params: {
+    shipmentId: string;
+    sellerId: string;
+    lengthCm: number;
+    widthCm: number;
+    heightCm: number;
+    weightGrams: number;
+  },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ) {
   const s = await prisma.shipment.findUniqueOrThrow({ where: { id: params.shipmentId } });
   if (s.sellerId !== params.sellerId) throw new ShippingError('Not your shipment.');
-  if (s.status !== 'PAID') throw new ShippingError(`Can’t ship a shipment that is ${s.status}.`);
+  if (s.status !== 'PAID') throw new ShippingError('This package isn’t awaiting confirmation.');
+  const dims = [params.lengthCm, params.widthCm, params.heightCm, params.weightGrams];
+  if (dims.some((n) => !Number.isFinite(n) || n <= 0)) {
+    throw new ShippingError('Enter the package length, width, height, and weight.');
+  }
+  return prisma.shipment.update({
+    where: { id: s.id },
+    data: {
+      status: 'LABEL_PENDING',
+      lengthCm: Math.round(params.lengthCm),
+      widthCm: Math.round(params.widthCm),
+      heightCm: Math.round(params.heightCm),
+      packageWeightG: Math.round(params.weightGrams),
+      confirmedAt: clock.now(),
+    },
+  });
+}
+
+/**
+ * Seller drops the package off. LABEL_CREATED -> SHIPPED. The tracking number is
+ * already on the BIDit-generated label, so there's nothing for the seller to enter.
+ */
+export async function markShipmentShipped(
+  params: { shipmentId: string; sellerId: string },
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+) {
+  const s = await prisma.shipment.findUniqueOrThrow({ where: { id: params.shipmentId } });
+  if (s.sellerId !== params.sellerId) throw new ShippingError('Not your shipment.');
+  if (s.status !== 'LABEL_CREATED') {
+    throw new ShippingError('Your shipping label isn’t ready to ship yet.');
+  }
   const now = clock.now();
   await prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
   // Shipping a weekly bundle closes the week — the buyer's next win starts a fresh
@@ -425,17 +467,50 @@ export async function markShipmentShipped(
   }
   const updated = await prisma.shipment.update({
     where: { id: s.id },
-    data: {
-      status: 'SHIPPED',
-      trackingNumber: params.trackingNumber?.trim() || null,
-      carrier: params.carrier?.trim() || null,
-      shippedAt: now,
-    },
+    data: { status: 'SHIPPED', shippedAt: now },
   });
   const track = updated.trackingNumber ? `Tracking: ${updated.carrier ? `${updated.carrier} · ` : ''}${updated.trackingNumber}` : 'Your package is on the way.';
   await notify({ userId: s.buyerId, kind: 'shipped', title: 'Your order shipped', body: track, href: '/ship' }, prisma);
   // Fulfilling orders is what earns the Verified badge.
   await maybeVerifySeller(s.sellerId, prisma);
+  return updated;
+}
+
+/**
+ * Operator attaches the generated shipping label + tracking to a confirmed
+ * package. LABEL_PENDING -> LABEL_CREATED, and the seller is emailed that it's
+ * ready to print. (The polished operator queue that calls this is step 5.)
+ */
+export async function createShipmentLabel(
+  params: { shipmentId: string; labelUrl: string; trackingNumber: string; carrier?: string },
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+) {
+  const s = await prisma.shipment.findUniqueOrThrow({ where: { id: params.shipmentId } });
+  if (s.status !== 'LABEL_PENDING') throw new ShippingError('This package isn’t awaiting a label.');
+  const labelUrl = params.labelUrl.trim();
+  const trackingNumber = params.trackingNumber.trim();
+  if (!labelUrl || !trackingNumber) throw new ShippingError('Provide the label file and tracking number.');
+  const updated = await prisma.shipment.update({
+    where: { id: s.id },
+    data: {
+      status: 'LABEL_CREATED',
+      labelUrl,
+      trackingNumber,
+      carrier: params.carrier?.trim() || null,
+      labelCreatedAt: clock.now(),
+    },
+  });
+  await notify(
+    {
+      userId: s.sellerId,
+      kind: 'label_ready',
+      title: 'Your shipping label is ready',
+      body: 'Print it, tape it to the package, and drop it at the carrier — then mark it shipped.',
+      href: '/seller/shipments',
+    },
+    prisma,
+  );
   return updated;
 }
 

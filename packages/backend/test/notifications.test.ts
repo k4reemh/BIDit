@@ -3,7 +3,7 @@ import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { createAuction, startAuction, placeBid, closeDueAuctions } from '../src/auction.js';
 import { settleAuctionDirect } from '../src/orders.js';
-import { createAndPayShipment, markShipmentShipped } from '../src/fulfillment.js';
+import { createAndPayShipment, confirmShipmentForLabel, createShipmentLabel, markShipmentShipped } from '../src/fulfillment.js';
 import { listNotifications } from '../src/notifications.js';
 import { usdc } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
@@ -34,7 +34,9 @@ describe('notifications', () => {
 
     const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { buyerId: buyer.userId } });
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
-    await markShipmentShipped({ shipmentId: shipment.id, sellerId: auction.sellerId, trackingNumber: '1Z' }, clock, prisma);
+    await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId: auction.sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
+    await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z' }, clock, prisma);
+    await markShipmentShipped({ shipmentId: shipment.id, sellerId: auction.sellerId }, clock, prisma);
 
     const afterShip = await listNotifications(buyer.userId, prisma);
     expect(afterShip.items.some((n) => n.kind === 'shipped')).toBe(true);

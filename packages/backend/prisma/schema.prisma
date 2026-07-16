@@ -410,14 +410,26 @@ model Shipment {
   buyerId        String
   sellerId       String
   mode           String    @default("STANDARD") // STANDARD | WEEKLY_BUNDLE | SHIP_LATER | PRIVATE
-  status         String    @default("PENDING_PAYMENT") // PENDING_PAYMENT | PAID | SHIPPED | DELIVERED | CANCELED
+  // Platform-label pipeline: PENDING_PAYMENT -> PAID (buyer paid shipping) ->
+  // LABEL_PENDING (seller confirmed package size; BIDit is making the label) ->
+  // LABEL_CREATED (label attached; seller can download + ship) -> SHIPPED ->
+  // DELIVERED. CANCELED at any point.
+  status         String    @default("PENDING_PAYMENT") // PENDING_PAYMENT | PAID | LABEL_PENDING | LABEL_CREATED | SHIPPED | DELIVERED | CANCELED
   shippingFee    BigInt    @default(0)
   privacyFee     BigInt    @default(0)
-  shipTo         Json      // address snapshot the seller ships to (operator hub when PRIVATE)
+  shipTo         Json      // address snapshot BIDit puts on the label (operator hub when PRIVATE)
   privateLeg2    Json?     // buyer's real address for the operator's reship leg (PRIVATE only)
   trackingNumber String?
   carrier        String?
+  // Package the seller will send (entered at confirm) + the label BIDit generates.
+  lengthCm       Int?
+  widthCm        Int?
+  heightCm       Int?
+  packageWeightG Int?
+  labelUrl       String?
   paidAt         DateTime?
+  confirmedAt    DateTime? // seller confirmed size → label queued for the operator
+  labelCreatedAt DateTime? // operator attached the label; seller can download + ship
   shippedAt      DateTime?
   deliveredAt    DateTime?
   canceledAt     DateTime?
