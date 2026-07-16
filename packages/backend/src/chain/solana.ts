@@ -40,6 +40,7 @@ interface SolanaConfig {
   treasury: Keypair;
   escrow: Keypair;
   buyback: Keypair;
+  fee: Keypair;
   depositSeed: string;
 }
 
@@ -55,7 +56,7 @@ export class SolanaChain implements ChainClient {
     this.conn = cfg.connection;
     this.cluster = cfg.cluster;
     this.usdcMint = cfg.usdcMint;
-    this.wallets = { treasury: cfg.treasury, escrow: cfg.escrow, buyback: cfg.buyback };
+    this.wallets = { treasury: cfg.treasury, escrow: cfg.escrow, buyback: cfg.buyback, fee: cfg.fee };
     this.depositSeed = cfg.depositSeed;
   }
 
@@ -77,10 +78,13 @@ export class SolanaChain implements ChainClient {
     const mint = process.env.USDC_MINT;
     if (!mint) throw new Error('Missing env USDC_MINT');
     const treasury = loadKeypair('TREASURY_SECRET');
-    // escrow/buyback are unused in direct-payout mode — fall back to treasury so
-    // the operator only has to configure one hot wallet for the live test.
+    // In direct-payout mode escrow/buyback/fee are unused, so each falls back to
+    // treasury when its secret is unset (single-wallet live test). For escrow mode
+    // these MUST be distinct wallets or the on-chain legs become self-transfers —
+    // the escrow launch checklist verifies they're set (see docs/ESCROW-DESIGN.md).
     const escrow = process.env.ESCROW_SECRET ? loadKeypair('ESCROW_SECRET') : treasury;
     const buyback = process.env.BUYBACK_SECRET ? loadKeypair('BUYBACK_SECRET') : treasury;
+    const fee = process.env.FEE_SECRET ? loadKeypair('FEE_SECRET') : treasury;
     return new SolanaChain({
       connection: new Connection(rpc, 'confirmed'),
       cluster,
@@ -88,6 +92,7 @@ export class SolanaChain implements ChainClient {
       treasury,
       escrow,
       buyback,
+      fee,
       depositSeed: process.env.DEPOSIT_SEED ?? 'bidit-deposit-seed',
     });
   }

@@ -7,7 +7,7 @@
  * buyback); the ledger remains the source of truth for who owns what. Amounts
  * are USDC micro-units (6dp) — same integers as the ledger, never floats.
  */
-export type WalletName = 'treasury' | 'escrow' | 'buyback';
+export type WalletName = 'treasury' | 'escrow' | 'buyback' | 'fee';
 
 export interface DepositEvent {
   userId: string;

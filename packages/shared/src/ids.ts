@@ -8,13 +8,16 @@
  *  - EXTERNAL: the boundary between BIDit and the outside world (bank/chain).
  *    Deposits credit a user and debit EXTERNAL; withdrawals do the reverse.
  *    Its balance is the negative of all money currently inside the system.
- *  - PLATFORM: collects the 5% cut from every settled sale. Its balance is the
- *    pool that funds $BID buybacks (the "buyback-pending" tally).
+ *  - PLATFORM: the buyback pool — collects the 4% buyback cut from every settled
+ *    sale (the "buyback-pending" tally that backs the buyback wallet).
+ *  - FEE: the operator fee pool — collects the 1% fee cut plus all shipping fees
+ *    buyers pay (backs the fee wallet).
  *  - ESCROW: holds a winner's committed funds between lock and release/refund.
  */
 export const SYSTEM_ACCOUNT_IDS = {
   EXTERNAL: 'sys_external',
   PLATFORM: 'sys_platform',
+  FEE: 'sys_fee',
   ESCROW: 'sys_escrow',
 } as const;
 

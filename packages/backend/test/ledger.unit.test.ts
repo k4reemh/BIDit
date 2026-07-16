@@ -10,7 +10,7 @@ import {
   getSystemTotal,
 } from '../src/ledger.js';
 import { InsufficientFundsError, InvalidAmountError } from '../src/errors.js';
-import { usdc, formatUsdc, splitAmount, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
+import { usdc, formatUsdc, splitAmount, splitSale, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
 import { resetDb, makeUser } from './setup.js';
 
 beforeEach(async () => {
@@ -153,6 +153,23 @@ describe('money helpers', () => {
       expect(platformFee + sellerProceeds).toBe(amount);
       expect(platformFee).toBe((amount * 500n) / 10_000n);
       expect(platformFee).toBeGreaterThanOrEqual(0n);
+    }
+  });
+
+  it('splitSale divides a sale 95/4/1 and conserves every micro-unit', () => {
+    // Clean case: $20 -> $19 seller, $0.80 buyback, $0.20 fee.
+    expect(splitSale(usdc('20'))).toEqual({
+      sellerProceeds: usdc('19'),
+      buybackFee: usdc('0.8'),
+      platformFee: usdc('0.2'),
+    });
+    // Odd/tiny amounts: both fees floor, seller gets the remainder, nothing leaks.
+    for (const amount of [1n, 3n, 7n, 999n, 1_000_001n, 33_333_333n, usdc('123.456789')]) {
+      const { sellerProceeds, buybackFee, platformFee } = splitSale(amount);
+      expect(sellerProceeds + buybackFee + platformFee).toBe(amount);
+      expect(buybackFee).toBe((amount * 400n) / 10_000n);
+      expect(platformFee).toBe((amount * 100n) / 10_000n);
+      expect(sellerProceeds).toBeGreaterThanOrEqual(0n);
     }
   });
 });

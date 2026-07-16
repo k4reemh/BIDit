@@ -147,7 +147,7 @@ describe('settlement (auction close -> LOCKED order)', () => {
   });
 });
 
-describe('happy path: ship -> deliver -> release splits 5/95', () => {
+describe('happy path: ship -> deliver -> release splits 95/4/1', () => {
   it('walks LOCKED -> SHIPPED -> DISPUTE_WINDOW -> RELEASED and pays out correctly', async () => {
     const clock = new ManualClock(T0);
     const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
@@ -171,9 +171,10 @@ describe('happy path: ship -> deliver -> release splits 5/95', () => {
     const released = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     expect(released.status).toBe(OrderStatus.RELEASED);
 
-    // 95% to seller, 5% to the buyback pool, escrow emptied.
+    // 95% seller / 4% buyback / 1% fee, escrow emptied.
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
-    expect(await getBuybackPending(prisma)).toBe(usdc('1'));
+    expect(await getBuybackPending(prisma)).toBe(usdc('0.8')); // 4% buyback pool
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2')); // 1% fee pool
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
     expect(await getSystemTotal(prisma)).toBe(0n);
   });
@@ -222,7 +223,7 @@ describe('refunds return the whole amount (fee only taken on release)', () => {
 });
 
 describe('dispute resolved as RELEASE pays the seller', () => {
-  it('splits 5/95 just like the happy path', async () => {
+  it('splits 95/4/1 just like the happy path', async () => {
     const clock = new ManualClock(T0);
     const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
     const sellerAcct = await sellerAccountId(sellerId);
@@ -234,7 +235,8 @@ describe('dispute resolved as RELEASE pays the seller', () => {
     const resolved = await resolveDispute(order.id, 'RELEASE', escrow, clock, prisma);
     expect(resolved.status).toBe(OrderStatus.RELEASED);
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
-    expect(await getBuybackPending(prisma)).toBe(usdc('1'));
+    expect(await getBuybackPending(prisma)).toBe(usdc('0.8')); // 4% buyback pool
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2')); // 1% fee pool
     expect(await getSystemTotal(prisma)).toBe(0n);
   });
 });
@@ -260,7 +262,8 @@ describe('guards', () => {
     // Calling the escrow release again must not pay the seller twice.
     await escrow.release(order.id);
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
-    expect(await getBuybackPending(prisma)).toBe(usdc('1'));
+    expect(await getBuybackPending(prisma)).toBe(usdc('0.8')); // 4% buyback pool
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2')); // 1% fee pool
     expect(await getSystemTotal(prisma)).toBe(0n);
   });
 });

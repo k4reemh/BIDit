@@ -117,17 +117,19 @@ describe('full on-chain settlement flow (mock chain)', () => {
 
     const sellerAcct = await getOrCreateUserAccount(auction.sellerId, prisma);
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // 95%
-    expect(await getBuybackPending(prisma)).toBe(usdc('1')); // 5%
+    expect(await getBuybackPending(prisma)).toBe(usdc('0.8')); // 4% buyback pool
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2')); // 1% fee pool
     expect(await chain.balance('escrow')).toBe(0n);
-    expect(await chain.balance('buyback')).toBe(usdc('1'));
+    expect(await chain.balance('buyback')).toBe(usdc('0.8'));
+    expect(await chain.balance('fee')).toBe(usdc('0.2'));
     expect(await chain.balance('treasury')).toBe(usdc('99')); // 80 + 19 back to pool
 
-    // 5) Buyback worker spends the pool on $BID.
+    // 5) Buyback worker spends the 4% pool on $BID.
     const swapper = new MockSwapper();
     const worker = new BuybackWorker(swapper, prisma);
     const buyback = await worker.run();
-    expect(buyback?.amount).toBe(usdc('1'));
-    expect(swapper.swaps).toEqual([usdc('1')]);
+    expect(buyback?.amount).toBe(usdc('0.8'));
+    expect(swapper.swaps).toEqual([usdc('0.8')]);
     expect(await getBuybackPending(prisma)).toBe(0n); // pool drained
     expect(await prisma.buyback.count()).toBe(1);
     expect(await getSystemTotal(prisma)).toBe(0n); // ledger still conserved end-to-end

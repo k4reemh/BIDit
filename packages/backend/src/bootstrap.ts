@@ -16,6 +16,12 @@ export async function ensureSystemAccounts(prisma: PrismaClient): Promise<void> 
     update: {},
     create: { id: SYSTEM_ACCOUNT_IDS.PLATFORM, kind: AccountKind.PLATFORM },
   });
+  // Operator fee pool (1% of sales + shipping fees). PLATFORM-kind, distinct id.
+  await prisma.account.upsert({
+    where: { id: SYSTEM_ACCOUNT_IDS.FEE },
+    update: {},
+    create: { id: SYSTEM_ACCOUNT_IDS.FEE, kind: AccountKind.PLATFORM },
+  });
   await prisma.account.upsert({
     where: { id: SYSTEM_ACCOUNT_IDS.ESCROW },
     update: {},

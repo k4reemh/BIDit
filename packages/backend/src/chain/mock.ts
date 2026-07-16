@@ -23,6 +23,7 @@ export class MockChain implements ChainClient {
     treasury: 'mockTREASURY',
     escrow: 'mockESCROW',
     buyback: 'mockBUYBACK',
+    fee: 'mockFEE',
   };
   private readonly bal = new Map<string, bigint>();
   private readonly userAddr = new Map<string, string>();

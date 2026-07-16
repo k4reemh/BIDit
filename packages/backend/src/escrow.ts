@@ -115,16 +115,20 @@ export class ProgramEscrow implements EscrowProvider {
       select: { amount: true, sellerId: true },
     });
     const sellerAccountId = await getOrCreateUserAccount(order.sellerId, this.prisma);
-    const { platformFee, sellerProceeds } = await escrowRelease(
+    const { sellerProceeds, buybackFee, platformFee } = await escrowRelease(
       { sellerAccountId, amount: order.amount, orderId },
       this.prisma,
     );
-    // 95% back to the pool (seller's custodial balance), 5% to the buyback wallet.
+    // 95% back to the pool (backs the seller's withdrawable balance), 4% to the
+    // buyback wallet, 1% to the fee wallet.
     if (sellerProceeds > 0n) {
       await this.chain.transfer('escrow', this.chain.walletAddress('treasury'), sellerProceeds, `release-seller:${orderId}`);
     }
+    if (buybackFee > 0n) {
+      await this.chain.transfer('escrow', this.chain.walletAddress('buyback'), buybackFee, `release-buyback:${orderId}`);
+    }
     if (platformFee > 0n) {
-      await this.chain.transfer('escrow', this.chain.walletAddress('buyback'), platformFee, `release-buyback:${orderId}`);
+      await this.chain.transfer('escrow', this.chain.walletAddress('fee'), platformFee, `release-fee:${orderId}`);
     }
   }
 

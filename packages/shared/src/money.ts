@@ -11,8 +11,13 @@ export type Micros = bigint;
 export const USDC_DECIMALS = 6;
 export const MICROS_PER_USDC = 1_000_000n;
 
-/** Platform cut, in basis points. 500 bps = 5%. Funds the $BID buyback wallet. */
+/** Total platform cut, in basis points. 500 bps = 5%. Split on release into the
+ *  buyback cut + the operator fee (below); their sum MUST equal this. */
 export const PLATFORM_FEE_BPS = 500n;
+/** Of a sale: 400 bps = 4% → buyback wallet (accumulates; no swap built yet). */
+export const BUYBACK_FEE_BPS = 400n;
+/** Of a sale: 100 bps = 1% → operator fee wallet (also collects shipping fees). */
+export const FEE_BPS = 100n;
 export const BPS_DENOMINATOR = 10_000n;
 
 /**
@@ -88,4 +93,24 @@ export function splitAmount(
   const platformFee = (amount * feeBps) / BPS_DENOMINATOR; // floor
   const sellerProceeds = amount - platformFee;
   return { platformFee, sellerProceeds };
+}
+
+/**
+ * Split a settled sale three ways for the escrow release: seller 95%, buyback 4%,
+ * operator fee 1%. Both fees floor; the seller gets the remainder, so
+ * sellerProceeds + buybackFee + platformFee === amount exactly (money conserved).
+ *
+ * Routing: buybackFee → PLATFORM ledger account / buyback wallet;
+ * platformFee → FEE ledger account / fee wallet.
+ */
+export function splitSale(
+  amount: Micros,
+): { sellerProceeds: Micros; buybackFee: Micros; platformFee: Micros } {
+  if (amount < 0n) {
+    throw new RangeError(`Cannot split a negative amount: ${amount}`);
+  }
+  const buybackFee = (amount * BUYBACK_FEE_BPS) / BPS_DENOMINATOR; // floor 4%
+  const platformFee = (amount * FEE_BPS) / BPS_DENOMINATOR; // floor 1%
+  const sellerProceeds = amount - buybackFee - platformFee; // remainder → seller
+  return { sellerProceeds, buybackFee, platformFee };
 }

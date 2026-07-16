@@ -24,6 +24,7 @@ import {
   HoldStatus,
   SYSTEM_ACCOUNT_IDS,
   splitAmount,
+  splitSale,
   type Micros,
 } from '@bidit/shared';
 import { prisma as defaultPrisma } from './db.js';
@@ -541,13 +542,19 @@ export async function escrowLock(
   }
 }
 
-/** Release escrow: ESCROW -> 95% seller (PAYOUT_CREDIT) + 5% platform (PLATFORM_FEE). */
+/**
+ * Release escrow, splitting the sale 95 / 4 / 1:
+ *   ESCROW -> 95% seller (PAYOUT_CREDIT)
+ *          -> 4%  buyback pool  = PLATFORM account (PLATFORM_FEE)
+ *          -> 1%  operator fee  = FEE account      (PLATFORM_FEE)
+ * All four legs sum to zero. Idempotent per order.
+ */
 export async function escrowRelease(
-  params: { sellerAccountId: string; amount: Micros; orderId: string; feeBps?: bigint },
+  params: { sellerAccountId: string; amount: Micros; orderId: string },
   prisma: PrismaClient = defaultPrisma,
-): Promise<{ platformFee: bigint; sellerProceeds: bigint }> {
+): Promise<{ sellerProceeds: bigint; buybackFee: bigint; platformFee: bigint }> {
   assertPositive(params.amount);
-  const { platformFee, sellerProceeds } = splitAmount(params.amount, params.feeBps);
+  const { sellerProceeds, buybackFee, platformFee } = splitSale(params.amount);
   const key = `escrow-release:${params.orderId}`;
   if (!(await alreadyApplied(key, prisma))) {
     try {
@@ -569,7 +576,14 @@ export async function escrowRelease(
             refId: params.orderId,
           },
           {
-            accountId: SYSTEM_ACCOUNT_IDS.PLATFORM,
+            accountId: SYSTEM_ACCOUNT_IDS.PLATFORM, // buyback pool (4%)
+            amount: buybackFee,
+            type: LedgerType.PLATFORM_FEE,
+            refType: LedgerRefType.ORDER,
+            refId: params.orderId,
+          },
+          {
+            accountId: SYSTEM_ACCOUNT_IDS.FEE, // operator fee pool (1%)
             amount: platformFee,
             type: LedgerType.PLATFORM_FEE,
             refType: LedgerRefType.ORDER,
@@ -581,7 +595,7 @@ export async function escrowRelease(
       if (!isUniqueViolation(err)) throw err;
     }
   }
-  return { platformFee, sellerProceeds };
+  return { sellerProceeds, buybackFee, platformFee };
 }
 
 /** Refund escrow: ESCROW -> 100% buyer (REFUND). No fee — never taken. */
