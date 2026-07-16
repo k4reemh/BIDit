@@ -207,6 +207,12 @@ async function main() {
   const depositWatcher = new DepositWatcher(chain, prisma, 5000, (userId) =>
     void realtime.notifyBalance(userId).catch(() => {}),
   );
+  // Recover any deposit that was swept on-chain but not yet credited before a
+  // prior crash/restart, then start the live poller.
+  await depositWatcher.reconcile().then(
+    (n) => n > 0 && console.log(`[deposits] reconciled ${n} pending deposit(s) on startup`),
+    (e) => console.error('[deposits] startup reconcile failed:', e),
+  );
   depositWatcher.start();
   // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
   const fulfillmentTimer = setInterval(() => {

@@ -483,3 +483,20 @@ model PointsEvent {
   @@unique([userId, kind, ref])
   @@index([userId, createdAt])
 }
+
+/// Durable record of a detected on-chain deposit sweep, written BEFORE the ledger
+/// credit so a crash between sweeping the funds and crediting the user can never
+/// lose the money. The credit is idempotent (idempotencyKey chain-deposit:<txSig>)
+/// and `creditedAt` flips once applied; reconcile-on-startup finishes any row that
+/// was recorded but not yet credited.
+model DepositReceipt {
+  id           String    @id @default(cuid())
+  userId       String
+  amountMicros BigInt
+  txSig        String    @unique
+  sweptAt      DateTime  @default(now())
+  creditedAt   DateTime?
+
+  @@index([creditedAt])
+  @@index([userId])
+}

@@ -82,40 +82,77 @@ export class DepositWatcher {
     }
   }
 
-  /** One poll. Returns the number of deposits credited. Never throws — a failed
-   *  poll is logged and retried next tick, so the watcher (and the whole server)
-   *  can't be taken down by a transient chain/RPC error. */
+  /** One poll. Detected+swept deposits are first written durably (DepositReceipt),
+   *  THEN credited from those records — so a crash between the on-chain sweep and
+   *  the ledger credit can never lose a user's money (the next tick / startup
+   *  reconcile finishes it). Returns the number of receipts credited this tick.
+   *  Never throws — a failed poll is logged and retried next tick. */
   async tick(): Promise<number> {
     try {
       const { events, cursor } = await this.chain.pollDeposits(this.cursor);
       this.cursor = cursor;
-      let credited = 0;
+      // 1. Durably record every swept deposit BEFORE crediting (idempotent on txSig).
       for (const event of events) {
         try {
-          const accountId = await getOrCreateUserAccount(event.userId, this.prisma);
-          await deposit(
-            {
-              accountId,
-              amount: event.amountMicros,
-              refId: event.txSig,
-              idempotencyKey: `chain-deposit:${event.txSig}`,
-            },
-            this.prisma,
-          );
-          credited += 1;
-          try {
-            this.onCredit?.(event.userId);
-          } catch {
-            /* a notify failure must never break crediting */
-          }
+          await this.prisma.depositReceipt.upsert({
+            where: { txSig: event.txSig },
+            create: { userId: event.userId, amountMicros: event.amountMicros, txSig: event.txSig },
+            update: {}, // already recorded — no-op
+          });
         } catch (err) {
-          console.error('[deposit-watcher] credit failed for', event.txSig, (err as Error)?.message ?? err);
+          console.error('[deposit-watcher] record failed for', event.txSig, (err as Error)?.message ?? err);
         }
       }
-      return credited;
+      // 2. Credit everything not yet credited (this poll's + any orphaned by a
+      //    prior crash). The ledger credit is idempotent, so retries are safe.
+      return await this.creditPending();
     } catch (err) {
       console.error('[deposit-watcher] poll failed (will retry):', (err as Error)?.message ?? err);
       return 0;
     }
+  }
+
+  /**
+   * Credit every recorded-but-uncredited deposit. Idempotent: the ledger credit
+   * is keyed on the tx signature, and `creditedAt` is flipped only after it lands,
+   * so a crash anywhere in here just leaves the row to be retried — never a double
+   * credit. Called each tick and once on startup (reconcile) to recover orphans.
+   */
+  async creditPending(): Promise<number> {
+    const pending = await this.prisma.depositReceipt.findMany({
+      where: { creditedAt: null },
+      orderBy: { sweptAt: 'asc' },
+      take: 500,
+    });
+    let credited = 0;
+    for (const r of pending) {
+      try {
+        const accountId = await getOrCreateUserAccount(r.userId, this.prisma);
+        await deposit(
+          {
+            accountId,
+            amount: r.amountMicros,
+            refId: r.txSig,
+            idempotencyKey: `chain-deposit:${r.txSig}`,
+          },
+          this.prisma,
+        );
+        await this.prisma.depositReceipt.update({ where: { id: r.id }, data: { creditedAt: new Date() } });
+        credited += 1;
+        try {
+          this.onCredit?.(r.userId);
+        } catch {
+          /* a notify failure must never break crediting */
+        }
+      } catch (err) {
+        console.error('[deposit-watcher] credit failed for', r.txSig, (err as Error)?.message ?? err);
+      }
+    }
+    return credited;
+  }
+
+  /** Startup recovery: finish crediting any deposit swept before a prior crash. */
+  reconcile(): Promise<number> {
+    return this.creditPending();
   }
 }
