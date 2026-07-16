@@ -51,7 +51,7 @@ import { getSettledBalance, getAvailableBalance } from '../ledger.js';
 import { AuctionScheduler } from '../scheduler.js';
 import { systemClock, type Clock } from '../clock.js';
 import { InMemoryBus, type BusHandler, type RealtimeBus, type Unsubscribe } from './bus.js';
-import { verifySession } from '../auth.js';
+import { verifySession, consumeWsTicket } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
@@ -272,7 +272,9 @@ export class RealtimeServer {
 
   private onConnection(ws: WebSocket, req: http.IncomingMessage): void {
     const url = new URL(req.url ?? '', 'http://localhost');
-    const userId = verifySession(url.searchParams.get('token'));
+    // Prefer a one-time WS ticket (no long-lived token in the URL). The raw token
+    // is still accepted as a transition fallback for clients not yet updated.
+    const userId = consumeWsTicket(url.searchParams.get('ticket')) ?? verifySession(url.searchParams.get('token'));
     if (!userId) {
       ws.close(4001, 'unauthorized');
       return;

@@ -26,6 +26,7 @@ import {
   buildLoginChallenge,
   verifyWalletSignature,
   isValidWalletAddress,
+  issueWsTicket,
 } from '../src/auth.js';
 import {
   findOrCreateByWallet,
@@ -402,6 +403,14 @@ async function main() {
           if (err instanceof AuthError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+
+      // Trade the bearer session for a one-time, short-lived WebSocket ticket, so
+      // the long-lived token never appears in a socket URL (which can leak via logs).
+      if (req.method === 'POST' && p === '/realtime/ticket') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, { ticket: issueWsTicket(userId) });
       }
 
       // ---- authenticated: me / withdraw ----

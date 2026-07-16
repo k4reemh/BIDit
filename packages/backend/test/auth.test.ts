@@ -10,6 +10,8 @@ import {
   verifyWalletSignature,
   isValidWalletAddress,
   outstandingChallengeCount,
+  issueWsTicket,
+  consumeWsTicket,
 } from '../src/auth.js';
 
 const randomAddress = () => bs58.encode(randomBytes(32));
@@ -93,5 +95,30 @@ describe('challenge map bounding', () => {
   it('never grows past the hard cap even under a flood of distinct addresses', () => {
     for (let i = 0; i < 10_200; i++) buildLoginChallenge(randomAddress());
     expect(outstandingChallengeCount()).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe('WebSocket tickets', () => {
+  it('mints a ticket that authenticates once and only once', () => {
+    const ticket = issueWsTicket('user-123');
+    expect(typeof ticket).toBe('string');
+    expect(ticket.length).toBeGreaterThan(20);
+    expect(consumeWsTicket(ticket)).toBe('user-123'); // valid
+    expect(consumeWsTicket(ticket)).toBeNull(); // consumed — can't be replayed
+  });
+
+  it('rejects unknown, empty, or missing tickets', () => {
+    expect(consumeWsTicket('nope-not-a-ticket')).toBeNull();
+    expect(consumeWsTicket('')).toBeNull();
+    expect(consumeWsTicket(null)).toBeNull();
+    expect(consumeWsTicket(undefined)).toBeNull();
+  });
+
+  it('issues distinct tickets per call', () => {
+    const a = issueWsTicket('u1');
+    const b = issueWsTicket('u1');
+    expect(a).not.toBe(b);
+    expect(consumeWsTicket(a)).toBe('u1');
+    expect(consumeWsTicket(b)).toBe('u1');
   });
 });

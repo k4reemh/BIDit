@@ -1,6 +1,25 @@
 import { API } from './config';
 import { getToken } from './api';
 
+/** Trade the bearer session for a one-time, short-lived WebSocket ticket, so the
+ *  long-lived token never goes in the socket URL. Returns null if signed out or
+ *  the mint fails (caller retries). */
+async function mintWsTicket(): Promise<string | null> {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${API}/realtime/ticket`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const { ticket } = (await r.json()) as { ticket?: string };
+    return typeof ticket === 'string' ? ticket : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface Balance {
   available: string;
   settled: string;
@@ -126,10 +145,14 @@ export function openSocket(h: Handlers): () => void {
   let closed = false;
   let retry: ReturnType<typeof setTimeout> | null = null;
 
-  const open = () => {
-    const token = getToken();
-    if (!token || closed) return;
-    ws = new WebSocket(`${wsBase}/ws?token=${encodeURIComponent(token)}`);
+  const open = async () => {
+    if (closed) return;
+    const ticket = await mintWsTicket();
+    if (!ticket || closed) {
+      if (!closed) retry = setTimeout(open, 2500); // no ticket yet (signed out / offline) — retry
+      return;
+    }
+    ws = new WebSocket(`${wsBase}/ws?ticket=${encodeURIComponent(ticket)}`);
     ws.onopen = () => {
       if (h.room) ws?.send(JSON.stringify({ type: 'SUBSCRIBE', room: h.room }));
     };
@@ -231,10 +254,14 @@ export function openRoom(room: string, h: Omit<Handlers, 'room'>): RoomControlle
   // without needing a page refresh.
   const resync = () => send({ type: 'SUBSCRIBE', room });
 
-  const open = () => {
-    const token = getToken();
-    if (closed || !token) return; // signed-out viewers can't open the socket
-    ws = new WebSocket(`${wsBase}/ws?token=${encodeURIComponent(token)}`);
+  const open = async () => {
+    if (closed) return; // signed-out viewers can't open the socket
+    const ticket = await mintWsTicket();
+    if (!ticket || closed) {
+      if (!closed) retry = setTimeout(open, 2500);
+      return;
+    }
+    ws = new WebSocket(`${wsBase}/ws?ticket=${encodeURIComponent(ticket)}`);
     ws.onopen = () => resync();
     ws.onmessage = (ev) => dispatch(h, String(ev.data));
     ws.onclose = () => {

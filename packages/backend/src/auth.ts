@@ -127,6 +127,52 @@ export function outstandingChallengeCount(): number {
   return challenges.size;
 }
 
+// ---------------------------------------------------------------------------
+// Short-lived WebSocket tickets
+// ---------------------------------------------------------------------------
+// The WebSocket auths via a query param, and URLs leak (proxy logs, history,
+// monitoring). Instead of putting the long-lived session token there, the client
+// trades it — over an authenticated POST — for a ONE-TIME ticket that's valid for
+// ~60s. A leaked socket URL is then worthless: the ticket is already used/expired.
+
+const WS_TICKET_TTL_MS = 60_000;
+const MAX_WS_TICKETS = 20_000;
+const wsTickets = new Map<string, { userId: string; exp: number }>();
+
+function pruneWsTickets(now: number): void {
+  for (const [k, v] of wsTickets) {
+    if (v.exp <= now) wsTickets.delete(k);
+  }
+  while (wsTickets.size >= MAX_WS_TICKETS) {
+    const oldest = wsTickets.keys().next().value;
+    if (oldest === undefined) break;
+    wsTickets.delete(oldest);
+  }
+}
+
+/** Mint a one-time, ~60s WebSocket ticket for an already-authenticated user. */
+export function issueWsTicket(userId: string): string {
+  pruneWsTickets(Date.now());
+  const ticket = randomBytes(24).toString('base64url');
+  wsTickets.set(ticket, { userId, exp: Date.now() + WS_TICKET_TTL_MS });
+  return ticket;
+}
+
+/** Validate + CONSUME a WS ticket (single use). Returns the userId, or null if
+ *  unknown/expired/already used. */
+export function consumeWsTicket(ticket: string | null | undefined): string | null {
+  if (!ticket) return null;
+  const t = wsTickets.get(ticket);
+  if (!t) return null;
+  wsTickets.delete(ticket); // one-time: consumed even if we then reject it as expired
+  return Date.now() > t.exp ? null : t.userId;
+}
+
+/** Test/introspection helper: outstanding (unconsumed) WS tickets. */
+export function outstandingWsTicketCount(): number {
+  return wsTickets.size;
+}
+
 /** Verify a base58 ed25519 signature of the wallet's outstanding challenge. */
 export function verifyWalletSignature(walletAddress: string, signatureBase58: string): boolean {
   const challenge = challenges.get(walletAddress);
