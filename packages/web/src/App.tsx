@@ -31,7 +31,7 @@ import SellerShipments from './pages/seller/Shipments';
 import SellerOrders from './pages/seller/Orders';
 import SellerPayouts from './pages/seller/Payouts';
 import SellerSettings from './pages/seller/Settings';
-import { restore, clearToken, refreshMe, type Session } from './api';
+import { restore, clearToken, logout, refreshMe, type Session } from './api';
 import { connectBalance } from './realtime';
 
 export interface User {
@@ -102,7 +102,7 @@ export default function App() {
   return (
     <div className="app">
       <div className="shell">
-        <TopNav user={user} onAuth={setAuth} onLogout={() => { clearToken(); setSession(null); }} onReplayTutorial={() => setTutorial(true)} />
+        <TopNav user={user} onAuth={setAuth} onLogout={() => { void logout(); clearToken(); setSession(null); }} onReplayTutorial={() => setTutorial(true)} />
         <Routes>
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
           <Route path="/docs" element={<Docs />} />

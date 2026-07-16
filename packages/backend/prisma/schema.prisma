@@ -115,6 +115,9 @@ model User {
   // BIDit Points — activity rewards redeemed against future community airdrops.
   // Denormalized sum of PointsEvents, kept in step for fast leaderboard reads.
   points        BigInt   @default(0)
+  // Sessions (bearer tokens) issued before this instant are revoked — set on
+  // logout / password change. null = never revoked. Mirrored in-memory for O(1) auth.
+  sessionsValidFrom DateTime?
   createdAt     DateTime @default(now())
 
   account       Account?

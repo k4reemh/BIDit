@@ -40,6 +40,8 @@ import {
   submitSellerOnboarding,
   isAdmin,
   AuthError,
+  revokeUserSessions,
+  loadSessionRevocations,
 } from '../src/authz.js';
 import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
 import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '../src/promo.js';
@@ -176,6 +178,8 @@ async function serve(res: http.ServerResponse, file: string) {
 async function main() {
   await ensureSystemAccounts(prisma);
   await ensureAdmin();
+  // Hydrate session-revocation cutoffs so logouts survive a restart.
+  await loadSessionRevocations(prisma).catch((e) => console.error('[auth] load revocations failed:', e));
 
   // Direct-payout mode (BIDIT_PAYOUT_MODE=direct): on a sale, pay the seller 100%
   // immediately — no escrow, no 5% fee. Used for the real-money friends test.
@@ -403,6 +407,14 @@ async function main() {
           if (err instanceof AuthError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+
+      // Log out everywhere: revoke every session token issued to this user so far
+      // (this device and any other). Idempotent; safe to call when already signed out.
+      if (req.method === 'POST' && p === '/auth/logout') {
+        const userId = authUser(req);
+        if (userId) await revokeUserSessions(userId, prisma);
+        return send(res, 200, { ok: true });
       }
 
       // Trade the bearer session for a one-time, short-lived WebSocket ticket, so

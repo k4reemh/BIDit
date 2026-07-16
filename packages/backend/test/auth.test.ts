@@ -12,7 +12,10 @@ import {
   outstandingChallengeCount,
   issueWsTicket,
   consumeWsTicket,
+  setRevokedEpoch,
 } from '../src/auth.js';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const randomAddress = () => bs58.encode(randomBytes(32));
 
@@ -95,6 +98,33 @@ describe('challenge map bounding', () => {
   it('never grows past the hard cap even under a flood of distinct addresses', () => {
     for (let i = 0; i < 10_200; i++) buildLoginChallenge(randomAddress());
     expect(outstandingChallengeCount()).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe('session revocation', () => {
+  it('rejects a token issued before the revocation epoch, accepts one issued after', async () => {
+    const uid = 'rev-' + Date.now();
+    const oldTok = issueSession(uid);
+    expect(verifySession(oldTok)).toBe(uid); // valid before any revocation
+
+    await sleep(3);
+    setRevokedEpoch(uid, Date.now()); // "log out everywhere" now
+    expect(verifySession(oldTok)).toBeNull(); // the old token is dead
+
+    await sleep(3);
+    const newTok = issueSession(uid); // re-login → issued after the epoch
+    expect(verifySession(newTok)).toBe(uid); // works again
+  });
+
+  it('does not affect other users', async () => {
+    const a = 'reva-' + Date.now();
+    const b = 'revb-' + Date.now();
+    const tokA = issueSession(a);
+    const tokB = issueSession(b);
+    await sleep(3);
+    setRevokedEpoch(a, Date.now()); // only A logs out
+    expect(verifySession(tokA)).toBeNull();
+    expect(verifySession(tokB)).toBe(b); // B untouched
   });
 });
 

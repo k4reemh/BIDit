@@ -48,13 +48,25 @@ function hmac(body: string): string {
   return b64url(createHmac('sha256', SECRET).update(body).digest());
 }
 
-/** Mint a session token for a user. */
+// Revocation: userId -> epoch (ms). A token whose issued-at (iat) is before the
+// user's epoch is rejected. Durably backed by User.sessionsValidFrom (persisted on
+// logout/password-change and hydrated into this map at startup), so revocations
+// survive restarts; the map keeps the auth-path check synchronous + O(1).
+const revokedBefore = new Map<string, number>();
+
+/** Mirror a user's revocation epoch into memory (call after persisting it). */
+export function setRevokedEpoch(userId: string, epochMs: number): void {
+  revokedBefore.set(userId, epochMs);
+}
+
+/** Mint a session token for a user. `iat` lets a later logout revoke it. */
 export function issueSession(userId: string, ttlMs = SESSION_TTL_MS): string {
-  const body = b64url(Buffer.from(JSON.stringify({ uid: userId, exp: Date.now() + ttlMs })));
+  const now = Date.now();
+  const body = b64url(Buffer.from(JSON.stringify({ uid: userId, iat: now, exp: now + ttlMs })));
   return `${body}.${hmac(body)}`;
 }
 
-/** Returns the userId in a valid, unexpired token, else null. */
+/** Returns the userId in a valid, unexpired, un-revoked token, else null. */
 export function verifySession(token: string | null | undefined): string | null {
   if (!token) return null;
   const dot = token.indexOf('.');
@@ -66,10 +78,19 @@ export function verifySession(token: string | null | undefined): string | null {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as {
       uid?: unknown;
+      iat?: unknown;
       exp?: unknown;
     };
     if (typeof payload.exp === 'number' && Date.now() > payload.exp) return null;
-    return typeof payload.uid === 'string' ? payload.uid : null;
+    const uid = typeof payload.uid === 'string' ? payload.uid : null;
+    if (!uid) return null;
+    // Revoked if the token predates the user's epoch. Pre-upgrade tokens (no iat)
+    // count as iat=0, so a logout revokes them too — but nobody is logged out on
+    // deploy, since no epoch is set until the first revocation.
+    const iat = typeof payload.iat === 'number' ? payload.iat : 0;
+    const revokedAt = revokedBefore.get(uid);
+    if (revokedAt !== undefined && iat < revokedAt) return null;
+    return uid;
   } catch {
     return null;
   }

@@ -61,6 +61,11 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
+/** Revoke this session server-side (log out everywhere), then it's up to the
+ *  caller to clear the local token. Best-effort — never blocks signing out. */
+export const logout = () =>
+  req<{ ok: boolean }>('/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined);
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json', ...(opts.headers as Record<string, string>) };
   const t = getToken();

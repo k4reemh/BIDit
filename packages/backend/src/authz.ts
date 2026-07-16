@@ -5,7 +5,7 @@ import { Prisma, type User } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount } from './ledger.js';
-import { hashPassword, verifyPassword } from './auth.js';
+import { hashPassword, verifyPassword, setRevokedEpoch } from './auth.js';
 
 export class ForbiddenError extends Error {
   readonly status = 403;
@@ -26,6 +26,29 @@ export class AuthError extends Error {
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const normEmail = (e: string) => e.trim().toLowerCase();
+
+// ---------------------------------------------------------------------------
+// Session revocation
+// ---------------------------------------------------------------------------
+
+/** Revoke all of a user's existing sessions (logout / password change / theft):
+ *  persist the cutoff, then mirror it into the in-memory map that verifySession
+ *  reads. Any token issued before this instant stops working immediately. */
+export async function revokeUserSessions(userId: string, prisma: PrismaClient = defaultPrisma): Promise<void> {
+  const now = new Date();
+  await prisma.user.update({ where: { id: userId }, data: { sessionsValidFrom: now } });
+  setRevokedEpoch(userId, now.getTime());
+}
+
+/** Startup: load persisted revocation cutoffs into memory so they survive restarts. */
+export async function loadSessionRevocations(prisma: PrismaClient = defaultPrisma): Promise<number> {
+  const users = await prisma.user.findMany({
+    where: { sessionsValidFrom: { not: null } },
+    select: { id: true, sessionsValidFrom: true },
+  });
+  for (const u of users) if (u.sessionsValidFrom) setRevokedEpoch(u.id, u.sessionsValidFrom.getTime());
+  return users.length;
+}
 
 /** True if `err` is Prisma's unique-constraint violation (P2002) on `field`.
  *  The DB @unique index is the real guard against races that slip past the
