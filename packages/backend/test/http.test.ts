@@ -22,8 +22,16 @@ describe('CORS origin policy', () => {
     expect(corsAllowOrigin(OTHER, env)).toBe(''); // not on the list → blocked
   });
 
-  it('in production with no allowlist configured, blocks everything', () => {
-    expect(corsAllowOrigin(ORIGIN, { BIDIT_ENV: 'production' })).toBe('');
+  it('in production with no allowlist configured, fails open (reflects) rather than blocking the whole site', () => {
+    expect(corsAllowOrigin(ORIGIN, { BIDIT_ENV: 'production' })).toBe(ORIGIN);
+    expect(corsAllowOrigin(OTHER, { BIDIT_ENV: 'production', BIDIT_ALLOWED_ORIGINS: '  ' })).toBe(OTHER);
+  });
+
+  it('tolerates trailing slashes and casing in the configured allowlist', () => {
+    const env = { BIDIT_ENV: 'production', BIDIT_ALLOWED_ORIGINS: 'https://BIDit.app/ , https://www.bidit.app/' };
+    expect(corsAllowOrigin('https://bidit.app', env)).toBe('https://bidit.app'); // echoes exact caller origin
+    expect(corsAllowOrigin('https://www.bidit.app', env)).toBe('https://www.bidit.app');
+    expect(corsAllowOrigin(OTHER, env)).toBe('');
   });
 
   it('mainnet cluster counts as production even without the flag', () => {

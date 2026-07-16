@@ -16,7 +16,7 @@ import { InsufficientFundsError } from '../src/errors.js';
 import { prisma } from '../src/db.js';
 import { ensureSystemAccounts } from '../src/bootstrap.js';
 import { assertStartupConfig, usingDefaultAuthSecret } from '../src/config.js';
-import { corsAllowOrigin } from '../src/http.js';
+import { corsAllowOrigin, corsAllowlist } from '../src/http.js';
 import { getOrCreateUserAccount, deposit, getAvailableBalance, getSettledBalance } from '../src/ledger.js';
 import { RealtimeServer } from '../src/realtime/server.js';
 import {
@@ -187,6 +187,9 @@ async function main() {
   const { isProd } = assertStartupConfig(chain.cluster);
   if (usingDefaultAuthSecret() && chain.cluster !== 'mock') {
     console.warn('[config] ⚠️  AUTH_SECRET is the insecure default on a real chain — set a strong value before exposing this deploy.');
+  }
+  if (isProd && corsAllowlist().length === 0) {
+    console.warn('[config] ⚠️  BIDIT_ALLOWED_ORIGINS is empty in production — CORS is failing open (any origin). Set it to your web origin to lock this down.');
   }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
