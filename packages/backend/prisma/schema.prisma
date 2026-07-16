@@ -366,6 +366,10 @@ model Order {
   deliveredAt        DateTime?
   disputeWindowEndsAt DateTime?
   disputedAt         DateTime?
+  // Buyer's dispute: why (reason code), the written detail, and evidence photos.
+  disputeReason      String?
+  disputeDetail      String?
+  disputePhotos      String[]  @default([])
   releasedAt         DateTime?
   refundedAt         DateTime?
   canceledAt         DateTime?

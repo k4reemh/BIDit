@@ -15,6 +15,7 @@ import {
   type ShipEstimate,
 } from '../../api';
 import { Truck, Check } from '../../icons';
+import DisputeModal from '../../components/DisputeModal';
 
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -193,13 +194,18 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
 
 function ShipmentCard({ shipment, onChanged }: { shipment: Shipment; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [dispute, setDispute] = useState(false);
   const confirm = async () => {
     setBusy(true);
     try { await confirmReceived(shipment.id); onChanged(); }
     finally { setBusy(false); }
   };
   const label = shipment.status === 'PAID' ? 'Awaiting seller shipment'
-    : shipment.status === 'SHIPPED' ? 'Shipped' : shipment.status;
+    : shipment.status === 'LABEL_PENDING' || shipment.status === 'LABEL_CREATED' ? 'Getting ready to ship'
+    : shipment.status === 'SHIPPED' ? 'On the way'
+    : shipment.status === 'DELIVERED' ? 'Delivered'
+    : shipment.status === 'DISPUTED' ? 'Problem reported'
+    : shipment.status;
   return (
     <div className="card acct-card">
       <div className="ship-grp__head">
@@ -221,6 +227,24 @@ function ShipmentCard({ shipment, onChanged }: { shipment: Shipment; onChanged: 
         <div className="acct-actions">
           <button className="btn btn-primary" disabled={busy} onClick={confirm}>{busy ? 'Confirming…' : 'Confirm received'}</button>
         </div>
+      )}
+      {shipment.status === 'DELIVERED' && (
+        <>
+          <p className="muted acct-note">Delivered. If anything’s wrong, report a problem within 2 days — otherwise you’re all set.</p>
+          <div className="acct-actions">
+            <button className="btn btn-ghost" onClick={() => setDispute(true)}>Report a problem</button>
+          </div>
+        </>
+      )}
+      {shipment.status === 'DISPUTED' && (
+        <p className="muted acct-note">Problem reported — our team is reviewing it and will be in touch.</p>
+      )}
+      {dispute && (
+        <DisputeModal
+          shipmentId={shipment.id}
+          onClose={() => setDispute(false)}
+          onResolved={() => { setDispute(false); onChanged(); }}
+        />
       )}
     </div>
   );

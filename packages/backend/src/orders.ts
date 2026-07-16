@@ -22,7 +22,17 @@ import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
 
 const DAY_MS = 86_400_000;
-export const DISPUTE_WINDOW_MS = 3 * DAY_MS;
+export const DISPUTE_WINDOW_MS = 2 * DAY_MS;
+
+/** Structured dispute a buyer can file within the window. */
+export interface DisputeReport {
+  /** Reason code, e.g. 'not_arrived' | 'damaged' | 'wrong_item' | 'not_as_described' | 'other'. */
+  reason: string;
+  /** The buyer's written description of what went wrong. */
+  detail: string;
+  /** Evidence photo URLs (data URLs or hosted links). */
+  photos?: string[];
+}
 export const NO_SHIP_TIMEOUT_MS = 7 * DAY_MS;
 
 export type DisputeOutcome = 'RELEASE' | 'REFUND';
@@ -286,6 +296,7 @@ export function markDelivered(
 /** Buyer disputes inside the window. DISPUTE_WINDOW -> DISPUTED. */
 export async function openDispute(
   orderId: string,
+  report?: DisputeReport,
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Order> {
@@ -298,8 +309,81 @@ export async function openDispute(
   }
   return prisma.order.update({
     where: { id: orderId },
-    data: { status: OrderStatus.DISPUTED, disputedAt: clock.now() },
+    data: {
+      status: OrderStatus.DISPUTED,
+      disputedAt: clock.now(),
+      disputeReason: report?.reason ?? null,
+      disputeDetail: report?.detail ?? null,
+      disputePhotos: report?.photos ?? [],
+    },
   });
+}
+
+/**
+ * Drive a shipment's linked orders through the escrow state machine as the package
+ * physically moves. A Shipment groups FulfillmentItems, each tied to an order.
+ *  - 'SHIPPED':        LOCKED -> SHIPPED (seller dropped it off).
+ *  - 'DISPUTE_WINDOW': SHIPPED/LOCKED -> DISPUTE_WINDOW (delivered; opens the 2-day
+ *                      window, after which processOrderTimers auto-releases).
+ * Only orders in an escrow state are touched — direct-payout orders are already
+ * RELEASED, so this is a safe no-op in direct mode. Idempotent (guarded by status).
+ * Returns the affected order ids.
+ */
+export async function advanceOrdersForShipment(
+  shipmentId: string,
+  to: 'SHIPPED' | 'DISPUTE_WINDOW',
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<string[]> {
+  const items = await prisma.fulfillmentItem.findMany({ where: { shipmentId }, select: { orderId: true } });
+  const orderIds = [...new Set(items.map((i) => i.orderId))];
+  const now = clock.now();
+  const advanced: string[] = [];
+  for (const id of orderIds) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) continue;
+    if (to === 'SHIPPED' && order.status === OrderStatus.LOCKED) {
+      await prisma.order.update({ where: { id }, data: { status: OrderStatus.SHIPPED, shippedAt: now } });
+      advanced.push(id);
+    } else if (to === 'DISPUTE_WINDOW' && (order.status === OrderStatus.SHIPPED || order.status === OrderStatus.LOCKED)) {
+      await prisma.order.update({
+        where: { id },
+        data: {
+          status: OrderStatus.DISPUTE_WINDOW,
+          deliveredAt: now,
+          disputeWindowEndsAt: new Date(now.getTime() + DISPUTE_WINDOW_MS),
+        },
+      });
+      advanced.push(id);
+    }
+  }
+  return advanced;
+}
+
+/**
+ * Buyer files a dispute against a delivered shipment: opens a dispute (with the
+ * reason/detail/photos) on every order in that shipment still inside its window.
+ * Returns how many orders were disputed. Throws if none are open for a dispute.
+ */
+export async function disputeShipment(
+  shipmentId: string,
+  buyerId: string,
+  report: DisputeReport,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<number> {
+  const items = await prisma.fulfillmentItem.findMany({ where: { shipmentId }, select: { orderId: true, buyerId: true } });
+  const orderIds = [...new Set(items.filter((i) => i.buyerId === buyerId).map((i) => i.orderId))];
+  let n = 0;
+  for (const id of orderIds) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (order?.status === OrderStatus.DISPUTE_WINDOW) {
+      await openDispute(id, report, clock, prisma);
+      n += 1;
+    }
+  }
+  if (n === 0) throw new Error('This delivery isn’t open for a dispute right now.');
+  return n;
 }
 
 /** Admin resolves a dispute, moving money accordingly. DISPUTED -> RELEASED | REFUNDED. */

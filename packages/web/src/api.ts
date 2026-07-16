@@ -463,6 +463,9 @@ export const discardFulfillmentItem = (itemId: string) =>
   req<Fulfillment>('/shipment/discard', { method: 'POST', body: JSON.stringify({ itemId }) });
 export const confirmReceived = (shipmentId: string) =>
   req<Fulfillment>('/shipment/confirm-received', { method: 'POST', body: JSON.stringify({ shipmentId }) });
+export interface DisputeInput { reason: string; detail: string; photos: string[] }
+export const disputeShipment = (shipmentId: string, input: DisputeInput) =>
+  req<Fulfillment>('/shipment/dispute', { method: 'POST', body: JSON.stringify({ shipmentId, ...input }) });
 
 export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
 export interface PackageDims { lengthCm: number; widthCm: number; heightCm: number; weightGrams: number }

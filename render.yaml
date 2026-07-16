@@ -68,3 +68,5 @@ services:
         sync: false # REQUIRED: strong random string (≥32 chars) for session tokens. Generate: `openssl rand -base64 48`
       - key: BIDIT_PII_KEY
         sync: false # encrypts shipping addresses at rest (≥16 chars). Generate: `openssl rand -base64 32`. Keep it STABLE — losing it makes encrypted addresses unreadable.
+      - key: SHIPPO_API_KEY
+        sync: false # Shippo tracking → delivery detection. If unset, delivery comes from buyer-confirm / admin instead of automatic tracking.

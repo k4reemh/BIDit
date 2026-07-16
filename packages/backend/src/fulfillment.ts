@@ -192,7 +192,7 @@ export async function getBuyerFulfillment(buyerId: string, prisma: PrismaClient 
       take: 200,
     }),
     prisma.shipment.findMany({
-      where: { buyerId, status: { in: ['PENDING_PAYMENT', 'PAID', 'SHIPPED'] } },
+      where: { buyerId, status: { in: ['PENDING_PAYMENT', 'PAID', 'LABEL_PENDING', 'LABEL_CREATED', 'SHIPPED', 'DELIVERED'] } },
       orderBy: { createdAt: 'desc' },
       take: 40,
     }),

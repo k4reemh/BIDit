@@ -229,7 +229,7 @@ describe('refunds return the whole amount (fee only taken on release)', () => {
     await markShipped(order.id, 'T', clock, prisma);
     await markDelivered(order.id, clock, prisma);
 
-    const disputed = await openDispute(order.id, clock, prisma);
+    const disputed = await openDispute(order.id, undefined, clock, prisma);
     expect(disputed.status).toBe(OrderStatus.DISPUTED);
 
     const resolved = await resolveDispute(order.id, 'REFUND', escrow, clock, prisma);
@@ -248,7 +248,7 @@ describe('dispute resolved as RELEASE pays the seller', () => {
     const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
     await markShipped(order.id, 'T', clock, prisma);
     await markDelivered(order.id, clock, prisma);
-    await openDispute(order.id, clock, prisma);
+    await openDispute(order.id, undefined, clock, prisma);
 
     const resolved = await resolveDispute(order.id, 'RELEASE', escrow, clock, prisma);
     expect(resolved.status).toBe(OrderStatus.RELEASED);

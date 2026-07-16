@@ -70,8 +70,11 @@ import {
   resolveDispute,
   releaseOrder,
   processOrderTimers,
+  advanceOrdersForShipment,
+  disputeShipment,
   type DisputeOutcome,
 } from '../src/orders.js';
+import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
 import {
   getBuyerFulfillment,
   getSellerShipments,
@@ -91,7 +94,7 @@ import {
   ShippingError,
   type ShipMode,
 } from '../src/fulfillment.js';
-import { listNotifications, markAllRead } from '../src/notifications.js';
+import { listNotifications, markAllRead, notify } from '../src/notifications.js';
 import { systemClock } from '../src/clock.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -239,6 +242,23 @@ async function main() {
     (e) => console.error('[withdrawals] startup reconcile failed:', e),
   );
   withdrawalReconciler.start();
+  // Track in-flight shipments via Shippo; on delivery, open the 2-day dispute
+  // window on the order(s) (processOrderTimers then auto-releases). Only runs when
+  // SHIPPO_API_KEY is set — otherwise delivery comes from buyer-confirm / admin.
+  const trackingProvider = getTrackingProvider();
+  if (trackingProvider) {
+    const tracker = new ShipmentTracker(trackingProvider, prisma, systemClock, 120_000, (buyerId) => {
+      void realtime.notifyBalance(buyerId).catch(() => {});
+      void notify(
+        { userId: buyerId, kind: 'delivered', title: 'Your order was delivered', body: 'If anything’s wrong, report a problem within 2 days — otherwise it’s all set.', href: '/ship' },
+        prisma,
+      ).catch(() => {});
+    });
+    tracker.start();
+    console.log('[tracking] Shippo shipment tracking enabled');
+  } else {
+    console.log('[tracking] SHIPPO_API_KEY not set — automatic delivery tracking off');
+  }
   // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
   const fulfillmentTimer = setInterval(() => {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
@@ -642,10 +662,29 @@ async function main() {
         if (!s || s.buyerId !== userId) return send(res, 404, { error: 'Shipment not found.' });
         try {
           await markShipmentDelivered(s.id, systemClock, prisma);
+          // Delivered → open the 2-day dispute window on the linked order(s).
+          await advanceOrdersForShipment(s.id, 'DISPUTE_WINDOW', systemClock, prisma);
           return send(res, 200, await buyerFulfillmentDto(userId));
         } catch (err) {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
           throw err;
+        }
+      }
+      // Buyer reports a problem with a delivered package (reason + detail + photos).
+      if (req.method === 'POST' && p === '/shipment/dispute') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const reason = String(b.reason ?? '').trim();
+        const detail = String(b.detail ?? '').trim();
+        const photos = Array.isArray(b.photos) ? b.photos.filter((x: unknown) => typeof x === 'string').slice(0, 6) : [];
+        if (!reason) return send(res, 400, { error: 'Pick what went wrong.' });
+        if (!detail) return send(res, 400, { error: 'Add a short description of the problem.' });
+        try {
+          await disputeShipment(String(b.shipmentId ?? ''), userId, { reason, detail, photos }, systemClock, prisma);
+          return send(res, 200, await buyerFulfillmentDto(userId));
+        } catch (err) {
+          return send(res, 400, { error: err instanceof Error ? err.message : 'Could not open the dispute.' });
         }
       }
 
@@ -793,7 +832,9 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
         try {
-          await markShipmentShipped({ shipmentId: String(b.shipmentId ?? ''), sellerId: userId }, systemClock, prisma);
+          const shipped = await markShipmentShipped({ shipmentId: String(b.shipmentId ?? ''), sellerId: userId }, systemClock, prisma);
+          // Advance the linked escrow order(s) LOCKED → SHIPPED (no-op in direct mode).
+          await advanceOrdersForShipment(shipped.id, 'SHIPPED', systemClock, prisma);
           return send(res, 200, await shipmentDto(String(b.shipmentId ?? ''), { forSeller: true }));
         } catch (err) {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
@@ -1067,7 +1108,7 @@ async function main() {
           let status: string;
           if (action === 'ship') status = (await markShipped(orderId, String(b.tracking ?? 'ADMIN'), systemClock, prisma)).status;
           else if (action === 'deliver') status = (await markDelivered(orderId, systemClock, prisma)).status;
-          else if (action === 'dispute') status = (await openDispute(orderId, systemClock, prisma)).status;
+          else if (action === 'dispute') status = (await openDispute(orderId, undefined, systemClock, prisma)).status;
           else if (action === 'release') status = (await releaseOrder(orderId, escrow, systemClock, prisma)).status;
           else if (action === 'refund')
             status = (await resolveDispute(orderId, 'REFUND' as DisputeOutcome, escrow, systemClock, prisma)).status;
