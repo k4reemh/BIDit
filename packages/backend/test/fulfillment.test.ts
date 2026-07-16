@@ -57,7 +57,7 @@ describe('fulfillment', () => {
     expect(item.heldUntil?.getTime()).toBe(T0 + 21_000 + SHIP_LATER_HOLD_MS);
   });
 
-  it('buyer pays shipping: seller credited, item IN_SHIPMENT, ledger balances', async () => {
+  it('buyer pays shipping: fee pool credited (not seller), item IN_SHIPMENT, ledger balances', async () => {
     const clock = new ManualClock(T0);
     const { item, buyer, sellerId } = await wonAndSettled(clock);
     await setAddress(buyer.userId);
@@ -65,13 +65,16 @@ describe('fulfillment', () => {
     const sellerAcct = await accountId(sellerId);
     const sellerBefore = await getSettledBalance(sellerAcct, prisma);
     const buyerBefore = await getSettledBalance(buyer.accountId, prisma);
+    const feeBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma);
 
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
     expect(shipment.status).toBe('PAID');
     expect(shipment.shippingFee).toBeGreaterThan(0n);
 
     const fee = shipment.shippingFee;
-    expect(await getSettledBalance(sellerAcct, prisma)).toBe(sellerBefore + fee);
+    // Platform runs shipping: the whole fee goes to the FEE pool, NOT the seller.
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(sellerBefore);
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(feeBefore + fee);
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(buyerBefore - fee);
 
     const after = await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } });
@@ -139,15 +142,18 @@ describe('fulfillment', () => {
     ).rejects.toBeInstanceOf(ShippingError);
   });
 
-  it('private shipping charges a privacy premium to the platform and hides the buyer address', async () => {
+  it('private shipping charges a privacy premium to the fee pool and hides the buyer address', async () => {
     const clock = new ManualClock(T0);
     const { item, buyer } = await wonAndSettled(clock);
     await setAddress(buyer.userId);
+    const feeBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma);
     const platformBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.PLATFORM, prisma);
 
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id], mode: 'PRIVATE' }, clock, prisma);
     expect(shipment.privacyFee).toBe(privacyPremium());
-    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.PLATFORM, prisma)).toBe(platformBefore + privacyPremium());
+    // Base shipping + privacy premium both land in the FEE pool; buyback pool untouched.
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(feeBefore + shipment.shippingFee + shipment.privacyFee);
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.PLATFORM, prisma)).toBe(platformBefore);
     // shipTo shown to the seller is the hub, NOT the buyer's real address.
     expect((shipment.shipTo as { line1?: string }).line1).not.toBe(ADDRESS.line1);
     expect((shipment.privateLeg2 as { line1?: string }).line1).toBe(ADDRESS.line1);

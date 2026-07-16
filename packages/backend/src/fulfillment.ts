@@ -152,12 +152,9 @@ export async function applyWeeklyBundling(
       shipTo: encryptPii(dest) as Prisma.InputJsonValue,
     },
   });
-  const [buyerAccountId, sellerAccountId] = await Promise.all([
-    getOrCreateUserAccount(params.buyerId, prisma),
-    getOrCreateUserAccount(params.sellerId, prisma),
-  ]);
+  const buyerAccountId = await getOrCreateUserAccount(params.buyerId, prisma);
   try {
-    await settleShipping({ buyerAccountId, sellerAccountId, sellerAmount: fee, shipmentId: shipment.id }, prisma);
+    await settleShipping({ buyerAccountId, amount: fee, shipmentId: shipment.id }, prisma);
   } catch {
     // Can't afford shipping right now — undo and fall back to Ready-to-ship (buy
     // now, ship later): the buyer keeps the win, the item just waits to be shipped.
@@ -291,15 +288,13 @@ export async function createAndPayShipment(
     },
   });
 
-  const [buyerAccountId, sellerAccountId] = await Promise.all([
-    getOrCreateUserAccount(params.buyerId, prisma),
-    getOrCreateUserAccount(sellerId, prisma),
-  ]);
+  const buyerAccountId = await getOrCreateUserAccount(params.buyerId, prisma);
 
-  // Charge the buyer: shipping -> seller, privacy premium -> platform. Throws
-  // InsufficientFundsError (mapped to a friendly 400 by the caller) if short.
+  // Charge the buyer: the whole fee (base shipping + any privacy premium) goes to
+  // the FEE pool — the platform buys the label. Throws InsufficientFundsError
+  // (mapped to a friendly 400 by the caller) if short.
   await settleShipping(
-    { buyerAccountId, sellerAccountId, sellerAmount: shippingFee, platformAmount: privacyFee, shipmentId: shipment.id },
+    { buyerAccountId, amount: shippingFee + privacyFee, shipmentId: shipment.id },
     prisma,
   );
 
