@@ -28,8 +28,59 @@ export const NO_SHIP_TIMEOUT_MS = 7 * DAY_MS;
 export type DisputeOutcome = 'RELEASE' | 'REFUND';
 
 /**
- * Turn a SETTLING auction into a LOCKED order: create the order, then lock the
- * winner's funds into escrow. Idempotent (one order per auction).
+ * Post-sale physical fulfillment, shared by the direct and escrow settle paths:
+ * create the buyer's "Ready to ship" item, fold it into any active weekly bundle,
+ * and notify both sides. Direct vs escrow differ only in how the *money* moves —
+ * the item ships the same way — so this lives in one place. Idempotent per order.
+ */
+async function postSaleFulfillment(
+  params: {
+    orderId: string;
+    buyerId: string;
+    sellerId: string;
+    listing: { id: string; title: string; photos: string[]; weightGrams: number | null };
+    amount: bigint;
+  },
+  clock: Clock,
+  prisma: PrismaClient,
+): Promise<void> {
+  await createFulfillmentItem(
+    {
+      orderId: params.orderId,
+      buyerId: params.buyerId,
+      sellerId: params.sellerId,
+      listingId: params.listing.id,
+      title: params.listing.title,
+      photo: params.listing.photos[0] ?? null,
+      weightGrams: params.listing.weightGrams,
+      amount: params.amount,
+    },
+    clock,
+    prisma,
+  );
+  // If both sides opted into weekly bundling, fold this win into the week's shipment
+  // (shipping charged once, on the first win of the week).
+  await applyWeeklyBundling(
+    { orderId: params.orderId, buyerId: params.buyerId, sellerId: params.sellerId },
+    clock,
+    prisma,
+  );
+  const price = `$${formatUsdc(params.amount)}`;
+  await notify(
+    { userId: params.buyerId, kind: 'won', title: `You won ${params.listing.title}`, body: `Winning bid ${price}. Go to Ready to ship to send it your way.`, href: '/ship' },
+    prisma,
+  );
+  await notify(
+    { userId: params.sellerId, kind: 'sold', title: `You sold ${params.listing.title}`, body: `Winning bid ${price}. You'll get a shipment to fulfill once the buyer pays shipping.`, href: '/seller/shipments' },
+    prisma,
+  );
+}
+
+/**
+ * Turn a SETTLING auction into a LOCKED order: create the order, lock the winner's
+ * funds into escrow, and drop the won card into the shipping pipeline (same as
+ * direct mode — escrow only changes when the money releases). Idempotent (one
+ * order per auction).
  */
 export async function settleAuction(
   auctionId: string,
@@ -42,7 +93,7 @@ export async function settleAuction(
 
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { listing: { select: { sellerId: true, id: true } } },
+    include: { listing: { select: { sellerId: true, id: true, title: true, photos: true, weightGrams: true } } },
   });
   if (
     !auction ||
@@ -98,6 +149,14 @@ export async function settleAuction(
 
   // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
   await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
+
+  // Drop the won card into the shipping pipeline (Ready to ship + seller queue).
+  // The order's escrow release is gated on delivery separately (Shippo, later).
+  await postSaleFulfillment(
+    { orderId: created.id, buyerId, sellerId, listing: auction.listing, amount },
+    clock,
+    prisma,
+  );
 
   return order;
 }
@@ -166,36 +225,13 @@ export async function settleAuctionDirect(
     data: { status: listing.quantity > 0 ? ListingStatus.QUEUED : ListingStatus.SOLD },
   });
 
-  // Physical fulfillment: the won card enters the buyer's "Ready to ship" list.
-  await createFulfillmentItem(
-    {
-      orderId: created.id,
-      buyerId,
-      sellerId,
-      listingId: auction.listing.id,
-      title: auction.listing.title,
-      photo: auction.listing.photos[0] ?? null,
-      weightGrams: auction.listing.weightGrams,
-      amount,
-    },
-    clock,
-    prisma,
-  );
-  // If both sides opted into weekly bundling, fold it into this week's shipment
-  // (charging shipping once, on the first win of the week).
-  await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
-
   // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
   await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
-  const price = `$${formatUsdc(amount)}`;
-  const title = auction.listing.title;
-  await notify(
-    { userId: buyerId, kind: 'won', title: `You won ${title}`, body: `Winning bid ${price}. Go to Ready to ship to send it your way.`, href: '/ship' },
-    prisma,
-  );
-  await notify(
-    { userId: sellerId, kind: 'sold', title: `You sold ${title}`, body: `Winning bid ${price}. You'll get a shipment to fulfill once the buyer pays shipping.`, href: '/seller/shipments' },
+  // Physical fulfillment (shared with the escrow path).
+  await postSaleFulfillment(
+    { orderId: created.id, buyerId, sellerId, listing: auction.listing, amount },
+    clock,
     prisma,
   );
 

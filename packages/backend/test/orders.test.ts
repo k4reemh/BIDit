@@ -56,6 +56,24 @@ async function sellerAccountId(sellerId: string): Promise<string> {
   return account!.id;
 }
 
+describe('escrow settle drops the won card into the shipping pipeline', () => {
+  it('creates a Ready-to-ship FulfillmentItem + "won" notice, like direct mode', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, buyer, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    expect(order.status).toBe(OrderStatus.LOCKED);
+
+    const item = await prisma.fulfillmentItem.findUnique({ where: { orderId: order.id } });
+    expect(item).not.toBeNull();
+    expect(item!.buyerId).toBe(buyer.userId);
+    expect(item!.sellerId).toBe(sellerId);
+    expect(item!.title).toBe('Charizard Holo');
+    expect(item!.amount).toBe(usdc('20'));
+    expect(item!.status).toBe('READY_TO_SHIP');
+    expect(await prisma.notification.count({ where: { userId: buyer.userId, kind: 'won' } })).toBe(1);
+  });
+});
+
 describe('listing quantity + re-auction', () => {
   it('decrements the listing on each sale and re-queues it until sold out', async () => {
     const clock = new ManualClock(T0);
