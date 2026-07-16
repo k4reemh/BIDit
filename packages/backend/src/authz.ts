@@ -6,6 +6,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount } from './ledger.js';
 import { hashPassword, verifyPassword, setRevokedEpoch } from './auth.js';
+import { encryptPii } from './pii.js';
 
 export class ForbiddenError extends Error {
   readonly status = 403;
@@ -37,6 +38,33 @@ const normEmail = (e: string) => e.trim().toLowerCase();
 export async function revokeUserSessions(userId: string, prisma: PrismaClient = defaultPrisma): Promise<void> {
   const now = new Date();
   await prisma.user.update({ where: { id: userId }, data: { sessionsValidFrom: now } });
+  setRevokedEpoch(userId, now.getTime());
+}
+
+/**
+ * Right-to-erasure: strip a user's personal data (email, name, avatar, bio, saved
+ * shipping address, wallet) and disable the account, keeping the row so the ledger
+ * and order history stay referentially intact. Sessions are revoked so the account
+ * can't be used again. Shipment address snapshots for in-flight orders are left for
+ * the seller to fulfil and age out under retention.
+ */
+export async function eraseUserData(userId: string, prisma: PrismaClient = defaultPrisma): Promise<void> {
+  const anon = `deleted_${randomBytes(6).toString('hex')}`;
+  const now = new Date();
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      email: null,
+      handle: anon, // unique + non-identifying
+      displayName: null,
+      avatarUrl: null,
+      bio: null,
+      shippingAddress: Prisma.DbNull,
+      passwordHash: null, // can't email-login
+      walletAddress: null, // can't wallet-login
+      sessionsValidFrom: now, // revoke everything
+    },
+  });
   setRevokedEpoch(userId, now.getTime());
 }
 
@@ -160,7 +188,7 @@ export async function updateProfile(
       ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl.trim() || null } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio.trim() || null } : {}),
       ...(patch.shippingAddress !== undefined
-        ? { shippingAddress: (patch.shippingAddress ?? null) as Prisma.InputJsonValue }
+        ? { shippingAddress: encryptPii(patch.shippingAddress ?? null) as Prisma.InputJsonValue }
         : {}),
       ...(mode !== undefined ? { shippingMode: mode, bundleShipping: mode === 'WEEKLY_BUNDLE' } : {}),
       ...(patch.bundleShipping !== undefined && mode === undefined ? { bundleShipping: patch.bundleShipping } : {}),

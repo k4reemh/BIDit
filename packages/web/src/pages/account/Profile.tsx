@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
 import Avatar from '../../components/Avatar';
 import ImageUpload from '../../components/ImageUpload';
-import { updateMe } from '../../api';
+import { updateMe, eraseMyData, clearToken } from '../../api';
 import { Check } from '../../icons';
 
 export default function Profile() {
@@ -12,6 +12,19 @@ export default function Profile() {
   const [bio, setBio] = useState(session.bio ?? '');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [erasing, setErasing] = useState(false);
+
+  const erase = async () => {
+    if (!window.confirm('Permanently delete your personal data (email, name, saved address) and disable this account? This cannot be undone.')) return;
+    setErasing(true);
+    try {
+      await eraseMyData();
+      clearToken();
+      window.location.href = '/';
+    } catch {
+      setErasing(false);
+    }
+  };
 
   const dirty =
     displayName !== (session.displayName ?? '') ||
@@ -79,6 +92,16 @@ export default function Profile() {
             {busy ? 'Saving…' : 'Save changes'}
           </button>
           {saved && <span className="acct-saved"><Check width={16} height={16} /> Saved</span>}
+        </div>
+      </div>
+
+      <div className="card acct-card danger-zone">
+        <h3 className="acct-sub">Delete my data</h3>
+        <p className="muted acct-note">Permanently remove your personal data — email, name, and saved shipping address — and disable this account. This can’t be undone.</p>
+        <div className="acct-actions">
+          <button className="btn btn-danger" onClick={erase} disabled={erasing}>
+            {erasing ? 'Deleting…' : 'Delete my account &amp; data'}
+          </button>
         </div>
       </div>
     </>

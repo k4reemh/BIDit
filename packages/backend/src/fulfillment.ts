@@ -12,6 +12,7 @@ import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
 import { quoteShipping, quoteShippingBreakdown, multiItemSurcharge, privacyPremium, type ShipLocation } from './shipping.js';
+import { encryptPii, decryptPii } from './pii.js';
 import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
 
@@ -131,7 +132,7 @@ export async function applyWeeklyBundling(
   }
 
   // Auto-ship this win — needs an address to ship to and funds for shipping.
-  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
   if (!dest || !dest.line1 || !dest.country) return; // no address → fall back to Ready-to-ship
   const origin: ShipLocation = {
     country: sellerProfile?.originCountry,
@@ -148,7 +149,7 @@ export async function applyWeeklyBundling(
       mode: 'WEEKLY_BUNDLE',
       status: 'PENDING_PAYMENT',
       shippingFee: fee,
-      shipTo: dest as Prisma.InputJsonValue,
+      shipTo: encryptPii(dest) as Prisma.InputJsonValue,
     },
   });
   const [buyerAccountId, sellerAccountId] = await Promise.all([
@@ -258,7 +259,7 @@ export async function createAndPayShipment(
   }
 
   const buyer = await prisma.user.findUniqueOrThrow({ where: { id: params.buyerId } });
-  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
   if (!dest || !dest.line1 || !dest.country) {
     throw new ShippingError('Add your shipping address before shipping items.');
   }
@@ -285,8 +286,8 @@ export async function createAndPayShipment(
       status: 'PENDING_PAYMENT',
       shippingFee,
       privacyFee,
-      shipTo: (isPrivate ? hubAddress() : (dest as Prisma.InputJsonValue)),
-      privateLeg2: isPrivate ? (dest as Prisma.InputJsonValue) : undefined,
+      shipTo: encryptPii(isPrivate ? hubAddress() : dest) as Prisma.InputJsonValue,
+      privateLeg2: isPrivate ? (encryptPii(dest) as Prisma.InputJsonValue) : undefined,
     },
   });
 
@@ -345,7 +346,7 @@ export async function estimateShipment(
     prisma.user.findUniqueOrThrow({ where: { id: params.buyerId } }),
     prisma.sellerProfile.findUnique({ where: { userId: sellerId } }),
   ]);
-  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
   const hasAddress = !!(dest && dest.line1 && dest.country);
   const origin: ShipLocation = {
     country: seller?.originCountry,
@@ -386,7 +387,7 @@ export async function estimateListingShipping(
     prisma.user.findUniqueOrThrow({ where: { id: buyerId } }),
     prisma.sellerProfile.findUnique({ where: { userId: listing.sellerId } }),
   ]);
-  const dest = (buyer.shippingAddress ?? null) as (ShipLocation & Record<string, unknown>) | null;
+  const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
   const hasAddress = !!(dest && dest.line1 && dest.country);
   const origin: ShipLocation = {
     country: seller?.originCountry,

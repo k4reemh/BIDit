@@ -66,6 +66,10 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 export const logout = () =>
   req<{ ok: boolean }>('/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined);
 
+/** Right-to-erasure: permanently wipe this user's personal data + disable the
+ *  account. Irreversible; caller clears the local token afterward. */
+export const eraseMyData = () => req<{ ok: boolean }>('/me/erase', { method: 'POST', body: '{}' });
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json', ...(opts.headers as Record<string, string>) };
   const t = getToken();

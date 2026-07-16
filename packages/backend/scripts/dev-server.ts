@@ -17,6 +17,7 @@ import { prisma } from '../src/db.js';
 import { ensureSystemAccounts } from '../src/bootstrap.js';
 import { assertStartupConfig, usingDefaultAuthSecret } from '../src/config.js';
 import { corsAllowOrigin, corsAllowlist } from '../src/http.js';
+import { decryptPii, piiEncryptionEnabled } from '../src/pii.js';
 import { getOrCreateUserAccount, deposit, getAvailableBalance, getSettledBalance } from '../src/ledger.js';
 import { RealtimeServer } from '../src/realtime/server.js';
 import {
@@ -42,6 +43,7 @@ import {
   AuthError,
   revokeUserSessions,
   loadSessionRevocations,
+  eraseUserData,
 } from '../src/authz.js';
 import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
 import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '../src/promo.js';
@@ -196,6 +198,9 @@ async function main() {
   if (isProd && corsAllowlist().length === 0) {
     console.warn('[config] ⚠️  BIDIT_ALLOWED_ORIGINS is empty in production — CORS is failing open (any origin). Set it to your web origin to lock this down.');
   }
+  if (isProd && !piiEncryptionEnabled()) {
+    console.warn('[config] ⚠️  BIDIT_PII_KEY is not set — shipping addresses are stored unencrypted. Set a strong key to encrypt PII at rest.');
+  }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
   const httpServer = http.createServer((req, res) => void route(req, res));
@@ -255,7 +260,7 @@ async function main() {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
-      shippingAddress: user.shippingAddress,
+      shippingAddress: decryptPii(user.shippingAddress),
       bundleShipping: user.bundleShipping,
       shippingMode: user.shippingMode,
       interests: user.interests,
@@ -414,6 +419,15 @@ async function main() {
       if (req.method === 'POST' && p === '/auth/logout') {
         const userId = authUser(req);
         if (userId) await revokeUserSessions(userId, prisma);
+        return send(res, 200, { ok: true });
+      }
+
+      // Right-to-erasure: wipe the user's personal data and disable the account.
+      // Irreversible; the client should drop its token afterward (session revoked).
+      if (req.method === 'POST' && p === '/me/erase') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await eraseUserData(userId, prisma);
         return send(res, 200, { ok: true });
       }
 
@@ -928,7 +942,7 @@ async function main() {
               buyerHandle: buyer?.handle ?? null,
               sellerHandle: seller?.handle ?? null,
               privacyFee: formatUsdc(s.privacyFee),
-              buyerRealAddress: s.privateLeg2, // operator-only
+              buyerRealAddress: decryptPii(s.privateLeg2), // operator-only
               trackingNumber: s.trackingNumber,
               carrier: s.carrier,
               items: items.map((it) => ({ id: it.id, title: it.title })),
@@ -1267,7 +1281,7 @@ async function shipmentDto(shipmentId: string) {
     privacyFee: formatUsdc(s.privacyFee),
     trackingNumber: s.trackingNumber,
     carrier: s.carrier,
-    shipTo: s.shipTo,
+    shipTo: decryptPii(s.shipTo),
     sellerHandle: seller?.handle ?? null,
     buyerHandle: buyer?.handle ?? null,
     createdAt: s.createdAt.getTime(),

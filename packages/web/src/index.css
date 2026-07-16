@@ -1678,3 +1678,9 @@ img { display: block; max-width: 100%; }
   background: rgba(240, 180, 41, 0.08); border: 1px solid rgba(240, 180, 41, 0.3); color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 .beta-cap svg { flex: none; margin-top: 1px; color: var(--amber, #f0b429); }
 .beta-cap b { color: var(--ink); }
+
+/* ===== account danger zone (delete my data) ============================== */
+.danger-zone { border-color: rgba(255, 90, 106, 0.35); }
+.danger-zone .acct-sub { color: var(--red, #ff5a6a); }
+.btn-danger { background: transparent; color: var(--red, #ff5a6a); border: 1px solid rgba(255, 90, 106, 0.5); }
+.btn-danger:hover:not(:disabled) { background: rgba(255, 90, 106, 0.1); }
