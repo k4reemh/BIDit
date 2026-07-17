@@ -495,12 +495,10 @@ export const disputeShipment = (shipmentId: string, input: DisputeInput) =>
 
 export const getSellerShipments = () => req<Shipment[]>('/seller/shipments');
 export interface PackageDims { lengthCm: number; widthCm: number; heightCm: number; weightGrams: number }
-/** Seller confirms the package size → BIDit generates the shipping label. */
+/** Seller confirms the package size → BIDit generates the shipping label. This is
+ *  the seller's only shipping action; the carrier's scans drive shipped → delivered. */
 export const confirmShipmentLabel = (shipmentId: string, dims: PackageDims) =>
   req<Shipment>('/seller/shipment/confirm-label', { method: 'POST', body: JSON.stringify({ shipmentId, ...dims }) });
-/** Seller marks the (labelled) package dropped off with the carrier. */
-export const shipShipment = (shipmentId: string) =>
-  req<Shipment>('/seller/shipment/ship', { method: 'POST', body: JSON.stringify({ shipmentId }) });
 
 export interface HeldItem {
   id: string;

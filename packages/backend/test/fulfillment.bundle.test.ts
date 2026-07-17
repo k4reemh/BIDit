@@ -9,7 +9,7 @@ import { confirmShipmentForLabel, createShipmentLabel, markShipmentShipped } fro
 async function shipViaLabel(shipmentId: string, sellerId: string, clock: ManualClock, tracking = 'T1') {
   await confirmShipmentForLabel({ shipmentId, sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
   await createShipmentLabel({ shipmentId, labelUrl: 'https://labels.test/x.pdf', trackingNumber: tracking }, clock, prisma);
-  return markShipmentShipped({ shipmentId, sellerId }, clock, prisma);
+  return markShipmentShipped(shipmentId, clock, prisma);
 }
 import { usdc } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeUser } from './setup.js';

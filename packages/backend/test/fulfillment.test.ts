@@ -94,7 +94,7 @@ describe('fulfillment', () => {
     // Platform-label flow: seller confirms size → BIDit makes the label → seller ships.
     await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
     await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z999', carrier: 'UPS' }, clock, prisma);
-    const shipped = await markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma);
+    const shipped = await markShipmentShipped(shipment.id, clock, prisma);
     expect(shipped.status).toBe('SHIPPED');
     expect(shipped.trackingNumber).toBe('1Z999');
     expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('SHIPPED');
@@ -112,7 +112,7 @@ describe('fulfillment', () => {
     expect(shipment.status).toBe('PAID');
 
     // Can't ship before BIDit has generated a label.
-    await expect(markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma)).rejects.toThrow(ShippingError);
+    await expect(markShipmentShipped(shipment.id, clock, prisma)).rejects.toThrow(ShippingError);
 
     // Seller confirms the package size → LABEL_PENDING (BIDit is making the label).
     const pending = await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId, lengthCm: 12, widthCm: 9, heightCm: 3, weightGrams: 45 }, clock, prisma);
@@ -126,7 +126,7 @@ describe('fulfillment', () => {
     expect(await prisma.notification.count({ where: { userId: sellerId, kind: 'label_ready' } })).toBe(1);
 
     // Now the seller can ship; tracking comes from the label, not the seller.
-    const shipped = await markShipmentShipped({ shipmentId: shipment.id, sellerId }, clock, prisma);
+    const shipped = await markShipmentShipped(shipment.id, clock, prisma);
     expect(shipped.status).toBe('SHIPPED');
     expect(shipped.trackingNumber).toBe('1Z-CONFIRM');
   });

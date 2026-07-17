@@ -36,7 +36,7 @@ describe('notifications', () => {
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
     await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId: auction.sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
     await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z' }, clock, prisma);
-    await markShipmentShipped({ shipmentId: shipment.id, sellerId: auction.sellerId }, clock, prisma);
+    await markShipmentShipped(shipment.id, clock, prisma);
 
     const afterShip = await listNotifications(buyer.userId, prisma);
     expect(afterShip.items.some((n) => n.kind === 'shipped')).toBe(true);

@@ -493,18 +493,21 @@ export async function confirmShipmentForLabel(
 }
 
 /**
- * Seller drops the package off. LABEL_CREATED -> SHIPPED. The tracking number is
- * already on the BIDit-generated label, so there's nothing for the seller to enter.
+ * Advance a package to SHIPPED — LABEL_CREATED -> SHIPPED. This is driven by the
+ * CARRIER: the ShipmentTracker flips a package here the moment tracking shows the
+ * label moving (with an admin override for the rare manual case). Sellers never
+ * self-attest shipping — they just print the BIDit label and drop the package off;
+ * the carrier's first scan is what marks it shipped. The tracking number is already
+ * on the label, so there's nothing to enter.
  */
 export async function markShipmentShipped(
-  params: { shipmentId: string; sellerId: string },
+  shipmentId: string,
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ) {
-  const s = await prisma.shipment.findUniqueOrThrow({ where: { id: params.shipmentId } });
-  if (s.sellerId !== params.sellerId) throw new ShippingError('Not your shipment.');
+  const s = await prisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
   if (s.status !== 'LABEL_CREATED') {
-    throw new ShippingError('Your shipping label isn’t ready to ship yet.');
+    throw new ShippingError('This package’s label isn’t ready to ship yet.');
   }
   const now = clock.now();
   await prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
@@ -557,7 +560,7 @@ export async function createShipmentLabel(
       userId: s.sellerId,
       kind: 'label_ready',
       title: 'Your shipping label is ready',
-      body: 'Print it, tape it to the package, and drop it at the carrier — then mark it shipped.',
+      body: 'Print it, tape it to the package, and drop it at your carrier — tracking takes it from there.',
       href: '/seller/shipments',
     },
     prisma,

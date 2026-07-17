@@ -12,7 +12,7 @@
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
-import { markShipmentDelivered } from './fulfillment.js';
+import { markShipmentShipped, markShipmentDelivered } from './fulfillment.js';
 import { advanceOrdersForShipment } from './orders.js';
 
 export type TrackStatus = 'pre_transit' | 'transit' | 'delivered' | 'failure' | 'unknown';
@@ -114,10 +114,11 @@ export class ShipmentTracker {
         try {
           const status = await this.provider.getStatus(s.carrier ?? '', s.trackingNumber!);
           if (status !== 'transit' && status !== 'delivered') continue;
-          // First movement: a label-made package is now actually in transit.
+          // First movement: the carrier has the package — mark it shipped (notifies
+          // the buyer, closes any weekly bundle). This is the ONLY thing that flips a
+          // package to SHIPPED in normal operation; the seller never self-attests.
           if (s.status === 'LABEL_CREATED') {
-            await this.prisma.shipment.update({ where: { id: s.id }, data: { status: 'SHIPPED', shippedAt: this.clock.now() } });
-            await this.prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
+            await markShipmentShipped(s.id, this.clock, this.prisma);
             await advanceOrdersForShipment(s.id, 'SHIPPED', this.clock, this.prisma);
           }
           if (status === 'delivered') {

@@ -59,6 +59,9 @@ export default function ProfileMenu({
         </div>
 
         <div className="pm__rows">
+          {user.isAdmin && (
+            <Link to="/admin/shipments" className="pm__row pm__row--admin" onClick={onClose}><Shield width={20} height={20} /> Admin · Shipping labels <Chevron className="pm__chev" width={16} height={16} /></Link>
+          )}
           <Link to="/friends" className="pm__row" onClick={onClose}><Users width={20} height={20} /> Friends <Chevron className="pm__chev" width={16} height={16} /></Link>
           {onReplayTutorial && (
             <button className="pm__row" onClick={() => { onReplayTutorial(); onClose(); }}><Bolt width={20} height={20} /> How it works <Chevron className="pm__chev" width={16} height={16} /></button>

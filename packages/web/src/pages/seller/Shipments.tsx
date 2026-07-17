@@ -5,7 +5,6 @@ import {
   getSellerShipments,
   getSellerHeld,
   confirmShipmentLabel,
-  shipShipment,
   type Shipment,
   type HeldItem,
 } from '../../api';
@@ -95,8 +94,8 @@ export default function Shipments() {
       )}
 
       {ready.length > 0 && (
-        <Section title="Ready to ship" hint="Print the label, tape it to the package, and drop it at the carrier.">
-          {ready.map((s) => <ReadyCard key={s.id} shipment={s} onShipped={load} />)}
+        <Section title="Ready to ship" hint="Print the label, tape it on, and drop it at the carrier — tracking updates on its own from there.">
+          {ready.map((s) => <ReadyCard key={s.id} shipment={s} />)}
         </Section>
       )}
 
@@ -228,14 +227,7 @@ function Dim({ label, unit, value, onChange }: { label: string; unit: string; va
   );
 }
 
-function ReadyCard({ shipment, onShipped }: { shipment: Shipment; onShipped: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const ship = async () => {
-    setBusy(true); setErr('');
-    try { await shipShipment(shipment.id); onShipped(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not mark shipped.'); setBusy(false); }
-  };
+function ReadyCard({ shipment }: { shipment: Shipment }) {
   return (
     <div className="card acct-card ship-card ship-card--ready">
       <CardHead shipment={shipment} pill={<span className="ship-pill is-ready">Label ready</span>} />
@@ -248,12 +240,13 @@ function ReadyCard({ shipment, onShipped }: { shipment: Shipment; onShipped: () 
           <span><b>3.</b> Drop it at {shipment.carrier || 'the carrier'}</span>
         </div>
         {shipment.trackingNumber && <p className="muted ship-hint">Tracking: <b>{shipment.carrier ? `${shipment.carrier} · ` : ''}{shipment.trackingNumber}</b></p>}
-        {err && <div className="auth__error">{err}</div>}
         <div className="acct-actions">
           {shipment.labelUrl && (
             <a className="btn btn-primary" href={shipment.labelUrl} target="_blank" rel="noreferrer"><DownloadIcon /> Download label</a>
           )}
-          <button className="btn btn-ghost" disabled={busy} onClick={ship}>{busy ? 'Saving…' : 'I’ve shipped it'}</button>
+          <span className="muted ship-hint ship-ready__auto">
+            <Check width={13} height={13} /> That’s it — tracking updates on its own once the carrier scans it.
+          </span>
         </div>
       </div>
     </div>

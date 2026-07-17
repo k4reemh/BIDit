@@ -45,10 +45,12 @@ export interface User {
   available: string;
   /** Total wallet balance (only drops when the user wins) — shown in the UI. */
   settled: string;
+  /** Operator account — reveals the Admin entry in the profile menu. */
+  isAdmin: boolean;
 }
 
 export function toUser(s: Session): User {
-  return { handle: s.handle, displayName: s.displayName, avatarUrl: s.avatarUrl, following: 0, followers: 0, verified: s.verified, available: s.available, settled: s.settled };
+  return { handle: s.handle, displayName: s.displayName, avatarUrl: s.avatarUrl, following: 0, followers: 0, verified: s.verified, available: s.available, settled: s.settled, isAdmin: !!s.isAdmin };
 }
 
 const STUBS: Record<string, { title: string; sub: string }> = {
@@ -110,6 +112,7 @@ export default function App() {
           <Route path="/help" element={<Help />} />
           <Route path="/points" element={<Points session={session} onAuth={() => setAuth('signup')} />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/admin" element={<Navigate to="/admin/shipments" replace />} />
           <Route path="/admin/sellers" element={<AdminSellers session={session} />} />
           <Route path="/admin/orders" element={<AdminOrders session={session} />} />
           <Route path="/admin/shipments" element={<AdminShipments session={session} />} />

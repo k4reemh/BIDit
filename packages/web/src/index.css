@@ -305,6 +305,8 @@ img { display: block; max-width: 100%; }
 .pm__chev { margin-left: auto; color: var(--faint); }
 .pm__row--logout { color: var(--red); }
 .pm__row--logout svg { color: var(--red); }
+.pm__row--admin { color: var(--accent-strong); font-weight: 600; }
+.pm__row--admin svg { color: var(--accent-strong); }
 
 /* ===== stub =============================================================== */
 .stub { min-height: 62vh; display: grid; place-items: center; padding: 70px 24px; }
@@ -1220,6 +1222,8 @@ img { display: block; max-width: 100%; }
 .ship-ready__steps { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 10px; }
 .ship-ready__steps span { font-size: 13px; color: var(--ink); }
 .ship-ready__steps b { color: var(--accent-strong); margin-right: 3px; }
+.ship-ready__auto { display: inline-flex; align-items: center; gap: 6px; }
+.ship-ready__auto svg { color: var(--green, var(--accent-strong)); }
 .ship-ready .acct-actions .btn-primary { display: inline-flex; align-items: center; gap: 7px; }
 
 @media (max-width: 640px) {
