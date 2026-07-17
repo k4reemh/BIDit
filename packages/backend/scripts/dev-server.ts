@@ -241,8 +241,11 @@ async function main() {
   });
   // Watch the chain for inbound USDC and credit the ledger (deposit detection).
   // On each credit, push a live BALANCE_UPDATE so the depositor's balance updates
-  // on-screen without a refresh.
-  const depositWatcher = new DepositWatcher(chain, prisma, 5000, (userId) =>
+  // on-screen without a refresh. Poll fast on the mock chain (no real RPC), but
+  // gently on a real chain — a per-address balance read every few seconds across
+  // all users otherwise hammers the RPC into 429s (BIDIT_DEPOSIT_POLL_MS overrides).
+  const depositPollMs = Number(process.env.BIDIT_DEPOSIT_POLL_MS) || (chain.cluster === 'mock' ? 5000 : 20000);
+  const depositWatcher = new DepositWatcher(chain, prisma, depositPollMs, (userId) =>
     void realtime.notifyBalance(userId).catch(() => {}),
   );
   // Recover any deposit that was swept on-chain but not yet credited before a

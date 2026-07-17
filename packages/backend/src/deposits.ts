@@ -59,6 +59,10 @@ export async function registerAllDeposits(
  */
 export class DepositWatcher {
   private cursor: string | null = null;
+  /** Guards against overlapping polls: on a slow/rate-limited RPC a poll can run
+   *  longer than the interval, and without this the next tick would fire on top of
+   *  it and pile MORE RPC calls on — a 429 death-spiral. One watcher per process. */
+  private running = false;
 
   constructor(
     private readonly chain: ChainClient,
@@ -88,6 +92,8 @@ export class DepositWatcher {
    *  reconcile finishes it). Returns the number of receipts credited this tick.
    *  Never throws — a failed poll is logged and retried next tick. */
   async tick(): Promise<number> {
+    if (this.running) return 0; // a previous poll is still in flight — don't stack
+    this.running = true;
     try {
       const { events, cursor } = await this.chain.pollDeposits(this.cursor);
       this.cursor = cursor;
@@ -109,6 +115,8 @@ export class DepositWatcher {
     } catch (err) {
       console.error('[deposit-watcher] poll failed (will retry):', (err as Error)?.message ?? err);
       return 0;
+    } finally {
+      this.running = false;
     }
   }
 
