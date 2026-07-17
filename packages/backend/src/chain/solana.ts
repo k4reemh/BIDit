@@ -115,10 +115,11 @@ export class SolanaChain implements ChainClient {
   }
 
   async balance(target: WalletName | string): Promise<bigint> {
-    const owner =
-      target === 'treasury' || target === 'escrow' || target === 'buyback'
-        ? this.wallets[target].publicKey
-        : new PublicKey(target);
+    // Resolve any known wallet name (treasury/escrow/buyback/fee) via the record;
+    // anything else is treated as a raw address. (Wallet names are never valid
+    // base58 pubkeys, so there's no ambiguity.)
+    const wallet = (this.wallets as Record<string, Keypair>)[target];
+    const owner = wallet ? wallet.publicKey : new PublicKey(target);
     const ata = await getAssociatedTokenAddress(this.usdcMint, owner);
     try {
       return (await getAccount(this.conn, ata)).amount;
