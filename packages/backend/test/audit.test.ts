@@ -17,11 +17,11 @@ describe('reconcileWallets', () => {
     await new DepositWatcher(chain, prisma).tick(); // sweeps to treasury + credits ledger
 
     const recon = await reconcileWallets(chain, prisma);
-    const by = Object.fromEntries(recon.rows.map((r) => [r.wallet, r]));
+    const row = (w: string) => recon.rows.find((r) => r.wallet === w)!;
     // treasury holds the pooled user balance; the segregated pools are empty.
-    expect(by.treasury.chain).toBe(usdc('100'));
-    expect(by.treasury.ledger).toBe(usdc('100'));
-    for (const w of ['treasury', 'escrow', 'buyback', 'fee']) expect(by[w].diff).toBe(0n);
+    expect(row('treasury').chain).toBe(usdc('100'));
+    expect(row('treasury').ledger).toBe(usdc('100'));
+    for (const w of ['treasury', 'escrow', 'buyback', 'fee']) expect(row(w).diff).toBe(0n);
     expect(recon.reconciled).toBe(true);
     expect(recon.pendingLegs).toBe(0);
   });
