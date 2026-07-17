@@ -133,12 +133,26 @@ immediately** (skip the 2-day window). These sit alongside the automatic path.
 
 ---
 
-## 7. On-chain legs to harden (durable settlement)
+## 7. On-chain legs — hardened (durable settlement) ✅ done
 
-Every leg below currently uses the blocking `chain.transfer()` — the same pattern
-that caused the withdrawal double-spend. Each becomes a durable send + status +
-reconcile (reuse `sendTransfer` / `getTransferStatus` / the reconciler from the
-withdrawal fix). Reverse/retry only on a chain-proven outcome, never on a timeout.
+All six legs are internal wallet→wallet moves (every wallet is operator-controlled).
+They are now a **durable outbox** (`ChainTransfer`) enqueued **atomically with the
+ledger move** (same DB transaction, idempotency-keyed), driven to the chain by a
+`ChainSettler`:
+
+```
+PENDING → (sendTransfer) SUBMITTED → confirmed → CONFIRMED
+                                   → failed    → PENDING (retry, fresh blockhash)
+                                   → unknown   → wait
+```
+
+Because the funds never leave our wallets, a failed/expired send is simply
+retried; a SUBMITTED leg is only ever *resolved* (never re-sent), so an in-flight
+tx is never duplicated. This fully closes the DB↔chain atomicity gap — a crash or
+timeout can neither lose money nor double-move it, and the ledger stays the source
+of truth. (Reuses `sendTransfer`/`getTransferStatus` from the withdrawal fix.)
+
+The six legs:
 
 1. lock: treasury → escrow (on win)
 2. shipping: treasury → fee (on buyer pays shipping)
@@ -146,6 +160,11 @@ withdrawal fix). Reverse/retry only on a chain-proven outcome, never on a timeou
 4. release-buyback: escrow → buyback (4%)
 5. release-fee: escrow → fee (1%)
 6. refund: escrow → treasury (item only)
+
+**Ops requirement:** each hot wallet pays gas for its *outgoing* legs, so the
+**escrow, buyback, and fee wallets each need a little SOL** (not just treasury)
+before escrow goes live — otherwise release/refund legs can't broadcast (they'll
+retry harmlessly until funded).
 
 ---
 
@@ -169,6 +188,7 @@ path triggered by hold-expiry instead of by delivery.
 4. Seller tabs ("Need to be shipped" / "Waiting for Buyer Shipping Order") + confirm-with-dims.
 5. Admin label queue + attach-label + "Label created" + seller email.
 6. Shippo tracking integration → delivered → 2-day window → auto-release.
-7. Admin testing overrides (mark states / release now).
-8. **Harden all 6 on-chain legs** (durable settlement) — last.
-9. Devnet dry-run of the whole path on real USDC, then flip `BIDIT_PAYOUT_MODE`.
+7. Admin testing overrides (mark states / release now). ✅
+8. Harden all 6 on-chain legs (durable ChainTransfer outbox + ChainSettler). ✅
+9. Devnet dry-run of the whole path on real USDC (fund escrow/buyback/fee wallets
+   with SOL first — see §7 ops note), then flip `BIDIT_PAYOUT_MODE=direct → escrow`.

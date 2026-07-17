@@ -76,6 +76,7 @@ import {
   type DisputeOutcome,
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
+import { ChainSettler } from '../src/chain-settle.js';
 import {
   getBuyerFulfillment,
   getSellerShipments,
@@ -261,6 +262,16 @@ async function main() {
   } else {
     console.log('[tracking] SHIPPO_API_KEY not set — automatic delivery tracking off');
   }
+  // Drive the durable escrow/shipping on-chain outbox (ChainTransfer) to the chain:
+  // broadcast, confirm, and safely retry each internal wallet→wallet leg. Recover
+  // any leg left mid-flight by a prior crash on startup, then poll. In direct mode
+  // the outbox is empty (or same-wallet no-ops), so this is a harmless no-op.
+  const chainSettler = new ChainSettler(chain, prisma, 8000);
+  await chainSettler.reconcile().then(
+    (n) => n > 0 && console.log(`[chain-settle] settled ${n} pending on-chain leg(s) on startup`),
+    (e) => console.error('[chain-settle] startup reconcile failed:', e),
+  );
+  chainSettler.start();
   // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
   const fulfillmentTimer = setInterval(() => {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));

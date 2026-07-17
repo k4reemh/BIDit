@@ -10,7 +10,7 @@ let counter = 0;
 /** Wipe every table and re-seed the system accounts. */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "DepositReceipt","PointsEvent","Notification","WeeklyShippingPass","FulfillmentItem","Shipment","GiveawayEntry","Giveaway","Buyback","Withdrawal","Hold","LedgerEntry","Bid","Order","Auction","Listing","SellerProfile","Account","User" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "ChainTransfer","DepositReceipt","PointsEvent","Notification","WeeklyShippingPass","FulfillmentItem","Shipment","GiveawayEntry","Giveaway","Buyback","Withdrawal","Hold","LedgerEntry","Bid","Order","Auction","Listing","SellerProfile","Account","User" RESTART IDENTITY CASCADE',
   );
   await ensureSystemAccounts(prisma);
 }

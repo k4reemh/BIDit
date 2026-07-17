@@ -3,6 +3,7 @@ import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { MockChain } from '../src/chain/index.js';
 import { ProgramEscrow } from '../src/escrow.js';
+import { ChainSettler } from '../src/chain-settle.js';
 import { DepositWatcher, ensureDepositAddress } from '../src/deposits.js';
 import { requestWithdrawal } from '../src/withdrawals.js';
 import { BuybackWorker, MockSwapper } from '../src/buyback.js';
@@ -29,6 +30,15 @@ async function fundViaChain(userId: string, chain: MockChain, amount: string): P
   await ensureDepositAddress(userId, chain, prisma);
   chain.simulateDeposit(userId, usdc(amount));
   await new DepositWatcher(chain, prisma).tick();
+}
+
+/** Drive the durable escrow outbox to the (mock) chain until it's empty. */
+async function drainChain(chain: MockChain): Promise<void> {
+  const settler = new ChainSettler(chain, prisma);
+  for (let i = 0; i < 5; i++) {
+    if ((await prisma.chainTransfer.count({ where: { status: { in: ['PENDING', 'SUBMITTED'] } } })) === 0) return;
+    await settler.tick();
+  }
 }
 
 describe('deposit rail (chain -> ledger)', () => {
@@ -104,7 +114,8 @@ describe('full on-chain settlement flow (mock chain)', () => {
     // 3) Settle into escrow — funds move treasury -> escrow on-chain.
     const order = (await settleAuction(auction.auctionId, escrow, clock, prisma))!;
     expect(order.status).toBe(OrderStatus.LOCKED);
-    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20'));
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20')); // ledger: synchronous
+    await drainChain(chain); // settle the treasury -> escrow leg on-chain
     expect(await chain.balance('escrow')).toBe(usdc('20'));
     expect(await chain.balance('treasury')).toBe(usdc('80'));
     expect(await getAvailableBalance(buyer.accountId, prisma)).toBe(usdc('80'));
@@ -116,9 +127,10 @@ describe('full on-chain settlement flow (mock chain)', () => {
     expect((await processOrderTimers(escrow, clock, prisma)).released).toEqual([order.id]);
 
     const sellerAcct = await getOrCreateUserAccount(auction.sellerId, prisma);
-    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // 95%
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // 95% (ledger: synchronous)
     expect(await getBuybackPending(prisma)).toBe(usdc('0.8')); // 4% buyback pool
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2')); // 1% fee pool
+    await drainChain(chain); // settle the escrow -> treasury / buyback / fee legs on-chain
     expect(await chain.balance('escrow')).toBe(0n);
     expect(await chain.balance('buyback')).toBe(usdc('0.8'));
     expect(await chain.balance('fee')).toBe(usdc('0.2'));

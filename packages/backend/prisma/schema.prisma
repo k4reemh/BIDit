@@ -224,6 +224,34 @@ model Withdrawal {
   @@index([status])
 }
 
+/// Durable outbox for the INTERNAL wallet→wallet USDC moves that keep the physical
+/// wallets aligned with the ledger's escrow/fee accounting (lock, release×3,
+/// refund, shipping→fee). Each row is enqueued ATOMICALLY with its ledger move
+/// (same DB transaction, keyed for idempotency), and a ChainSettler drives it to
+/// CONFIRMED. Because every wallet here is operator-controlled, a failed/expired
+/// send is simply retried with a fresh blockhash — funds never leave our control,
+/// so a crash can neither lose money nor double-move it. This is what makes the
+/// DB↔chain boundary safe (see chain-settle.ts).
+model ChainTransfer {
+  id                   String    @id @default(cuid())
+  /// One row per logical leg — e.g. `lock:<orderId>`, `release-seller:<orderId>`,
+  /// `shipping:<shipmentId>`. Unique, so enqueuing is idempotent.
+  key                  String    @unique
+  fromWallet           String    // treasury | escrow | buyback | fee
+  toWallet             String    // treasury | escrow | buyback | fee (all ours)
+  amount               BigInt
+  memo                 String?
+  status               String    @default("PENDING") // PENDING | SUBMITTED | CONFIRMED
+  txSig                String?
+  lastValidBlockHeight BigInt?
+  attempts             Int       @default(0)
+  lastError            String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt @default(now())
+
+  @@index([status])
+}
+
 /// Public record of a $BID buyback funded by the 5% platform fee pool.
 model Buyback {
   id        String   @id @default(cuid())

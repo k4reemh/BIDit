@@ -85,6 +85,31 @@ async function lockAccount(tx: Tx, accountId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM "Account" WHERE id = ${accountId} FOR UPDATE`;
 }
 
+/**
+ * An internal wallet→wallet USDC move to enqueue in the durable ChainTransfer
+ * outbox — recorded in the SAME transaction as its ledger move, so the physical
+ * transfer is never lost or double-recorded relative to the ledger truth. A
+ * ChainSettler drives it to CONFIRMED out of band (see chain-settle.ts).
+ */
+export interface ChainLeg {
+  /** Idempotency key, one per logical leg (e.g. `lock:<orderId>`). */
+  key: string;
+  fromWallet: string;
+  toWallet: string;
+  amount: bigint;
+  memo?: string;
+}
+
+/** Insert outbox legs inside the caller's transaction. Idempotent (unique key,
+ *  skipDuplicates); zero/negative legs are dropped. No-op when legs is empty. */
+async function enqueueChainLegs(tx: Tx, legs?: ChainLeg[]): Promise<void> {
+  const data = (legs ?? [])
+    .filter((l) => l.amount > 0n)
+    .map((l) => ({ key: l.key, fromWallet: l.fromWallet, toWallet: l.toWallet, amount: l.amount, memo: l.memo ?? null }));
+  if (data.length === 0) return;
+  await tx.chainTransfer.createMany({ data, skipDuplicates: true });
+}
+
 // ---------------------------------------------------------------------------
 // Balance reads
 // ---------------------------------------------------------------------------
@@ -458,6 +483,11 @@ export async function settleShipping(
           refId: params.shipmentId,
         },
       ]);
+      // Physically segregate the shipping USDC into the fee wallet (no-op when the
+      // fee wallet falls back to treasury, i.e. before escrow mode is configured).
+      await enqueueChainLegs(tx, [
+        { key, fromWallet: 'treasury', toWallet: 'fee', amount: params.amount, memo: key },
+      ]);
     }, TX_OPTS);
   } catch (err) {
     if (isUniqueViolation(err)) return;
@@ -475,7 +505,7 @@ export async function settleShipping(
  * release, so a refund can return 100%. Idempotent per order.
  */
 export async function escrowLock(
-  params: { buyerAccountId: string; amount: Micros; orderId: string; auctionId: string | null },
+  params: { buyerAccountId: string; amount: Micros; orderId: string; auctionId: string | null; chainLegs?: ChainLeg[] },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
@@ -523,6 +553,7 @@ export async function escrowLock(
           refId: params.orderId,
         },
       ]);
+      await enqueueChainLegs(tx, params.chainLegs);
     }, TX_OPTS);
   } catch (err) {
     if (isUniqueViolation(err)) return;
@@ -538,7 +569,7 @@ export async function escrowLock(
  * All four legs sum to zero. Idempotent per order.
  */
 export async function escrowRelease(
-  params: { sellerAccountId: string; amount: Micros; orderId: string },
+  params: { sellerAccountId: string; amount: Micros; orderId: string; chainLegs?: ChainLeg[] },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ sellerProceeds: bigint; buybackFee: bigint; platformFee: bigint }> {
   assertPositive(params.amount);
@@ -578,6 +609,7 @@ export async function escrowRelease(
             refId: params.orderId,
           },
         ]);
+        await enqueueChainLegs(tx, params.chainLegs);
       }, TX_OPTS);
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
@@ -588,7 +620,7 @@ export async function escrowRelease(
 
 /** Refund escrow: ESCROW -> 100% buyer (REFUND). No fee — never taken. */
 export async function escrowRefund(
-  params: { buyerAccountId: string; amount: Micros; orderId: string },
+  params: { buyerAccountId: string; amount: Micros; orderId: string; chainLegs?: ChainLeg[] },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
@@ -613,6 +645,7 @@ export async function escrowRefund(
           refId: params.orderId,
         },
       ]);
+      await enqueueChainLegs(tx, params.chainLegs);
     }, TX_OPTS);
   } catch (err) {
     if (isUniqueViolation(err)) return;

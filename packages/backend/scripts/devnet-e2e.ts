@@ -40,6 +40,7 @@ const { prisma } = await import('../src/db.js');
 const { ensureSystemAccounts } = await import('../src/bootstrap.js');
 const { getChainClient } = await import('../src/chain/index.js');
 const { ProgramEscrow } = await import('../src/escrow.js');
+const { ChainSettler } = await import('../src/chain-settle.js');
 const { DepositWatcher, ensureDepositAddress } = await import('../src/deposits.js');
 const { requestWithdrawal, WithdrawalReconciler } = await import('../src/withdrawals.js');
 const { BuybackWorker, MockSwapper } = await import('../src/buyback.js');
@@ -68,6 +69,17 @@ async function main() {
 
   await ensureSystemAccounts(prisma);
   const escrow = new ProgramEscrow(chain, prisma);
+  const settler = new ChainSettler(chain, prisma);
+  // Escrow legs are enqueued in the durable outbox, not sent inline — drain them
+  // to the chain (a few ticks, allowing for confirmation) after each escrow op.
+  const drainChain = async () => {
+    for (let i = 0; i < 25; i++) {
+      const pending = await prisma.chainTransfer.count({ where: { status: { in: ['PENDING', 'SUBMITTED'] } } });
+      if (pending === 0) return;
+      await settler.tick();
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  };
   const clock = new ManualClock(Date.now());
   const stamp = Date.now();
 
@@ -104,18 +116,21 @@ async function main() {
 
   // --- 3. settle -> escrow lock (treasury -> escrow on-chain) -------------
   const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+  await drainChain(); // treasury -> escrow leg
   console.log(`3) order ${order.status}; escrowRef ${order.escrowRef}`);
   console.log(`   escrow on-chain balance: ${fmt(await chain.balance('escrow'))}`);
   console.log(`   buyer ledger available: ${fmt(await getSettledBalance(buyerAcct, prisma))}\n`);
 
-  // --- 4. ship -> deliver -> release (95% seller / 5% buyback) -----------
+  // --- 4. ship -> deliver -> release (95% seller / 4% buyback / 1% fee) ---
   await markShipped(order.id, 'DEVNET-TRACK', clock, prisma);
   await markDelivered(order.id, clock, prisma);
   clock.advance(DISPUTE_WINDOW_MS + 1000);
   await processOrderTimers(escrow, clock, prisma);
+  await drainChain(); // escrow -> treasury / buyback / fee legs
   console.log('4) shipped -> delivered -> dispute window passed -> RELEASED');
   console.log(`   seller ledger balance: ${fmt(await getSettledBalance(sellerAcct, prisma))} (95%)`);
-  console.log(`   buyback wallet on-chain: ${fmt(await chain.balance('buyback'))} (5%)`);
+  console.log(`   buyback wallet on-chain: ${fmt(await chain.balance('buyback'))} (4%)`);
+  console.log(`   fee wallet on-chain: ${fmt(await chain.balance('fee'))} (1%)`);
   console.log(`   escrow on-chain balance: ${fmt(await chain.balance('escrow'))}\n`);
 
   // --- 5. buyback worker (devnet: reserved; mainnet: real Jupiter swap) ---

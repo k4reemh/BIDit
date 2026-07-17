@@ -11,7 +11,7 @@
  * real funds or keys. ProgramEscrow (a later chunk) implements the same interface
  * against the real on-chain program and drops in without changing order logic.
  */
-import { ESCROW_WALLET_ADDRESS } from '@bidit/shared';
+import { ESCROW_WALLET_ADDRESS, splitSale } from '@bidit/shared';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import {
@@ -74,11 +74,14 @@ export class DevWalletEscrow implements EscrowProvider {
 }
 
 /**
- * On-chain escrow — does the same ledger movements as DevWalletEscrow AND the
- * real USDC transfers via the chain client (custodial wallet now; an on-chain PDA
- * program later, same interface). MockChain makes it fully testable; SolanaChain
- * moves real devnet USDC. The order state machine guarantees lock/release/refund
- * run once per order, so there's no on-chain double-spend.
+ * On-chain escrow — the same ledger movements as DevWalletEscrow, but each also
+ * ENQUEUES its internal wallet→wallet USDC move into the durable ChainTransfer
+ * outbox, ATOMICALLY with the ledger write (one DB transaction). It does NOT
+ * broadcast here: a ChainSettler drives each leg to the chain idempotently and
+ * retries safely (all wallets are ours), so the ledger↔chain boundary can neither
+ * lose funds nor double-move on a crash/timeout. MockChain makes it testable;
+ * SolanaChain moves real USDC. Physical leg amounts equal the ledger amounts
+ * (same splitSale), so the wallets converge exactly on the ledger accounts.
  */
 export class ProgramEscrow implements EscrowProvider {
   constructor(
@@ -97,16 +100,17 @@ export class ProgramEscrow implements EscrowProvider {
       select: { auctionId: true },
     });
     await escrowLock(
-      { buyerAccountId: buyerRef, amount: amountMicro, orderId, auctionId: order.auctionId },
+      {
+        buyerAccountId: buyerRef,
+        amount: amountMicro,
+        orderId,
+        auctionId: order.auctionId,
+        // Physical: treasury (pooled) → escrow wallet.
+        chainLegs: [{ key: `lock:${orderId}`, fromWallet: 'treasury', toWallet: 'escrow', amount: amountMicro, memo: `lock:${orderId}` }],
+      },
       this.prisma,
     );
-    const txSig = await this.chain.transfer(
-      'treasury',
-      this.chain.walletAddress('escrow'),
-      amountMicro,
-      `lock:${orderId}`,
-    );
-    return `${this.chain.cluster}:escrow:${this.chain.walletAddress('escrow')}:${orderId}:${txSig}`;
+    return `${this.chain.cluster}:escrow:${this.chain.walletAddress('escrow')}:${orderId}`;
   }
 
   async release(orderId: string): Promise<void> {
@@ -115,21 +119,22 @@ export class ProgramEscrow implements EscrowProvider {
       select: { amount: true, sellerId: true },
     });
     const sellerAccountId = await getOrCreateUserAccount(order.sellerId, this.prisma);
-    const { sellerProceeds, buybackFee, platformFee } = await escrowRelease(
-      { sellerAccountId, amount: order.amount, orderId },
+    // Same split escrowRelease uses for the ledger → the physical legs match exactly.
+    const { sellerProceeds, buybackFee, platformFee } = splitSale(order.amount);
+    await escrowRelease(
+      {
+        sellerAccountId,
+        amount: order.amount,
+        orderId,
+        chainLegs: [
+          // 95% back to the pool (backs the seller's withdrawable balance).
+          { key: `release-seller:${orderId}`, fromWallet: 'escrow', toWallet: 'treasury', amount: sellerProceeds, memo: `release-seller:${orderId}` },
+          { key: `release-buyback:${orderId}`, fromWallet: 'escrow', toWallet: 'buyback', amount: buybackFee, memo: `release-buyback:${orderId}` },
+          { key: `release-fee:${orderId}`, fromWallet: 'escrow', toWallet: 'fee', amount: platformFee, memo: `release-fee:${orderId}` },
+        ],
+      },
       this.prisma,
     );
-    // 95% back to the pool (backs the seller's withdrawable balance), 4% to the
-    // buyback wallet, 1% to the fee wallet.
-    if (sellerProceeds > 0n) {
-      await this.chain.transfer('escrow', this.chain.walletAddress('treasury'), sellerProceeds, `release-seller:${orderId}`);
-    }
-    if (buybackFee > 0n) {
-      await this.chain.transfer('escrow', this.chain.walletAddress('buyback'), buybackFee, `release-buyback:${orderId}`);
-    }
-    if (platformFee > 0n) {
-      await this.chain.transfer('escrow', this.chain.walletAddress('fee'), platformFee, `release-fee:${orderId}`);
-    }
   }
 
   async refund(orderId: string): Promise<void> {
@@ -138,7 +143,15 @@ export class ProgramEscrow implements EscrowProvider {
       select: { amount: true, buyerId: true },
     });
     const buyerAccountId = await getOrCreateUserAccount(order.buyerId, this.prisma);
-    await escrowRefund({ buyerAccountId, amount: order.amount, orderId }, this.prisma);
-    await this.chain.transfer('escrow', this.chain.walletAddress('treasury'), order.amount, `refund:${orderId}`);
+    await escrowRefund(
+      {
+        buyerAccountId,
+        amount: order.amount,
+        orderId,
+        // Physical: escrow wallet → treasury (buyer's refund lands in their pooled balance).
+        chainLegs: [{ key: `refund:${orderId}`, fromWallet: 'escrow', toWallet: 'treasury', amount: order.amount, memo: `refund:${orderId}` }],
+      },
+      this.prisma,
+    );
   }
 }
