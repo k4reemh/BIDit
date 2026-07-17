@@ -1337,6 +1337,13 @@ img { display: block; max-width: 100%; }
 .adm-lbl__items { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
 .adm-lbl__form { border-top: 1px dashed var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 560px) { .adm-lbl__grid { grid-template-columns: 1fr; } }
+
+/* ---- admin: wallet reconciliation ---- */
+.adm-recon { margin-bottom: 14px; }
+.adm-recon__tbl { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 13.5px; }
+.adm-recon__tbl th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.adm-recon__tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line-2); }
+.adm-recon__tbl td:first-child { text-transform: capitalize; font-weight: 600; }
 .adm-nav span { color: var(--faint); }
 .adm-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .ord-pill { margin-left: 8px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; vertical-align: middle; background: rgba(127, 127, 127, 0.16); color: var(--muted); }

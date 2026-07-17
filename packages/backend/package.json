@@ -13,6 +13,7 @@
     "demo": "tsx scripts/with-db.ts tsx scripts/demo.ts",
     "dev": "tsx scripts/with-db.ts tsx scripts/dev-server.ts",
     "devnet:e2e": "BIDIT_PG_PROFILE=test tsx scripts/with-db.ts tsx scripts/devnet-e2e.ts",
+    "audit:wallets": "tsx scripts/audit-wallets.ts",
     "deploy:push": "prisma db push --skip-generate",
     "start": "tsx scripts/dev-server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

@@ -274,6 +274,14 @@ export interface LedgerAudit {
   buybackPending: string;
 }
 export const getLedgerAudit = () => req<LedgerAudit>('/admin/audit');
+
+export interface WalletAudit {
+  cluster: string;
+  pendingLegs: number;
+  reconciled: boolean;
+  rows: { wallet: string; chain: string; ledger: string; diff: string }[];
+}
+export const getWalletAudit = () => req<WalletAudit>('/admin/wallet-audit');
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 

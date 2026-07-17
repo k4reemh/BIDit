@@ -13,8 +13,8 @@ import {
   releaseOrder,
   processOrderTimers,
   DISPUTE_WINDOW_MS,
-  NO_SHIP_TIMEOUT_MS,
 } from '../src/orders.js';
+import { SHIP_LATER_HOLD_MS } from '../src/fulfillment.js';
 import {
   getSettledBalance,
   getAvailableBalance,
@@ -144,7 +144,7 @@ describe('settlement (auction close -> LOCKED order)', () => {
     expect(order!.platformFee).toBe(usdc('1')); // 5%
     expect(order!.sellerProceeds).toBe(usdc('19')); // 95%
     expect(order!.lockedAt).not.toBeNull();
-    expect(order!.noShipDeadline).not.toBeNull();
+    expect(order!.noShipDeadline).toBeNull(); // ship-clock starts when the buyer pays shipping
 
     // Buyer charged; funds now sit in escrow. No fee taken yet.
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('80'));
@@ -199,14 +199,16 @@ describe('happy path: ship -> deliver -> release splits 95/4/1', () => {
 });
 
 describe('refunds return the whole amount (fee only taken on release)', () => {
-  it('no-ship timeout cancels and refunds 100% to the buyer', async () => {
+  it('no-ship: once shipping is paid, an unshipped order refunds the item to the buyer', async () => {
     const clock = new ManualClock(T0);
     const { auctionId, buyer, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
     const sellerAcct = await sellerAccountId(sellerId);
     const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    // Buyer pays shipping → the seller's ship-clock starts (deadline set).
+    await prisma.order.update({ where: { id: order.id }, data: { noShipDeadline: new Date(clock.now().getTime() + 1000) } });
 
-    // Seller never ships; the no-ship deadline passes.
-    clock.advance(NO_SHIP_TIMEOUT_MS + 1000);
+    // Seller never ships; the deadline passes.
+    clock.advance(2000);
     const result = await processOrderTimers(escrow, clock, prisma);
     expect(result.refunded).toEqual([order.id]);
 
@@ -219,6 +221,29 @@ describe('refunds return the whole amount (fee only taken on release)', () => {
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(0n);
     expect(await getBuybackPending(prisma)).toBe(0n);
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+
+  it('never-paid shipping: the ship-later hold expiring forfeits the win to the seller', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    expect(order.noShipDeadline).toBeNull(); // buyer never paid shipping
+
+    // The item's ship-later hold expires with no shipping arranged → forfeit to seller.
+    clock.advance(SHIP_LATER_HOLD_MS + 1000);
+    const result = await processOrderTimers(escrow, clock, prisma);
+    expect(result.forfeited).toEqual([order.id]);
+
+    const forfeited = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(forfeited.status).toBe(OrderStatus.RELEASED);
+    // Seller paid 95/4/1 (buyer forfeited); the item is discarded.
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
+    expect(await getBuybackPending(prisma)).toBe(usdc('0.8'));
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(usdc('0.2'));
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect((await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } })).status).toBe('DISCARDED');
     expect(await getSystemTotal(prisma)).toBe(0n);
   });
 

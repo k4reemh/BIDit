@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getAdminOrders, adminOrderAction, getLedgerAudit, type AdminOrder, type LedgerAudit, type Session } from '../../api';
+import { getAdminOrders, adminOrderAction, getLedgerAudit, getWalletAudit, type AdminOrder, type LedgerAudit, type WalletAudit, type Session } from '../../api';
 
 const fmt = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 
@@ -23,8 +23,17 @@ function actionsFor(status: string): { label: string; action: string; danger?: b
 export default function AdminOrders({ session }: { session: Session | null }) {
   const [orders, setOrders] = useState<AdminOrder[] | null>(null);
   const [audit, setAudit] = useState<LedgerAudit | null>(null);
+  const [wallets, setWallets] = useState<WalletAudit | null>(null);
+  const [wBusy, setWBusy] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+
+  const reconcile = async () => {
+    setWBusy(true); setError('');
+    try { setWallets(await getWalletAudit()); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Reconcile failed.'); }
+    finally { setWBusy(false); }
+  };
 
   const load = () => {
     getAdminOrders().then(setOrders).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
@@ -63,6 +72,37 @@ export default function AdminOrders({ session }: { session: Session | null }) {
           <div><span className="muted">Ledger total (must be $0)</span><b className={audit.systemTotal === '0' ? 'ok' : 'bad'}>${audit.systemTotal}</b></div>
         </div>
       )}
+
+      <div className="card acct-card adm-recon">
+        <div className="adm-row__head">
+          <div className="adm-row__id"><b>Wallet reconciliation</b> <span className="muted">on-chain USDC vs the ledger — run before flipping to escrow</span></div>
+          <button className="btn btn-sm btn-primary" disabled={wBusy} onClick={reconcile}>{wBusy ? 'Checking…' : 'Reconcile wallets'}</button>
+        </div>
+        {wallets && (
+          <>
+            <table className="adm-recon__tbl">
+              <thead><tr><th>Wallet</th><th>On-chain</th><th>Ledger</th><th>Diff</th></tr></thead>
+              <tbody>
+                {wallets.rows.map((r) => (
+                  <tr key={r.wallet}>
+                    <td>{r.wallet}</td><td>${r.chain}</td><td>${r.ledger}</td>
+                    <td className={r.diff === '0' ? 'ok' : 'bad'}>${r.diff}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted acct-note">
+              {wallets.reconciled
+                ? '✅ Reconciled — every wallet matches its ledger account.'
+                : wallets.pendingLegs > 0
+                  ? `⏳ ${wallets.pendingLegs} on-chain leg(s) still settling — re-run once they clear.`
+                  : '⚠️ Mismatch with no pending legs — investigate before flipping to escrow.'}
+              {` · cluster: ${wallets.cluster}`}
+            </p>
+          </>
+        )}
+      </div>
+
       {error && <div className="auth__error">{error}</div>}
       {orders && orders.length === 0 && <p className="muted">No orders yet. (In direct-payout mode, sales settle instantly and won’t appear here as held orders.)</p>}
 

@@ -59,7 +59,8 @@ import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/st
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
 import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
-import { DevWalletEscrow } from '../src/escrow.js';
+import { reconcileWallets } from '../src/audit.js';
+import { DevWalletEscrow, ProgramEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
 import { ensureDepositAddress, DepositWatcher, registerAllDeposits } from '../src/deposits.js';
 import { requestWithdrawal, WithdrawalError, WithdrawalReconciler } from '../src/withdrawals.js';
@@ -195,12 +196,30 @@ async function main() {
   // Direct-payout mode (BIDIT_PAYOUT_MODE=direct): on a sale, pay the seller 100%
   // immediately — no escrow, no 5% fee. Used for the real-money friends test.
   const directPayout = process.env.BIDIT_PAYOUT_MODE === 'direct';
-  const escrow = new DevWalletEscrow(prisma);
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
+  // In escrow mode use the chain-backed ProgramEscrow (durable ChainTransfer outbox
+  // → real wallet segregation); in direct mode nothing calls escrow for settlement,
+  // so the ledger-only DevWalletEscrow suffices.
+  const escrow = directPayout ? new DevWalletEscrow(prisma) : new ProgramEscrow(chain, prisma);
   // Fail fast on an unsafe production/real-money configuration (missing/weak
   // AUTH_SECRET, a mock chain in prod, force-enabled dev endpoints, missing
   // custody secrets). Throws → main().catch → process.exit(1).
   const { isProd } = assertStartupConfig(chain.cluster);
+  // Escrow mode moves real USDC between segregated wallets — refuse to boot if any
+  // of escrow/buyback/fee collapses onto treasury (a missing *_SECRET falls back to
+  // treasury), which would silently commingle held funds and fees.
+  if (!directPayout && isProd) {
+    const addr = { treasury: chain.walletAddress('treasury'), escrow: chain.walletAddress('escrow'), buyback: chain.walletAddress('buyback'), fee: chain.walletAddress('fee') };
+    const dupes = (['escrow', 'buyback', 'fee'] as const).filter((w) => addr[w] === addr.treasury);
+    if (dupes.length > 0) {
+      throw new Error(
+        `Refusing to run escrow mode: wallet(s) ${dupes.join(', ')} fall back to treasury — set ESCROW_SECRET/BUYBACK_SECRET/FEE_SECRET to distinct keypairs.`,
+      );
+    }
+    if (new Set(Object.values(addr)).size !== 4) {
+      throw new Error('Refusing to run escrow mode: treasury/escrow/buyback/fee wallets must all be distinct.');
+    }
+  }
   if (usingDefaultAuthSecret() && chain.cluster !== 'mock') {
     console.warn('[config] ⚠️  AUTH_SECRET is the insecure default on a real chain — set a strong value before exposing this deploy.');
   }
@@ -1013,6 +1032,20 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await ledgerAudit(userId, prisma));
+      }
+      // Wallet ↔ ledger reconciliation (hits the chain 4×): the pre-flip + ongoing
+      // escrow safety check. Every wallet should equal its ledger account.
+      if (req.method === 'GET' && p === '/admin/wallet-audit') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const recon = await reconcileWallets(chain, prisma);
+        return send(res, 200, {
+          cluster: chain.cluster,
+          pendingLegs: recon.pendingLegs,
+          reconciled: recon.reconciled,
+          rows: recon.rows.map((r) => ({ wallet: r.wallet, chain: formatUsdc(r.chain), ledger: formatUsdc(r.ledger), diff: formatUsdc(r.diff) })),
+        });
       }
       // Operator-only: Private Secure Shipping reship queue. Exposes each buyer's
       // REAL address (privateLeg2) — never shown to sellers — so the operator can

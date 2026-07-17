@@ -141,7 +141,12 @@ export async function settleAuction(
       status: OrderStatus.LOCKED,
       escrowRef: ref,
       lockedAt: now,
-      noShipDeadline: new Date(now.getTime() + NO_SHIP_TIMEOUT_MS),
+      // The seller's ship-clock starts when the BUYER PAYS SHIPPING (set in
+      // createAndPayShipment), not at win — otherwise a buyer who hasn't paid
+      // shipping yet would be wrongly auto-refunded. A win the buyer never pays
+      // shipping for is instead forfeited to the seller when the ship-later hold
+      // expires (processOrderTimers). So: no deadline yet.
+      noShipDeadline: null,
     },
   });
 
@@ -456,19 +461,45 @@ export async function releaseOrdersForShipment(
 // Timers (server-driven, like the auction scheduler)
 // ---------------------------------------------------------------------------
 
+/** Buyer abandoned a win — never arranged shipping before the ship-later hold
+ *  expired. The seller keeps the item AND is paid: release the escrow to them.
+ *  LOCKED -> RELEASED. (Direct-mode orders are already RELEASED, so this only ever
+ *  applies to escrow.) */
+export async function forfeitOrder(
+  orderId: string,
+  escrow: EscrowProvider,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<Order> {
+  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+  if (order.status !== OrderStatus.LOCKED) {
+    throw new Error(`Cannot forfeit an order in ${order.status}`);
+  }
+  await escrow.release(orderId);
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { status: OrderStatus.RELEASED, releasedAt: clock.now() },
+  });
+}
+
 /**
  * Advance time-based transitions:
  *  - DISPUTE_WINDOW past its deadline with no dispute -> RELEASED (release).
- *  - LOCKED past the no-ship deadline -> CANCELED -> REFUNDED (refund).
+ *  - LOCKED past the no-ship deadline (set when the buyer PAID shipping and the
+ *    seller then didn't ship) -> CANCELED -> REFUNDED (item price back to buyer;
+ *    shipping is kept).
+ *  - LOCKED with no shipping ever paid, past the item's ship-later hold -> the
+ *    buyer abandoned it -> RELEASED to the seller (forfeit), item discarded.
  */
 export async function processOrderTimers(
   escrow: EscrowProvider,
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
-): Promise<{ released: string[]; refunded: string[] }> {
+): Promise<{ released: string[]; refunded: string[]; forfeited: string[] }> {
   const now = clock.now();
   const released: string[] = [];
   const refunded: string[] = [];
+  const forfeited: string[] = [];
 
   const toRelease = await prisma.order.findMany({
     where: { status: OrderStatus.DISPUTE_WINDOW, disputeWindowEndsAt: { lte: now } },
@@ -479,6 +510,7 @@ export async function processOrderTimers(
     released.push(id);
   }
 
+  // Seller was paid to ship (noShipDeadline set) but didn't in time → refund item.
   const unshipped = await prisma.order.findMany({
     where: { status: OrderStatus.LOCKED, noShipDeadline: { lte: now } },
     select: { id: true },
@@ -490,5 +522,20 @@ export async function processOrderTimers(
     refunded.push(id);
   }
 
-  return { released, refunded };
+  // Buyer never paid shipping and the ship-later hold has expired → forfeit to
+  // seller. (noShipDeadline is null until shipping is paid, which is how we tell
+  // "abandoned" from "paid-but-not-shipped" above.)
+  const abandoned = await prisma.fulfillmentItem.findMany({
+    where: { status: 'READY_TO_SHIP', heldUntil: { lte: now } },
+    select: { id: true, orderId: true },
+  });
+  for (const it of abandoned) {
+    const order = await prisma.order.findUnique({ where: { id: it.orderId } });
+    if (order?.status !== OrderStatus.LOCKED || order.noShipDeadline !== null) continue;
+    await forfeitOrder(it.orderId, escrow, clock, prisma);
+    await prisma.fulfillmentItem.update({ where: { id: it.id }, data: { status: 'DISCARDED', discardedAt: now } });
+    forfeited.push(it.orderId);
+  }
+
+  return { released, refunded, forfeited };
 }

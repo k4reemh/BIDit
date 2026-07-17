@@ -18,8 +18,37 @@ import { maybeVerifySeller } from './seller-verify.js';
 
 const DAY_MS = 86_400_000;
 export const SHIP_LATER_HOLD_MS = 14 * DAY_MS; // seller holds a "ship later" win up to 2 weeks
+/** Once the buyer pays shipping, the seller has this many BUSINESS days to ship a
+ *  won item before the escrow is refunded (see processOrderTimers). */
+export const NO_SHIP_BUSINESS_DAYS = 7;
 /** Fallback weight for a sleeved card + mailer when the seller didn't estimate. */
 const DEFAULT_WEIGHT_G = 60;
+
+/** Add N business days (skipping Sat/Sun) to a date. Holidays are ignored — fine
+ *  for the beta's no-ship deadline. */
+export function addBusinessDays(from: Date, n: number): Date {
+  const d = new Date(from.getTime());
+  let added = 0;
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) added += 1;
+  }
+  return d;
+}
+
+/** Start the seller's ship-by clock on any LOCKED (escrow) order behind these
+ *  items — the buyer just paid shipping, so the seller has NO_SHIP_BUSINESS_DAYS
+ *  to ship before the escrow is refunded. No-op for direct-mode orders (RELEASED). */
+async function startSellerShipClock(itemIds: string[], clock: Clock, prisma: PrismaClient): Promise<void> {
+  const items = await prisma.fulfillmentItem.findMany({ where: { id: { in: itemIds } }, select: { orderId: true } });
+  const orderIds = [...new Set(items.map((i) => i.orderId))];
+  if (orderIds.length === 0) return;
+  await prisma.order.updateMany({
+    where: { id: { in: orderIds }, status: 'LOCKED', noShipDeadline: null },
+    data: { noShipDeadline: addBusinessDays(clock.now(), NO_SHIP_BUSINESS_DAYS) },
+  });
+}
 
 export type ShipMode = 'STANDARD' | 'WEEKLY_BUNDLE' | 'SHIP_LATER' | 'PRIVATE';
 
@@ -166,6 +195,7 @@ export async function applyWeeklyBundling(
     where: { id: item.id },
     data: { status: 'IN_SHIPMENT', shipmentId: shipment.id },
   });
+  await startSellerShipClock([item.id], clock, prisma);
   if (offersBundling) {
     // Open the week so the buyer's later wins from this seller ride free.
     await prisma.weeklyShippingPass.create({
@@ -324,6 +354,7 @@ export async function createAndPayShipment(
     where: { id: { in: ids } },
     data: { status: 'IN_SHIPMENT', shipmentId: shipment.id },
   });
+  await startSellerShipClock(ids, clock, prisma);
 
   return prisma.shipment.findUniqueOrThrow({ where: { id: shipment.id } });
 }
@@ -567,7 +598,11 @@ export async function discardItem(
   });
 }
 
-/** Auto-discard items whose 7-day seller hold expired with no buyer action. */
+/** Auto-discard items whose ship-later hold expired with no buyer action. Escrow
+ *  orders still LOCKED are left for the order timer, which forfeits them to the
+ *  seller (releasing the escrow) rather than plain-discarding — otherwise the
+ *  escrowed item price would be stranded. Direct-mode orders (already RELEASED)
+ *  just discard: the buyer forfeits, the seller keeps the card. */
 export async function processFulfillmentTimers(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
@@ -575,16 +610,16 @@ export async function processFulfillmentTimers(
   const now = clock.now();
   const expired = await prisma.fulfillmentItem.findMany({
     where: { status: 'READY_TO_SHIP', heldUntil: { lte: now } },
-    select: { id: true },
+    select: { id: true, orderId: true },
   });
-  const ids = expired.map((e) => e.id);
-  if (ids.length > 0) {
-    await prisma.fulfillmentItem.updateMany({
-      where: { id: { in: ids } },
-      data: { status: 'DISCARDED', discardedAt: now },
-    });
+  const discarded: string[] = [];
+  for (const it of expired) {
+    const order = await prisma.order.findUnique({ where: { id: it.orderId }, select: { status: true } });
+    if (order?.status === 'LOCKED') continue; // escrow: forfeited by the order timer
+    await prisma.fulfillmentItem.update({ where: { id: it.id }, data: { status: 'DISCARDED', discardedAt: now } });
+    discarded.push(it.id);
   }
-  return { discarded: ids };
+  return { discarded };
 }
 
 function isUniqueViolation(err: unknown): boolean {
