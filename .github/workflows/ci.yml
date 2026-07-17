@@ -18,6 +18,11 @@ jobs:
     name: typecheck · test · build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Prisma resolves env("DATABASE_URL") during generate/validate, and CI has no
+      # .env (it's gitignored). A dummy is fine: `validate` never connects, and the
+      # test suite overrides this with its own embedded-Postgres URL (with-db.ts).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
 
