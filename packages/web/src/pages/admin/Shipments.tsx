@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getLabelQueue, createLabel, type LabelQueueRow, type OriginAddr, type Session } from '../../api';
+import {
+  getLabelQueue,
+  createLabel,
+  getInflightShipments,
+  adminMarkShipped,
+  adminMarkDelivered,
+  adminReleaseNow,
+  type LabelQueueRow,
+  type InflightShipment,
+  type OriginAddr,
+  type Session,
+} from '../../api';
 
 interface Addr { name?: string; line1?: string; line2?: string; city?: string; region?: string; postal?: string; country?: string }
 
@@ -16,8 +27,12 @@ const sizeOf = (d: LabelQueueRow['dims']) => (d.lengthCm ? `${d.lengthCm} × ${d
 
 export default function AdminShipments({ session }: { session: Session | null }) {
   const [queue, setQueue] = useState<LabelQueueRow[] | null>(null);
+  const [inflight, setInflight] = useState<InflightShipment[]>([]);
   const [error, setError] = useState('');
-  const load = () => getLabelQueue().then(setQueue).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+  const load = () => {
+    getLabelQueue().then(setQueue).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getInflightShipments().then(setInflight).catch(() => {});
+  };
   useEffect(() => { if (session?.isAdmin) void load(); }, [session?.isAdmin]);
 
   if (!session) return <Gate>Sign in with an admin account.</Gate>;
@@ -35,9 +50,56 @@ export default function AdminShipments({ session }: { session: Session | null })
         <p className="muted">Packages a seller has confirmed and that need a label. Buy the carrier label (seller&nbsp;→&nbsp;buyer, at the size shown), paste its link and tracking number, and hit “Label created” — the seller is emailed to print and ship it.</p>
       </div>
       {error && <div className="auth__error">{error}</div>}
+
+      <h2 className="acct-sub" style={{ marginBottom: 12 }}>Needs a label</h2>
       {queue && queue.length === 0 && <p className="muted">Nothing waiting for a label right now. 🎉</p>}
       {(queue ?? []).map((row) => <QueueCard key={row.id} row={row} onDone={load} />)}
+
+      {inflight.length > 0 && (
+        <>
+          <h2 className="acct-sub" style={{ margin: '30px 0 4px' }}>Test controls</h2>
+          <p className="muted ship-sec__hint" style={{ marginBottom: 12 }}>Shippo advances these automatically in production — use these to drive a package through shipped → delivered → released by hand while testing.</p>
+          {inflight.map((s) => <InflightRow key={s.id} s={s} onDone={load} setError={setError} />)}
+        </>
+      )}
     </main>
+  );
+}
+
+function InflightRow({ s, onDone, setError }: { s: InflightShipment; onDone: () => void; setError: (m: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true); setError('');
+    try { await fn(); onDone(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Action failed.'); setBusy(false); }
+  };
+  const pill = s.status === 'LABEL_CREATED' ? { txt: 'Label ready', cls: 'is-ready' }
+    : s.status === 'SHIPPED' ? { txt: 'In transit', cls: 'is-pending' }
+    : { txt: 'Delivered', cls: 'is-ready' };
+  return (
+    <div className="card acct-card adm-lbl">
+      <div className="adm-lbl__head" style={{ cursor: 'default' }}>
+        <div className="adm-lbl__sum">
+          <b>To @{s.buyerHandle}</b>
+          <span className="muted"> · {s.items.map((i) => i.title).join(', ')} · from @{s.sellerHandle}</span>
+        </div>
+        <span className={`ship-pill ${pill.cls}`}>{pill.txt}</span>
+      </div>
+      <div className="adm-lbl__body" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+        <div className="acct-actions">
+          {s.status === 'LABEL_CREATED' && (
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => run(() => adminMarkShipped(s.id))}>Mark shipped</button>
+          )}
+          {s.status === 'SHIPPED' && (
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => run(() => adminMarkDelivered(s.id))}>Mark delivered</button>
+          )}
+          {s.releasable && (
+            <button className="btn btn-sm btn-ghost" disabled={busy} onClick={() => run(() => adminReleaseNow(s.id))}>Release payment now</button>
+          )}
+          {s.status === 'DELIVERED' && !s.releasable && <span className="muted" style={{ alignSelf: 'center', fontSize: 12.5 }}>Released / resolved.</span>}
+        </div>
+      </div>
+    </div>
   );
 }
 

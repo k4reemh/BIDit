@@ -250,6 +250,24 @@ export const getLabelQueue = () => req<LabelQueueRow[]>('/admin/label-queue');
 export const createLabel = (shipmentId: string, labelUrl: string, trackingNumber: string, carrier?: string) =>
   req<Shipment>('/admin/shipment/label', { method: 'POST', body: JSON.stringify({ shipmentId, labelUrl, trackingNumber, carrier }) });
 
+// Admin test controls — drive the shipment pipeline by hand (Shippo does this in prod).
+export interface InflightShipment {
+  id: string;
+  status: string; // LABEL_CREATED | SHIPPED | DELIVERED
+  buyerHandle: string | null;
+  sellerHandle: string | null;
+  trackingNumber: string | null;
+  releasable: boolean;
+  items: { id: string; title: string }[];
+}
+export const getInflightShipments = () => req<InflightShipment[]>('/admin/shipments/inflight');
+export const adminMarkShipped = (shipmentId: string) =>
+  req<{ ok: boolean }>('/admin/shipment/mark-shipped', { method: 'POST', body: JSON.stringify({ shipmentId }) });
+export const adminMarkDelivered = (shipmentId: string) =>
+  req<{ ok: boolean }>('/admin/shipment/mark-delivered', { method: 'POST', body: JSON.stringify({ shipmentId }) });
+export const adminReleaseNow = (shipmentId: string) =>
+  req<{ ok: boolean }>('/admin/shipment/release-now', { method: 'POST', body: JSON.stringify({ shipmentId }) });
+
 export interface LedgerAudit {
   accounts: { id: string; kind: string; handle: string | null; balance: string }[];
   systemTotal: string;

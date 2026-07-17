@@ -72,6 +72,7 @@ import {
   processOrderTimers,
   advanceOrdersForShipment,
   disputeShipment,
+  releaseOrdersForShipment,
   type DisputeOutcome,
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
@@ -81,6 +82,7 @@ import {
   getSellerHeldItems,
   listPrivateShipments,
   listLabelQueue,
+  listInflightShipments,
   shipmentItems,
   createAndPayShipment,
   estimateShipment,
@@ -1090,6 +1092,75 @@ async function main() {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+      // Operator TEST controls — drive the pipeline by hand (Shippo normally does
+      // this). List in-flight packages + step them shipped → delivered → released.
+      if (req.method === 'GET' && p === '/admin/shipments/inflight') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const inflight = await listInflightShipments(prisma);
+        const out = await Promise.all(
+          inflight.map(async (s) => {
+            const [items, buyer, seller, fitems] = await Promise.all([
+              shipmentItems(s.id, prisma),
+              prisma.user.findUnique({ where: { id: s.buyerId }, select: { handle: true } }),
+              prisma.user.findUnique({ where: { id: s.sellerId }, select: { handle: true } }),
+              prisma.fulfillmentItem.findMany({ where: { shipmentId: s.id }, select: { orderId: true } }),
+            ]);
+            const orderIds = [...new Set(fitems.map((f) => f.orderId))];
+            const orders = orderIds.length
+              ? await prisma.order.findMany({ where: { id: { in: orderIds } }, select: { status: true } })
+              : [];
+            return {
+              id: s.id,
+              status: s.status,
+              buyerHandle: buyer?.handle ?? null,
+              sellerHandle: seller?.handle ?? null,
+              trackingNumber: s.trackingNumber,
+              // Can we release now? Only if a linked order is in the dispute window.
+              releasable: orders.some((o) => o.status === 'DISPUTE_WINDOW'),
+              items: items.map((it) => ({ id: it.id, title: it.title })),
+            };
+          }),
+        );
+        return send(res, 200, out);
+      }
+      if (req.method === 'POST' && p === '/admin/shipment/mark-shipped') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        const s = await prisma.shipment.findUnique({ where: { id: String(b.shipmentId ?? '') } });
+        if (!s) return send(res, 404, { error: 'Shipment not found.' });
+        if (s.status !== 'LABEL_CREATED') return send(res, 400, { error: `Can’t ship a package that is ${s.status}.` });
+        await prisma.shipment.update({ where: { id: s.id }, data: { status: 'SHIPPED', shippedAt: new Date() } });
+        await prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
+        await advanceOrdersForShipment(s.id, 'SHIPPED', systemClock, prisma);
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && p === '/admin/shipment/mark-delivered') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        try {
+          await markShipmentDelivered(String(b.shipmentId ?? ''), systemClock, prisma);
+          await advanceOrdersForShipment(String(b.shipmentId ?? ''), 'DISPUTE_WINDOW', systemClock, prisma);
+          return send(res, 200, { ok: true });
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/admin/shipment/release-now') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        const released = await releaseOrdersForShipment(String(b.shipmentId ?? ''), escrow, systemClock, prisma);
+        if (released.length === 0) return send(res, 400, { error: 'Nothing to release — no order is in the dispute window.' });
+        return send(res, 200, { ok: true, released: released.length });
       }
       if (req.method === 'GET' && p === '/admin/orders') {
         const userId = authUser(req);

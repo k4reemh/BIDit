@@ -431,6 +431,27 @@ export async function releaseOrder(
   });
 }
 
+/** Release now (skip the dispute-window wait) every DISPUTE_WINDOW order in a
+ *  shipment. Returns the released order ids. Used by the admin test controls. */
+export async function releaseOrdersForShipment(
+  shipmentId: string,
+  escrow: EscrowProvider,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<string[]> {
+  const items = await prisma.fulfillmentItem.findMany({ where: { shipmentId }, select: { orderId: true } });
+  const orderIds = [...new Set(items.map((i) => i.orderId))];
+  const released: string[] = [];
+  for (const id of orderIds) {
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (order?.status === OrderStatus.DISPUTE_WINDOW) {
+      await releaseOrder(id, escrow, clock, prisma);
+      released.push(id);
+    }
+  }
+  return released;
+}
+
 // ---------------------------------------------------------------------------
 // Timers (server-driven, like the auction scheduler)
 // ---------------------------------------------------------------------------

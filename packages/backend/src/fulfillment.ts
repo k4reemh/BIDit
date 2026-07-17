@@ -222,6 +222,16 @@ export function getSellerHeldItems(sellerId: string, prisma: PrismaClient = defa
   });
 }
 
+/** Operator test view: shipments moving through the pipeline (post-label) that an
+ *  admin can drive by hand — normally Shippo advances these automatically. */
+export function listInflightShipments(prisma: PrismaClient = defaultPrisma) {
+  return prisma.shipment.findMany({
+    where: { status: { in: ['LABEL_CREATED', 'SHIPPED', 'DELIVERED'] } },
+    orderBy: { createdAt: 'asc' },
+    take: 100,
+  });
+}
+
 /** Operator queue: packages a seller has confirmed that need a label generated
  *  (LABEL_PENDING). The operator makes the label, then calls createShipmentLabel. */
 export function listLabelQueue(prisma: PrismaClient = defaultPrisma) {

@@ -3,7 +3,7 @@ import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { placeBid, closeDueAuctions } from '../src/auction.js';
-import { settleAuction, processOrderTimers, disputeShipment, DISPUTE_WINDOW_MS } from '../src/orders.js';
+import { settleAuction, processOrderTimers, disputeShipment, releaseOrdersForShipment, DISPUTE_WINDOW_MS } from '../src/orders.js';
 import { createAndPayShipment, confirmShipmentForLabel, createShipmentLabel } from '../src/fulfillment.js';
 import { ShipmentTracker, MockTrackingProvider } from '../src/tracking.js';
 import { getSettledBalance, getBuybackPending, getSystemTotal } from '../src/ledger.js';
@@ -89,5 +89,19 @@ describe('shipment tracking → delivery → escrow release', () => {
     clock.advance(DISPUTE_WINDOW_MS + 1000);
     expect((await processOrderTimers(escrow, clock, prisma)).released).not.toContain(order.id);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.DISPUTED);
+  });
+
+  it('admin release-now releases the escrow immediately, skipping the 2-day wait', async () => {
+    const clock = new ManualClock(T0);
+    const { escrow, order, shipment, sellerId } = await shippedEscrowOrder(clock);
+    const provider = new MockTrackingProvider();
+    provider.set('TRK1', 'delivered');
+    await new ShipmentTracker(provider, prisma, clock).tick();
+
+    // No clock advance — release right away (as the admin test control does).
+    expect(await releaseOrdersForShipment(shipment.id, escrow, clock, prisma)).toContain(order.id);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.RELEASED);
+    const sellerAcct = (await prisma.account.findUniqueOrThrow({ where: { userId: sellerId } })).id;
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // 95%
   });
 });
