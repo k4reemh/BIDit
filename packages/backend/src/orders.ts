@@ -14,7 +14,7 @@ import { AuctionStatus, OrderStatus, ListingStatus, splitAmount, formatUsdc } fr
 import type { Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
-import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
+import { getOrCreateUserAccount, settleDirectSale, escrowSettleApplied, escrowLockApplied } from './ledger.js';
 import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
 import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
@@ -270,6 +270,26 @@ async function transition(
   return prisma.order.update({ where: { id: orderId }, data });
 }
 
+/**
+ * Atomically CLAIM a status transition: flip the status only if the order is still
+ * in an expected pre-state, in one conditional write. Returns true iff THIS call
+ * won it. The DB serializes the update, so exactly one racer wins — this is what
+ * makes escrow release and refund mutually exclusive (a dispute racing the
+ * auto-release timer can't drive one order to both a payout AND a refund). The
+ * money move is done ONLY after a won claim; the shared ledger idempotency key
+ * (escrowSettleKey) is the final backstop, and processOrderTimers re-runs the
+ * idempotent move for any order that crashed between the claim and the move.
+ */
+async function claimTransition(
+  prisma: PrismaClient,
+  orderId: string,
+  from: OrderStatus[],
+  data: Parameters<PrismaClient['order']['updateMany']>[0]['data'],
+): Promise<boolean> {
+  const res = await prisma.order.updateMany({ where: { id: orderId, status: { in: from } }, data });
+  return res.count === 1;
+}
+
 /** Seller submits tracking. LOCKED -> SHIPPED. */
 export function markShipped(
   orderId: string,
@@ -312,16 +332,18 @@ export async function openDispute(
   if (order.disputeWindowEndsAt && clock.now().getTime() > order.disputeWindowEndsAt.getTime()) {
     throw new Error('Dispute window has closed');
   }
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.DISPUTED,
-      disputedAt: clock.now(),
-      disputeReason: report?.reason ?? null,
-      disputeDetail: report?.detail ?? null,
-      disputePhotos: report?.photos ?? [],
-    },
+  // Atomically claim DISPUTE_WINDOW → DISPUTED. If the auto-release timer already
+  // released this order (racing us), the claim wins 0 rows and we reject the dispute
+  // rather than letting both a dispute and a release proceed.
+  const won = await claimTransition(prisma, orderId, [OrderStatus.DISPUTE_WINDOW], {
+    status: OrderStatus.DISPUTED,
+    disputedAt: clock.now(),
+    disputeReason: report?.reason ?? null,
+    disputeDetail: report?.detail ?? null,
+    disputePhotos: report?.photos ?? [],
   });
+  if (!won) throw new Error('This order can no longer be disputed — it was already resolved.');
+  return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 
 /**
@@ -399,23 +421,19 @@ export async function resolveDispute(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Order> {
-  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-  if (order.status !== OrderStatus.DISPUTED) {
-    throw new Error(`Order is not disputed (${order.status})`);
-  }
   const now = clock.now();
+  // Claim DISPUTED → terminal atomically, THEN move money. The claim is the gate:
+  // only one outcome (release or refund) can win it, so escrow can't be double-moved.
   if (outcome === 'RELEASE') {
+    const won = await claimTransition(prisma, orderId, [OrderStatus.DISPUTED], { status: OrderStatus.RELEASED, releasedAt: now });
+    if (!won) throw new Error('Order is not disputed (already resolved).');
     await escrow.release(orderId);
-    return prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.RELEASED, releasedAt: now },
-    });
+  } else {
+    const won = await claimTransition(prisma, orderId, [OrderStatus.DISPUTED], { status: OrderStatus.REFUNDED, refundedAt: now });
+    if (!won) throw new Error('Order is not disputed (already resolved).');
+    await escrow.refund(orderId);
   }
-  await escrow.refund(orderId);
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: OrderStatus.REFUNDED, refundedAt: now },
-  });
+  return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 
 /** Release escrow once the dispute window passes (timer) or by admin. */
@@ -425,15 +443,13 @@ export async function releaseOrder(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Order> {
-  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-  if (order.status !== OrderStatus.DISPUTE_WINDOW) {
-    throw new Error(`Cannot release an order in ${order.status}`);
-  }
+  // Claim DISPUTE_WINDOW → RELEASED atomically. If a buyer disputed first (racing
+  // this timer), the claim wins 0 rows and we do NOT release — the dispute path owns
+  // the outcome. Money moves only after a won claim.
+  const won = await claimTransition(prisma, orderId, [OrderStatus.DISPUTE_WINDOW], { status: OrderStatus.RELEASED, releasedAt: clock.now() });
+  if (!won) return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   await escrow.release(orderId);
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: OrderStatus.RELEASED, releasedAt: clock.now() },
-  });
+  return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 
 /** Release now (skip the dispute-window wait) every DISPUTE_WINDOW order in a
@@ -471,15 +487,12 @@ export async function forfeitOrder(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Order> {
-  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-  if (order.status !== OrderStatus.LOCKED) {
-    throw new Error(`Cannot forfeit an order in ${order.status}`);
-  }
+  // Claim LOCKED → RELEASED atomically (guards against a concurrent ship/refund on
+  // the same abandoned order), THEN release the escrow to the seller.
+  const won = await claimTransition(prisma, orderId, [OrderStatus.LOCKED], { status: OrderStatus.RELEASED, releasedAt: clock.now() });
+  if (!won) return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   await escrow.release(orderId);
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: OrderStatus.RELEASED, releasedAt: clock.now() },
-  });
+  return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 
 /**
@@ -501,6 +514,28 @@ export async function processOrderTimers(
   const refunded: string[] = [];
   const forfeited: string[] = [];
 
+  // 0. Crash recovery: an order whose status was flipped terminal (RELEASED/
+  //    REFUNDED) but whose escrow move never posted — a crash in the tiny window
+  //    between the atomic claim and the money move. Re-run the idempotent settle so
+  //    no escrowed order is left half-applied. Only escrow-locked orders qualify
+  //    (direct-payout orders are RELEASED without ever escrowing).
+  const since = new Date(now.getTime() - DAY_MS);
+  const maybeUnsettled = await prisma.order.findMany({
+    where: {
+      OR: [
+        { status: OrderStatus.RELEASED, releasedAt: { gte: since } },
+        { status: OrderStatus.REFUNDED, refundedAt: { gte: since } },
+      ],
+    },
+    select: { id: true, status: true },
+  });
+  for (const o of maybeUnsettled) {
+    if (!(await escrowLockApplied(o.id, prisma))) continue; // direct order — never escrowed
+    if (await escrowSettleApplied(o.id, prisma)) continue; // already settled
+    if (o.status === OrderStatus.RELEASED) await escrow.release(o.id);
+    else await escrow.refund(o.id);
+  }
+
   const toRelease = await prisma.order.findMany({
     where: { status: OrderStatus.DISPUTE_WINDOW, disputeWindowEndsAt: { lte: now } },
     select: { id: true },
@@ -516,7 +551,9 @@ export async function processOrderTimers(
     select: { id: true },
   });
   for (const { id } of unshipped) {
-    await prisma.order.update({ where: { id }, data: { status: OrderStatus.CANCELED, canceledAt: now } });
+    // Claim LOCKED → CANCELED atomically, THEN refund, THEN mark REFUNDED. The claim
+    // gates the money move (a concurrent ship/forfeit on the same order can't also fire).
+    if (!(await claimTransition(prisma, id, [OrderStatus.LOCKED], { status: OrderStatus.CANCELED, canceledAt: now }))) continue;
     await escrow.refund(id);
     await prisma.order.update({ where: { id }, data: { status: OrderStatus.REFUNDED, refundedAt: now } });
     refunded.push(id);

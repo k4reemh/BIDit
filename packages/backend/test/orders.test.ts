@@ -284,6 +284,61 @@ describe('dispute resolved as RELEASE pays the seller', () => {
   });
 });
 
+describe('escrow release/refund are mutually exclusive (M2 — no double-spend)', () => {
+  it('firing BOTH the release and the refund on one order pays out only once', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId, buyer } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!; // LOCKED, $20 in escrow
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20'));
+
+    // The TOCTOU the audit found: both terminal money moves fire on the same order.
+    // The SHARED ledger idempotency key means only the first posts.
+    await escrow.release(order.id);
+    await escrow.refund(order.id); // deduped — must NOT also pay out
+
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n); // not -$20 (no drain)
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // release won
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('80')); // buyer NOT refunded on top
+    expect(await getSystemTotal(prisma)).toBe(0n); // double-entry intact
+  });
+
+  it('a dispute+refund makes the racing auto-release timer a no-op (CAS gate)', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId, buyer } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    await markShipped(order.id, 'T', clock, prisma);
+    await markDelivered(order.id, clock, prisma); // DISPUTE_WINDOW
+    await openDispute(order.id, undefined, clock, prisma); // -> DISPUTED
+    await resolveDispute(order.id, 'REFUND', escrow, clock, prisma); // refund wins
+
+    // The timer had read DISPUTE_WINDOW before the dispute; now it fires. The CAS
+    // claim (from DISPUTE_WINDOW) matches 0 rows → no release, no double-spend.
+    const late = await releaseOrder(order.id, escrow, clock, prisma);
+    expect(late.status).toBe(OrderStatus.REFUNDED);
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('100')); // refunded once
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(0n); // seller not paid
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+
+  it('processOrderTimers finishes a settle that crashed after the status flip', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!; // LOCKED, $20 escrowed
+    // Simulate a crash: status flipped RELEASED but the escrow move never ran.
+    await prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.RELEASED, releasedAt: clock.now() } });
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20')); // still stuck
+
+    await processOrderTimers(escrow, clock, prisma); // recovery pass re-runs the idempotent move
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+});
+
 describe('guards', () => {
   it('rejects out-of-order transitions', async () => {
     const clock = new ManualClock(T0);

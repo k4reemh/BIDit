@@ -568,13 +568,32 @@ export async function escrowLock(
  *          -> 1%  operator fee  = FEE account      (PLATFORM_FEE)
  * All four legs sum to zero. Idempotent per order.
  */
+/** The ONE idempotency key for an order's terminal escrow move. Release and refund
+ *  are mutually-exclusive outcomes, so they SHARE this key: the ledger's unique
+ *  constraint then guarantees at most one of them ever posts for a given order —
+ *  a disputed order racing the auto-release timer can never drain escrow twice. */
+export const escrowSettleKey = (orderId: string) => `escrow-settle:${orderId}`;
+
+/** Whether an order's terminal escrow move (release OR refund) has already posted.
+ *  Used by the order-timer crash-recovery pass to finish a half-applied settle. */
+export async function escrowSettleApplied(orderId: string, reader: Reader = defaultPrisma): Promise<boolean> {
+  return alreadyApplied(escrowSettleKey(orderId), reader);
+}
+
+/** Whether an order's escrow LOCK posted — i.e. its funds actually entered escrow.
+ *  Direct-payout orders never lock, so this lets recovery skip them (re-releasing a
+ *  direct order would post an escrow move against funds that were never escrowed). */
+export async function escrowLockApplied(orderId: string, reader: Reader = defaultPrisma): Promise<boolean> {
+  return alreadyApplied(`escrow-lock:${orderId}`, reader);
+}
+
 export async function escrowRelease(
   params: { sellerAccountId: string; amount: Micros; orderId: string; chainLegs?: ChainLeg[] },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ sellerProceeds: bigint; buybackFee: bigint; platformFee: bigint }> {
   assertPositive(params.amount);
   const { sellerProceeds, buybackFee, platformFee } = splitSale(params.amount);
-  const key = `escrow-release:${params.orderId}`;
+  const key = escrowSettleKey(params.orderId);
   if (!(await alreadyApplied(key, prisma))) {
     try {
       await prisma.$transaction(async (tx) => {
@@ -624,7 +643,7 @@ export async function escrowRefund(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
-  const key = `escrow-refund:${params.orderId}`;
+  const key = escrowSettleKey(params.orderId); // SHARED with release — release XOR refund
   if (await alreadyApplied(key, prisma)) return;
   try {
     await prisma.$transaction(async (tx) => {
