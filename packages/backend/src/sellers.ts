@@ -14,6 +14,16 @@ import { systemClock, type Clock } from './clock.js';
 export const DEMO_TITLE = 'Charizard — Base Set Holo';
 export const DEMO_IMAGE = 'https://images.pokemontcg.io/base1/4_hires.png';
 
+/** A user-facing seller/coin conflict (e.g. a coin already linked elsewhere). 409
+ *  so it's distinct from a plain auth failure; the top-level handler reads `status`. */
+export class SellerError extends Error {
+  readonly status = 409;
+  constructor(message: string) {
+    super(message);
+    this.name = 'SellerError';
+  }
+}
+
 export interface ResolvedRoom {
   room: string;
   sellerHandle: string;
@@ -38,11 +48,11 @@ export async function resolveRoomByCoin(
   return { room: profile.user.id, sellerHandle: profile.user.handle };
 }
 
-/** Give `coinAddress` exclusively to `sellerId`, releasing it from anyone else who
- *  had claimed it. Without this a coin re-used across accounts (repeat signups, the
- *  demo-seed path) leaves multiple profiles pointing at it and resolveRoomByCoin
- *  can hand a buyer a *stale* seller's room — so they never see the active seller's
- *  auctions. Claiming the coin makes the mapping one-to-one and resolution correct. */
+/** Force-give `coinAddress` to `sellerId`, releasing it from anyone else who had it.
+ *  This is a TRUSTED move — it can silently steal a coin from another seller, so it
+ *  is only reachable from paths that have already established authority: the admin
+ *  seed (`linkCoinToSeller`) and the admin reassign endpoint (`reassignCoin`). The
+ *  self-serve seller path (`setSellerCoin`) must NOT use it — see that function. */
 async function claimCoin(sellerId: string, coin: string, prisma: PrismaClient): Promise<void> {
   await prisma.sellerProfile.updateMany({
     where: { pumpCoinAddress: coin, NOT: { userId: sellerId } },
@@ -106,18 +116,50 @@ export async function seedRunningAuction(
   return auctionId;
 }
 
-/** Seller sets the Pump coin they stream on. Does NOT grant verification. */
+/** Seller sets the Pump coin they stream on. Does NOT grant verification.
+ *  FIRST-CLAIM-WINS: a coin already linked to another seller CANNOT be taken over
+ *  here — only an admin can move it (`reassignCoin`). Without this, any logged-in
+ *  caller could point a victim's coin at their own room and reroute the victim's
+ *  buyers' USDC (a coin resolves to exactly one seller via `resolveRoomByCoin`).
+ *  Clearing your own coin (empty string) and re-affirming your own are always fine. */
 export async function setSellerCoin(
   sellerId: string,
   coinAddress: string,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   const coin = coinAddress.trim();
-  if (coin) await claimCoin(sellerId, coin, prisma);
+  if (coin) {
+    const owner = await prisma.sellerProfile.findFirst({
+      where: { pumpCoinAddress: coin, NOT: { userId: sellerId } },
+      select: { userId: true },
+    });
+    if (owner) {
+      throw new SellerError('That coin is already linked to another seller. If it’s yours, contact support to move it.');
+    }
+  }
   await prisma.sellerProfile.upsert({
     where: { userId: sellerId },
     update: { pumpCoinAddress: coin || null },
     create: { userId: sellerId, pumpCoinAddress: coin || null },
+  });
+}
+
+/** Admin-only: force-move `coinAddress` to `sellerId`, releasing it from any other
+ *  seller. This is the ONLY way a claimed coin changes hands (legit ownership
+ *  transfers / dispute resolution). The target must already be a seller. */
+export async function reassignCoin(
+  sellerId: string,
+  coinAddress: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const coin = coinAddress.trim();
+  if (!coin) throw new SellerError('Provide the coin address to reassign.');
+  await requireSeller(sellerId, prisma);
+  await claimCoin(sellerId, coin, prisma);
+  await prisma.sellerProfile.upsert({
+    where: { userId: sellerId },
+    update: { pumpCoinAddress: coin },
+    create: { userId: sellerId, pumpCoinAddress: coin },
   });
 }
 

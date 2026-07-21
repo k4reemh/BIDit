@@ -1319,6 +1319,9 @@ img { display: block; max-width: 100%; }
 .adm-row__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 18px; font-size: 13px; }
 .adm-row__grid b { color: var(--muted); font-weight: 600; margin-right: 5px; }
 .adm-row__pitch { margin-top: 10px; font-style: italic; font-size: 13.5px; }
+.adm-reassign { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.adm-reassign__in { flex: 1; min-width: 200px; padding: 7px 10px; font-size: 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); }
+.adm-reassign__msg { font-size: 12.5px; }
 @media (max-width: 640px) { .adm-row__grid { grid-template-columns: 1fr; } }
 .adm-nav { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 10px; }
 .adm-nav a { color: var(--muted); font-weight: 600; text-decoration: none; }

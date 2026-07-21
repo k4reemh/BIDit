@@ -174,6 +174,11 @@ export const getSellerApplications = () => req<SellerApplication[]>('/admin/sell
 export const verifySellerAdmin = (sellerUserId: string) =>
   req<{ ok: boolean }>('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
 
+/** Admin-only: force-move a pump.fun coin to a seller (the only way a claimed coin
+ *  changes hands — self-serve claiming is first-claim-wins). */
+export const adminReassignCoin = (sellerUserId: string, coinAddress: string) =>
+  req<{ ok: boolean }>('/admin/seller-coin', { method: 'POST', body: JSON.stringify({ sellerUserId, coinAddress }) });
+
 // ---- launch "$100 to sell" promo ----
 export interface PromoState {
   active: boolean;

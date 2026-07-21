@@ -40,6 +40,7 @@ import {
   applyAsSeller,
   submitSellerOnboarding,
   isAdmin,
+  requireSeller,
   AuthError,
   revokeUserSessions,
   loadSessionRevocations,
@@ -52,6 +53,7 @@ import {
   linkCoinToSeller,
   seedRunningAuction,
   setSellerCoin,
+  reassignCoin,
   startAuctionFromListing,
 } from '../src/sellers.js';
 import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
@@ -768,6 +770,7 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/coin') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
         const b = await readJson(req);
         await setSellerCoin(userId, String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
@@ -777,6 +780,7 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/stream-settings') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
         const b = await readJson(req);
         const clip = (v: unknown, max: number) =>
           typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
@@ -794,6 +798,7 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/shipping-settings') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
         const b = await readJson(req);
         const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
         const data = {
@@ -931,6 +936,7 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/giveaway') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
         const b = await readJson(req);
         try {
           const durationMs = b.durationSeconds ? Number(b.durationSeconds) * 1000 : undefined;
@@ -1017,6 +1023,16 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
         await verifySeller(userId, String(b.sellerUserId), prisma);
+        return send(res, 200, { ok: true });
+      }
+      // Admin: force-move a pump.fun coin to a seller. The ONLY way a claimed coin
+      // changes hands — sellers self-serve is first-claim-wins (see setSellerCoin).
+      if (req.method === 'POST' && p === '/admin/seller-coin') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        await reassignCoin(String(b.sellerUserId ?? ''), String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
       }
       if (req.method === 'GET' && p === '/admin/audit') {

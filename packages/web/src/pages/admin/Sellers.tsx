@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getSellerApplications, verifySellerAdmin, getAdminPromo, markPromoPaid, type SellerApplication, type AdminPromo, type Session } from '../../api';
+import { getSellerApplications, verifySellerAdmin, adminReassignCoin, getAdminPromo, markPromoPaid, type SellerApplication, type AdminPromo, type Session } from '../../api';
 import { Check } from '../../icons';
 
 const fmt = (ms: number | null) =>
@@ -93,10 +93,10 @@ export default function AdminSellers({ session }: { session: Session | null }) {
 
       <h2 className="acct-sub" style={{ fontSize: 16, marginTop: 26 }}>Unverified · {pending.length}</h2>
       {rows && pending.length === 0 && <p className="muted">No unverified sellers.</p>}
-      {pending.map((r) => <Row key={r.userId} r={r} onVerify={verify} busy={busy === r.userId} />)}
+      {pending.map((r) => <Row key={r.userId} r={r} onVerify={verify} busy={busy === r.userId} onDone={load} />)}
 
       {verified.length > 0 && <h2 className="acct-sub" style={{ fontSize: 16, marginTop: 26 }}>Verified · {verified.length}</h2>}
-      {verified.map((r) => <Row key={r.userId} r={r} onVerify={verify} busy={busy === r.userId} />)}
+      {verified.map((r) => <Row key={r.userId} r={r} onVerify={verify} busy={busy === r.userId} onDone={load} />)}
     </main>
   );
 }
@@ -110,7 +110,7 @@ function Gate({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Row({ r, onVerify, busy }: { r: SellerApplication; onVerify: (id: string) => void; busy: boolean }) {
+function Row({ r, onVerify, busy, onDone }: { r: SellerApplication; onVerify: (id: string) => void; busy: boolean; onDone: () => void }) {
   const s = r.socials ?? {};
   const socialStr = [s.x && `X ${s.x}`, s.instagram && `IG ${s.instagram}`, s.tiktok && `TT ${s.tiktok}`].filter(Boolean).join(' · ');
   return (
@@ -141,6 +141,30 @@ function Row({ r, onVerify, busy }: { r: SellerApplication; onVerify: (id: strin
         <span><b>Socials</b> {socialStr || '—'}</span>
       </div>
       {r.pitch && <p className="muted adm-row__pitch">“{r.pitch}”</p>}
+      <ReassignCoin userId={r.userId} current={r.pumpCoinAddress} onDone={onDone} />
+    </div>
+  );
+}
+
+/** Admin escape hatch: bind a coin to this seller (force-moves it off any other
+ *  seller). Self-serve claiming is first-claim-wins, so this is how a legit coin
+ *  transfer / dispute gets resolved. */
+function ReassignCoin({ userId, current, onDone }: { userId: string; current: string | null; onDone: () => void }) {
+  const [coin, setCoin] = useState(current ?? '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const submit = async () => {
+    if (!coin.trim()) { setMsg('Enter a coin address.'); return; }
+    setBusy(true); setMsg('');
+    try { await adminReassignCoin(userId, coin.trim()); setMsg('Coin reassigned.'); onDone(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : 'Could not reassign.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="adm-reassign">
+      <input className="adm-reassign__in" value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Bind a pump.fun coin to this seller…" />
+      <button className="btn btn-ghost btn-sm" onClick={submit} disabled={busy}>{busy ? 'Saving…' : 'Reassign coin'}</button>
+      {msg && <span className="muted adm-reassign__msg">{msg}</span>}
     </div>
   );
 }

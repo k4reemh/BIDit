@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
-import { resolveRoomByCoin, linkCoinToSeller, seedRunningAuction, setSellerCoin } from '../src/sellers.js';
+import { resolveRoomByCoin, linkCoinToSeller, seedRunningAuction, setSellerCoin, reassignCoin, SellerError } from '../src/sellers.js';
 import { makeUser } from './setup.js';
 import { AuctionStatus } from '@bidit/shared';
 import { resetDb } from './setup.js';
@@ -29,21 +29,45 @@ describe('coin <-> seller resolution', () => {
     expect(await prisma.sellerProfile.count({ where: { userId: b.room } })).toBe(1);
   });
 
-  it('a coin belongs to exactly one seller — the latest claimant wins', async () => {
-    // Two sellers link the SAME coin (e.g. repeat test signups). Without the
-    // exclusive claim, resolve could return the stale first seller and a buyer
-    // would never see the active seller's auctions.
+  it('self-serve coin claim is FIRST-claim-wins — a second seller cannot hijack it', async () => {
+    // The hijack this blocks: whoever streams on SHARED_COIN owns the room buyers
+    // route to, so silently repointing it steals their USDC. First-claim-wins means
+    // only an admin can move a coin once a seller holds it.
+    const a = await makeUser('seller');
+    const b = await makeUser('seller');
+    await setSellerCoin(a.userId, 'SHARED_COIN', prisma); // a claims first
+    await setSellerCoin(b.userId, '', prisma); // b is a seller but has no coin yet
+
+    // b tries to take a's coin → rejected; a keeps it.
+    await expect(setSellerCoin(b.userId, 'SHARED_COIN', prisma)).rejects.toThrow(SellerError);
+    expect((await resolveRoomByCoin('SHARED_COIN', prisma))?.room).toBe(a.userId);
+    expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: 'SHARED_COIN' } })).toBe(1);
+  });
+
+  it('re-affirming your OWN coin is fine, and you can clear it', async () => {
+    const a = await makeUser('seller');
+    await setSellerCoin(a.userId, 'MY_COIN', prisma);
+    await setSellerCoin(a.userId, 'MY_COIN', prisma); // idempotent, no throw
+    expect((await resolveRoomByCoin('MY_COIN', prisma))?.room).toBe(a.userId);
+    await setSellerCoin(a.userId, '', prisma); // clear
+    expect(await resolveRoomByCoin('MY_COIN', prisma)).toBeNull();
+  });
+
+  it('admin reassign is the only way a claimed coin moves', async () => {
     const a = await makeUser('seller');
     const b = await makeUser('seller');
     await setSellerCoin(a.userId, 'SHARED_COIN', prisma);
-    await setSellerCoin(b.userId, 'SHARED_COIN', prisma); // b claims it last
+    await setSellerCoin(b.userId, '', prisma); // b needs a SellerProfile for requireSeller
 
+    await reassignCoin(b.userId, 'SHARED_COIN', prisma); // admin force-move
     expect((await resolveRoomByCoin('SHARED_COIN', prisma))?.room).toBe(b.userId);
-    // a no longer holds the coin
-    const aProfile = await prisma.sellerProfile.findUnique({ where: { userId: a.userId } });
-    expect(aProfile?.pumpCoinAddress).toBeNull();
-    // exactly one profile points at the coin
+    expect((await prisma.sellerProfile.findUnique({ where: { userId: a.userId } }))?.pumpCoinAddress).toBeNull();
     expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: 'SHARED_COIN' } })).toBe(1);
+  });
+
+  it('reassign requires the target to be a seller', async () => {
+    const notSeller = await makeUser('buyer');
+    await expect(reassignCoin(notSeller.userId, 'ANY_COIN', prisma)).rejects.toThrow();
   });
 
   it('resolve ignores blank/whitespace coins and trims lookups', async () => {
