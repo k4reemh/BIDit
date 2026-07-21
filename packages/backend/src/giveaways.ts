@@ -33,6 +33,8 @@ export interface OpenGiveawayInput {
 const DEFAULT_DURATION_MS = 30_000;
 const MIN_DURATION_MS = 5_000;
 const MAX_DURATION_MS = 10 * 60_000;
+/** Max length of a seller-set prize name (broadcast to every viewer). */
+const PRIZE_MAX_LEN = 80;
 
 /** Open a giveaway for a seller: commit a seed and set the entry window. */
 export async function openGiveaway(
@@ -41,7 +43,11 @@ export async function openGiveaway(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ) {
-  const prize = (input.prize ?? '').trim();
+  // Bound + de-fang the seller-controlled prize: it's broadcast to every viewer's
+  // extension. Rendering is now textContent (not innerHTML), so this is belt-and-
+  // suspenders — strip control chars and cap the length so it can't be abused as a
+  // payload carrier or blow up the broadcast.
+  const prize = (input.prize ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, PRIZE_MAX_LEN);
   if (!prize) throw new Error('giveaway needs a prize');
   const kind = normalizeGiveawayKind(input.kind);
   const dur = Math.min(

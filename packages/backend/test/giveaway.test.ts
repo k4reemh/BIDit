@@ -103,6 +103,18 @@ describe('openGiveaway', () => {
       openGiveaway(seller.userId, { kind: 'PUBLIC', prize: '   ' }, new ManualClock(), prisma),
     ).rejects.toThrow();
   });
+
+  it('strips control chars and caps the prize length (XSS/broadcast hardening)', async () => {
+    const seller = await makeUser('seller');
+    // A payload-shaped prize with newlines/control chars + an over-long tail.
+    const nasty = 'win\n\t<img src=x onerror=alert(1)>' + 'A'.repeat(200);
+    const g = await openGiveaway(seller.userId, { kind: 'PUBLIC', prize: nasty }, new ManualClock(), prisma);
+    expect(g.prize.length).toBeLessThanOrEqual(80);
+    expect(g.prize).not.toContain('\n');
+    expect(g.prize).not.toContain('\t');
+    // still stored as literal text (defanged at render via textContent, not here)
+    expect(g.prize.startsWith('win <img')).toBe(true);
+  });
 });
 
 // ---- entry: public vs buyer-only --------------------------------------------

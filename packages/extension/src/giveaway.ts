@@ -330,7 +330,12 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
       const whead = el('div', 'whead');
       whead.textContent = r.isMe ? 'YOU WON!' : `@${r.winnerHandle}`;
       const wprize = el('div', 'wprize');
-      wprize.innerHTML = `wins <b>${r.prize}</b>`;
+      // textContent, NOT innerHTML — r.prize is seller-controlled and broadcast
+      // verbatim; as raw HTML it's a stored-XSS sink running in every viewer's
+      // extension (token theft). Mirrors the safe entry-phase render above.
+      const wprizeName = el('b');
+      wprizeName.textContent = r.prize;
+      wprize.append('wins ', wprizeName);
       const fair = el('div', 'fair');
       fair.innerHTML = `<i></i> Provably fair · seed <code>${r.seedHash.slice(0, 10)}…</code>`;
       winWrap.append(wbig, wkick, whead, wprize, fair);
