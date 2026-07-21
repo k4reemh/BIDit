@@ -46,11 +46,13 @@ describe('email sign-up persists a real account', () => {
     expect(verifySession(token + 'tamper')).toBeNull();
   });
 
-  it('password hashing helpers are sound', () => {
-    const stored = hashPassword('s3cret!');
-    expect(verifyPassword('s3cret!', stored)).toBe(true);
-    expect(verifyPassword('nope', stored)).toBe(false);
-    expect(verifyPassword('x', null)).toBe(false);
+  it('password hashing helpers are sound', async () => {
+    const stored = await hashPassword('s3cret!');
+    expect(await verifyPassword('s3cret!', stored)).toBe(true);
+    expect(await verifyPassword('nope', stored)).toBe(false);
+    expect(await verifyPassword('x', null)).toBe(false);
+    // Over-long passwords are rejected without hashing (event-loop DoS guard).
+    expect(await verifyPassword('a'.repeat(5000), stored)).toBe(false);
   });
 });
 

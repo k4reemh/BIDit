@@ -7,7 +7,8 @@
  * Sessions are stateless HMAC tokens (no DB/Redis needed). They replace the old
  * `dev.<userId>` stub everywhere (WebSocket + REST).
  */
-import { createHmac, timingSafeEqual, randomBytes, scryptSync } from 'node:crypto';
+import { createHmac, timingSafeEqual, randomBytes, scrypt as scryptCb } from 'node:crypto';
+import { promisify } from 'node:util';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 
@@ -16,20 +17,30 @@ import bs58 from 'bs58';
 // Stored as "scrypt$<saltHex>$<hashHex>".
 // ---------------------------------------------------------------------------
 
-export function hashPassword(password: string): string {
+const scrypt = promisify(scryptCb) as (password: string | Buffer, salt: string | Buffer, keylen: number) => Promise<Buffer>;
+
+/** Max accepted password length. scrypt hashes on the event loop, so an unbounded
+ *  password (the body cap is 4 MB) could stall all request handling — bound it. */
+export const MAX_PASSWORD_LEN = 128;
+
+/** Hash a password (async so scrypt yields the event loop instead of blocking it). */
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
+  const hash = await scrypt(password, salt, 64);
   return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`;
 }
 
-export function verifyPassword(password: string, stored: string | null | undefined): boolean {
+export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
   if (!stored) return false;
+  // Never feed an over-long password into scrypt (event-loop DoS) — a legit
+  // password is capped at registration, so a long one here is never valid.
+  if (password.length > MAX_PASSWORD_LEN) return false;
   const [scheme, saltHex, hashHex] = stored.split('$');
   if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
   const expected = Buffer.from(hashHex, 'hex');
   let actual: Buffer;
   try {
-    actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+    actual = await scrypt(password, Buffer.from(saltHex, 'hex'), expected.length);
   } catch {
     return false;
   }

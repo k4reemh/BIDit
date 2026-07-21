@@ -5,7 +5,7 @@ import { Prisma, type User } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount } from './ledger.js';
-import { hashPassword, verifyPassword, setRevokedEpoch } from './auth.js';
+import { hashPassword, verifyPassword, setRevokedEpoch, MAX_PASSWORD_LEN } from './auth.js';
 import { encryptPii } from './pii.js';
 
 export class ForbiddenError extends Error {
@@ -107,6 +107,7 @@ export async function registerWithEmail(
   const email = normEmail(input.email);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new AuthError('Enter a valid email address.');
   if (input.password.length < 8) throw new AuthError('Password must be at least 8 characters.');
+  if (input.password.length > MAX_PASSWORD_LEN) throw new AuthError(`Password must be at most ${MAX_PASSWORD_LEN} characters.`);
   if (await prisma.user.findUnique({ where: { email } })) throw new AuthError('That email is already registered.');
 
   let handle: string;
@@ -121,7 +122,7 @@ export async function registerWithEmail(
   let user: User;
   try {
     user = await prisma.user.create({
-      data: { email, handle, passwordHash: hashPassword(input.password), role: Role.buyer },
+      data: { email, handle, passwordHash: await hashPassword(input.password), role: Role.buyer },
     });
   } catch (err) {
     if (isUniqueViolation(err, 'handle')) throw new AuthError('That handle is taken.');
@@ -166,7 +167,7 @@ export async function loginWithEmail(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User | null> {
   const user = await prisma.user.findUnique({ where: { email: normEmail(input.email) } });
-  if (!user || !verifyPassword(input.password, user.passwordHash)) return null;
+  if (!user || !(await verifyPassword(input.password, user.passwordHash))) return null;
   return user;
 }
 
