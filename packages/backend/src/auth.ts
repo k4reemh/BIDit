@@ -65,9 +65,31 @@ function hmac(body: string): string {
 // survive restarts; the map keeps the auth-path check synchronous + O(1).
 const revokedBefore = new Map<string, number>();
 
-/** Mirror a user's revocation epoch into memory (call after persisting it). */
+/** Listeners fired when a user's sessions are revoked. The realtime server
+ *  registers here to drop that user's live sockets — a revoked HTTP session must
+ *  not leave an authenticated WebSocket open. A hook keeps auth.ts free of a
+ *  dependency on the WS layer. */
+const revokeListeners = new Set<(userId: string) => void>();
+/** Register a revocation listener; returns a disposer to unregister it (so a
+ *  short-lived server, e.g. in tests, doesn't leak listeners on the module-level set). */
+export function onSessionRevoked(fn: (userId: string) => void): () => void {
+  revokeListeners.add(fn);
+  return () => revokeListeners.delete(fn);
+}
+
+/** Mirror a user's revocation epoch into memory (call after persisting it). Also
+ *  voids that user's outstanding WS tickets and drops their live sockets, so a
+ *  logout / "log out everywhere" / erasure reaches connections opened before it. */
 export function setRevokedEpoch(userId: string, epochMs: number): void {
   revokedBefore.set(userId, epochMs);
+  purgeUserWsTickets(userId);
+  for (const fn of revokeListeners) {
+    try {
+      fn(userId);
+    } catch {
+      /* a listener failure must never break revocation */
+    }
+  }
 }
 
 /** Mint a session token for a user. `iat` lets a later logout revoke it. */
@@ -179,6 +201,14 @@ function pruneWsTickets(now: number): void {
     const oldest = wsTickets.keys().next().value;
     if (oldest === undefined) break;
     wsTickets.delete(oldest);
+  }
+}
+
+/** Drop every outstanding WS ticket for a user — called on revocation so a ticket
+ *  minted moments before a logout/erasure can't be redeemed for a fresh socket. */
+function purgeUserWsTickets(userId: string): void {
+  for (const [k, v] of wsTickets) {
+    if (v.userId === userId) wsTickets.delete(k);
   }
 }
 

@@ -5,6 +5,7 @@ import { ManualClock } from '../src/clock.js';
 import { RealtimeServer } from '../src/realtime/server.js';
 import { InMemoryBus } from '../src/realtime/bus.js';
 import { issueSession } from '../src/auth.js';
+import { revokeUserSessions, eraseUserData } from '../src/authz.js';
 import { BidRejectReason, RealtimeRejectReason } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
 
@@ -345,5 +346,42 @@ describe('wheel-spin randomizer (bid to win a roll)', () => {
     await ca.expectNone('RANDOMIZER_SPIN');
 
     ca.close();
+  });
+});
+
+describe('session revocation reaches live sockets (H1)', () => {
+  const waitClose = (c: TestClient) => new Promise<number>((resolve) => c.ws.on('close', (code) => resolve(code)));
+
+  it('drops a user’s open socket the moment their sessions are revoked', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const u = await makeFundedUser('100');
+    const c = new TestClient(url(issueSession(u.userId)));
+    await c.open();
+    await c.waitFor('BALANCE_UPDATE'); // connected + authenticated
+
+    const closed = waitClose(c);
+    await revokeUserSessions(u.userId, prisma); // logout → setRevokedEpoch → closeUserSockets
+    expect(await closed).toBe(4001);
+  });
+
+  it('erasing a user also drops their open socket, and spares other users', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const victim = await makeFundedUser('100');
+    const bystander = await makeFundedUser('100');
+    const cv = new TestClient(url(issueSession(victim.userId)));
+    const cb = new TestClient(url(issueSession(bystander.userId)));
+    await cv.open();
+    await cb.open();
+    await cv.waitFor('BALANCE_UPDATE');
+    await cb.waitFor('BALANCE_UPDATE');
+
+    const victimClosed = waitClose(cv);
+    await eraseUserData(victim.userId, prisma);
+    expect(await victimClosed).toBe(4001);
+    // The bystander's socket is untouched.
+    expect(cb.ws.readyState).toBe(WebSocket.OPEN);
+    cb.close();
   });
 });

@@ -51,7 +51,7 @@ import { getSettledBalance, getAvailableBalance } from '../ledger.js';
 import { AuctionScheduler } from '../scheduler.js';
 import { systemClock, type Clock } from '../clock.js';
 import { InMemoryBus, type BusHandler, type RealtimeBus, type Unsubscribe } from './bus.js';
-import { verifySession, consumeWsTicket } from '../auth.js';
+import { verifySession, consumeWsTicket, onSessionRevoked } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
@@ -101,6 +101,7 @@ export class RealtimeServer {
   private readonly busSubs = new Map<string, { unsub: Unsubscribe; refCount: number }>();
   private readonly rate = new Map<string, number[]>();
   private readonly giveawayTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly unsubRevoke: () => void;
 
   constructor(opts: RealtimeServerOptions = {}) {
     this.prisma = opts.prisma ?? defaultPrisma;
@@ -113,6 +114,10 @@ export class RealtimeServer {
     this.httpServer = opts.httpServer ?? http.createServer();
     this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws' });
     this.wss.on('connection', (ws, req) => void this.onConnection(ws, req));
+    // When a user's sessions are revoked (logout / "log out everywhere" / erasure),
+    // drop their live sockets — the connection authenticates once at connect time
+    // and would otherwise keep full capability until it happened to disconnect.
+    this.unsubRevoke = onSessionRevoked((userId) => this.closeUserSockets(userId));
     this.scheduler = new AuctionScheduler({
       clock: this.clock,
       prisma: this.prisma,
@@ -140,6 +145,7 @@ export class RealtimeServer {
   }
 
   async close(): Promise<void> {
+    this.unsubRevoke();
     this.scheduler.stop();
     for (const t of this.giveawayTimers.values()) clearTimeout(t);
     this.giveawayTimers.clear();
@@ -643,6 +649,17 @@ export class RealtimeServer {
       const conn = this.conns.get(id);
       if (conn && conn.ws.readyState === WebSocket.OPEN) conn.ws.send(payload);
     }
+  }
+
+  /** Force-close every live socket for a user (session revoked / account erased).
+   *  Snapshots the id set first: ws.close triggers the 'close' handler, which
+   *  mutates localUsers, so we must not iterate it live. */
+  closeUserSockets(userId: string): number {
+    const ids = [...(this.localUsers.get(userId) ?? [])];
+    for (const id of ids) {
+      this.conns.get(id)?.ws.close(4001, 'session revoked');
+    }
+    return ids.length;
   }
 
   // ---- bus subscription ref-counting & local membership ------------------
