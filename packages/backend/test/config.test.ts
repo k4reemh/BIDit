@@ -3,6 +3,7 @@ import { assertStartupConfig, usingDefaultAuthSecret, StartupConfigError, AUTH_S
 
 const STRONG = 'x'.repeat(48); // a stand-in strong secret (≥32 chars)
 const SEED = 's'.repeat(32);
+const PII = 'p'.repeat(24); // a stand-in PII key (≥16 chars)
 
 describe('assertStartupConfig', () => {
   it('allows a local mock boot with no secrets', () => {
@@ -10,8 +11,20 @@ describe('assertStartupConfig', () => {
     expect(r.isProd).toBe(false);
   });
 
-  it('does not require secrets on a plain devnet boot (no prod flag)', () => {
-    expect(() => assertStartupConfig('devnet', {})).not.toThrow();
+  it('requires a strong AUTH_SECRET on ANY real chain — even devnet with no prod flag (H2)', () => {
+    // A network-exposed devnet/staging box that forgot BIDIT_ENV=production must
+    // not boot on the shipped default — anyone could forge admin tokens.
+    expect(() => assertStartupConfig('devnet', {})).toThrow(/AUTH_SECRET is missing/);
+    expect(() => assertStartupConfig('devnet', { AUTH_SECRET: AUTH_SECRET_FALLBACK })).toThrow(/insecure default/);
+    // A strong secret is enough for a plain (non-prod) devnet boot — no PII/custody yet.
+    expect(() => assertStartupConfig('devnet', { AUTH_SECRET: STRONG })).not.toThrow();
+  });
+
+  it('hard-fails a production boot with no BIDIT_PII_KEY (H3)', () => {
+    expect(() => assertStartupConfig('devnet', { BIDIT_ENV: 'production', AUTH_SECRET: STRONG }))
+      .toThrow(/BIDIT_PII_KEY/);
+    expect(() => assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED, BIDIT_PII_KEY: 'short' }))
+      .toThrow(/BIDIT_PII_KEY/);
   });
 
   it('treats mainnet as production and requires a strong AUTH_SECRET', () => {
@@ -53,12 +66,12 @@ describe('assertStartupConfig', () => {
   });
 
   it('passes a fully-configured mainnet boot', () => {
-    const r = assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED });
+    const r = assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED, BIDIT_PII_KEY: PII });
     expect(r.isProd).toBe(true);
   });
 
-  it('passes an explicit-production devnet boot with a strong secret', () => {
-    const r = assertStartupConfig('devnet', { BIDIT_ENV: 'production', AUTH_SECRET: STRONG });
+  it('passes an explicit-production devnet boot with a strong secret + PII key', () => {
+    const r = assertStartupConfig('devnet', { BIDIT_ENV: 'production', AUTH_SECRET: STRONG, BIDIT_PII_KEY: PII });
     expect(r.isProd).toBe(true);
   });
 
