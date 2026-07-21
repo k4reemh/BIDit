@@ -136,6 +136,17 @@ function authRateLimited(req: http.IncomingMessage): boolean {
   return recent.length > 10; // >10 attempts / minute / IP
 }
 
+// Throttle money endpoints per-USER (withdraw, buy). The balance check + daily cap
+// already stop overspend; this blunts request floods that would hammer the DB/RPC.
+const moneyHits = new Map<string, number[]>();
+function moneyRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const recent = (moneyHits.get(userId) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  moneyHits.set(userId, recent);
+  return recent.length > 20; // >20 money actions / minute / user
+}
+
 function send(res: http.ServerResponse, status: number, body: unknown, type = 'application/json') {
   const payload = type === 'application/json' ? JSON.stringify(body) : String(body);
   res.writeHead(status, { 'content-type': type }); // CORS headers already set via applyCors()
@@ -525,6 +536,7 @@ async function main() {
       if (req.method === 'POST' && p === '/withdraw') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         const b = await readJson(req);
         const toAddress = String(b.toAddress ?? '').trim();
         const amount = usdc(String(b.amount ?? '0'));
@@ -1060,8 +1072,9 @@ async function main() {
       if (req.method === 'GET' && p === '/admin/private-shipments') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const user = await getUser(userId, prisma);
-        if (user?.role !== Role.admin) return send(res, 403, { error: 'admin required' });
+        // isAdmin() (role OR BIDIT_ADMIN_EMAILS) — consistent with every other admin
+        // route; a direct role check locked allowlist operators out of this PII view.
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         const shipments = await listPrivateShipments(prisma);
         const out = await Promise.all(
           shipments.map(async (s) => {
@@ -1282,6 +1295,7 @@ async function main() {
       if (req.method === 'POST' && p === '/shop/buy') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         const b = await readJson(req);
         try {
           const order = await purchaseListing(userId, String(b.listingId ?? ''), { directPayout, escrow }, prisma);

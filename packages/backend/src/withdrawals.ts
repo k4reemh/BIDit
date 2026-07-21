@@ -93,6 +93,17 @@ export async function requestWithdrawal(
     throw new WithdrawalError('That doesn’t look like a valid Solana address.');
   }
 
+  // 1b. The destination must be EXTERNAL. Withdrawing into an operator wallet is an
+  //     on-chain self-transfer (no funds leave) while the ledger still debits the
+  //     user — silently corrupting the treasury↔Σbalances reconciliation. Withdrawing
+  //     into a user deposit address would round-trip back through the deposit sweep.
+  //     Both are internal addresses and never valid withdrawal targets.
+  const operatorWallets = (['treasury', 'escrow', 'buyback', 'fee'] as const).map((w) => chain.walletAddress(w));
+  const isDepositAddress = await prisma.account.findFirst({ where: { depositAddress: toAddress }, select: { id: true } });
+  if (operatorWallets.includes(toAddress) || isDepositAddress) {
+    throw new WithdrawalError('That address isn’t a valid withdrawal destination.');
+  }
+
   // 2. Temporary beta daily cap. Checked before debiting so an over-cap request
   //    never moves money. (Not a hard concurrency guard — acceptable for beta,
   //    where the cap is a blast-radius limit, not a security boundary.)

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { MockChain } from '../src/chain/mock.js';
 import { requestWithdrawal, withdrawnLast24h, dailyWithdrawCapMicros, WithdrawalError } from '../src/withdrawals.js';
+import { ensureDepositAddress } from '../src/deposits.js';
 import { getSettledBalance } from '../src/ledger.js';
 import { usdc } from '@bidit/shared';
 import { resetDb, makeFundedUser } from './setup.js';
@@ -20,6 +21,23 @@ describe('withdrawal daily cap + address validation', () => {
     await expect(requestWithdrawal(u.userId, '', usdc('10'), chain, prisma)).rejects.toThrow(WithdrawalError);
     expect(await getSettledBalance(u.accountId, prisma)).toBe(usdc('100')); // untouched
     expect(await prisma.withdrawal.count({ where: { userId: u.userId } })).toBe(0); // nothing recorded
+  });
+
+  it('rejects a withdrawal into an operator wallet or a deposit address (M1)', async () => {
+    const u = await makeFundedUser('100');
+    const chain = new MockChain();
+    // Each operator wallet — an on-chain self-transfer that still debits the user.
+    for (const w of ['treasury', 'escrow', 'buyback', 'fee'] as const) {
+      await expect(requestWithdrawal(u.userId, chain.walletAddress(w), usdc('10'), chain, prisma))
+        .rejects.toThrow(/valid withdrawal destination/);
+    }
+    // A user deposit address is internal too — it would just round-trip via the sweep.
+    const dep = await ensureDepositAddress(u.userId, chain, prisma);
+    await expect(requestWithdrawal(u.userId, dep, usdc('10'), chain, prisma))
+      .rejects.toThrow(/valid withdrawal destination/);
+    // Nothing moved, nothing recorded.
+    expect(await getSettledBalance(u.accountId, prisma)).toBe(usdc('100'));
+    expect(await prisma.withdrawal.count({ where: { userId: u.userId } })).toBe(0);
   });
 
   it('allows withdrawals up to $1,000/day and blocks the one that exceeds it', async () => {
