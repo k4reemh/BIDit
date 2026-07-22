@@ -73,8 +73,11 @@ export function dailyWithdrawCapMicros(): bigint {
 /** USDC a user has committed to withdrawing in the last 24h. Counts everything
  *  in-flight or confirmed; only FAILED (reversed) rows are excluded — so a stuck
  *  or ambiguous withdrawal keeps consuming the cap until it is proven dead. */
-export async function withdrawnLast24h(userId: string, prisma: PrismaClient = defaultPrisma): Promise<bigint> {
-  const agg = await prisma.withdrawal.aggregate({
+export async function withdrawnLast24h(
+  userId: string,
+  db: Pick<PrismaClient, 'withdrawal'> = defaultPrisma,
+): Promise<bigint> {
+  const agg = await db.withdrawal.aggregate({
     where: { userId, createdAt: { gte: new Date(Date.now() - DAY_MS) }, status: { in: [...INFLIGHT] } },
     _sum: { amount: true },
   });
@@ -104,22 +107,25 @@ export async function requestWithdrawal(
     throw new WithdrawalError('That address isn’t a valid withdrawal destination.');
   }
 
-  // 2. Temporary beta daily cap. Checked before debiting so an over-cap request
-  //    never moves money. (Not a hard concurrency guard — acceptable for beta,
-  //    where the cap is a blast-radius limit, not a security boundary.)
+  // 2. Temporary beta daily cap, enforced ATOMICALLY. Concurrent /withdraw calls
+  //    used to each read the same 24h total and all pass, blowing the blast-radius
+  //    cap. A transaction-scoped advisory lock keyed on the user serializes their
+  //    withdrawals, so the total is re-read (seeing any just-created PENDING row)
+  //    and the new row is created under the same lock. (Overspend is separately
+  //    prevented by the debit's account lock below — this only guards the cap.)
   const cap = dailyWithdrawCapMicros();
-  const used = await withdrawnLast24h(userId, prisma);
-  if (used + amountMicros > cap) {
-    const remaining = used >= cap ? 0n : cap - used;
-    const money = (m: bigint) => Number(formatUsdc(m)).toLocaleString('en-US', { maximumFractionDigits: 2 });
-    throw new WithdrawalError(
-      `Beta withdrawals are limited to $${money(cap)} per day. You have $${money(remaining)} left in the next 24h.`,
-    );
-  }
-
   const accountId = await getOrCreateUserAccount(userId, prisma);
-  const withdrawal = await prisma.withdrawal.create({
-    data: { userId, toAddress, amount: amountMicros, status: 'PENDING' },
+  const withdrawal = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
+    const used = await withdrawnLast24h(userId, tx);
+    if (used + amountMicros > cap) {
+      const remaining = used >= cap ? 0n : cap - used;
+      const money = (m: bigint) => Number(formatUsdc(m)).toLocaleString('en-US', { maximumFractionDigits: 2 });
+      throw new WithdrawalError(
+        `Beta withdrawals are limited to $${money(cap)} per day. You have $${money(remaining)} left in the next 24h.`,
+      );
+    }
+    return tx.withdrawal.create({ data: { userId, toAddress, amount: amountMicros, status: 'PENDING' } });
   });
 
   // 3. Debit first (this enforces the no-overspend / holds-respected guarantee).

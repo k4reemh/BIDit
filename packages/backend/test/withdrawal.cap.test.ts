@@ -51,6 +51,19 @@ describe('withdrawal daily cap + address validation', () => {
     expect(await withdrawnLast24h(u.userId, prisma)).toBe(usdc('1000'));
   });
 
+  it('holds the daily cap under CONCURRENT withdrawals (M4 — atomic)', async () => {
+    const u = await makeFundedUser('5000'); // funds well over the cap, so only the cap can block
+    const chain = new MockChain();
+    // Fire 15 concurrent $100 withdrawals against the $1,000/day cap. Without the
+    // atomic guard they'd all read used=0 and pass; with it, at most 10 succeed.
+    const results = await Promise.allSettled(
+      Array.from({ length: 15 }, () => requestWithdrawal(u.userId, ADDR, usdc('100'), chain, prisma)),
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    expect(ok).toBe(10);
+    expect(await withdrawnLast24h(u.userId, prisma)).toBe(usdc('1000')); // never exceeds the cap
+  });
+
   it('a failed withdrawal does not consume the daily cap', async () => {
     const u = await makeFundedUser('100');
     const chain = new MockChain();
