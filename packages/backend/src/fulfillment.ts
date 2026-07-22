@@ -6,7 +6,7 @@
  * weekly bundle / ship-later / private) are policies over this; slice 1 is
  * Standard + the shared plumbing every mode reuses.
  */
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
@@ -609,7 +609,7 @@ export async function discardItem(
 export async function processFulfillmentTimers(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
-): Promise<{ discarded: string[] }> {
+): Promise<{ discarded: string[]; purgedPii: number }> {
   const now = clock.now();
   const expired = await prisma.fulfillmentItem.findMany({
     where: { status: 'READY_TO_SHIP', heldUntil: { lte: now } },
@@ -622,7 +622,24 @@ export async function processFulfillmentTimers(
     await prisma.fulfillmentItem.update({ where: { id: it.id }, data: { status: 'DISCARDED', discardedAt: now } });
     discarded.push(it.id);
   }
-  return { discarded };
+  const purgedPii = await purgeDeliveredShipmentPii(undefined, clock, prisma);
+  return { discarded, purgedPii };
+}
+
+/** PII retention: null the buyer's address snapshot on shipments delivered more
+ *  than `retentionDays` ago — we only keep it long enough to get the package there.
+ *  shipTo is NOT-NULL Json (so JSON null), privateLeg2 is nullable. Idempotent. */
+export async function purgeDeliveredShipmentPii(
+  retentionDays = 90,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<number> {
+  const cutoff = new Date(clock.now().getTime() - retentionDays * DAY_MS);
+  const res = await prisma.shipment.updateMany({
+    where: { status: 'DELIVERED', deliveredAt: { lte: cutoff } },
+    data: { shipTo: Prisma.JsonNull, privateLeg2: Prisma.DbNull },
+  });
+  return res.count;
 }
 
 function isUniqueViolation(err: unknown): boolean {

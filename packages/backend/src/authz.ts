@@ -65,6 +65,13 @@ export async function eraseUserData(userId: string, prisma: PrismaClient = defau
       sessionsValidFrom: now, // revoke everything
     },
   });
+  // Wipe the buyer's saved address snapshots on shipments that no longer need them
+  // (delivered/terminal). In-flight shipments keep the address so the package can
+  // still be delivered; purgeDeliveredShipmentPii clears those after delivery.
+  await prisma.shipment.updateMany({
+    where: { buyerId: userId, status: { in: ['DELIVERED', 'CANCELED'] } },
+    data: { shipTo: Prisma.JsonNull, privateLeg2: Prisma.DbNull },
+  });
   setRevokedEpoch(userId, now.getTime());
 }
 
