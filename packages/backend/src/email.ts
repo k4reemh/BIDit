@@ -12,6 +12,11 @@ export interface EmailMessage {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
+/** Email subjects are single-line. Strip CR/LF + control chars and clamp length so
+ *  seller-controlled text (a listing title / carrier / tracking #) that flows into a
+ *  subject can't inject headers or bloat it. Applied at the one send choke point. */
+export const cleanSubject = (s: string) => s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+
 /** Minimal branded HTML shell around a message body. */
 export function emailShell(heading: string, bodyHtml: string, ctaHref?: string): string {
   const cta = ctaHref
@@ -33,15 +38,16 @@ export function paragraph(text: string): string {
 export async function sendEmail(msg: EmailMessage): Promise<void> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.BIDIT_EMAIL_FROM ?? 'BIDit <onboarding@resend.dev>';
+  const subject = cleanSubject(msg.subject);
   if (!key) {
-    console.log(`[email:noop] to=${msg.to} subject=${JSON.stringify(msg.subject)} (set RESEND_API_KEY to send)`);
+    console.log(`[email:noop] to=${msg.to} subject=${JSON.stringify(subject)} (set RESEND_API_KEY to send)`);
     return;
   }
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ from, to: msg.to, subject: msg.subject, html: msg.html }),
+      body: JSON.stringify({ from, to: msg.to, subject, html: msg.html }),
     });
     if (!res.ok) console.error('[email] send failed', res.status, await res.text().catch(() => ''));
   } catch (err) {

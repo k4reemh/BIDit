@@ -108,18 +108,26 @@ export function buildReel(
  * clean WheelEntry[]. Drops anything without a label and omits empty optional
  * fields entirely (no `undefined` keys) so the result is safe to store as JSON.
  */
+/** Caps on a seller-controlled wheel — it's repeated REEL_REPEATS× and broadcast to
+ *  every viewer, so an uncapped wheel is a realtime-DoS vector. */
+export const MAX_WHEEL_ENTRIES = 64;
+const MAX_WHEEL_LABEL_LEN = 120;
+const MAX_WHEEL_TIER_LEN = 40;
+const MAX_WHEEL_IMAGE_LEN = 2000;
+
 export function normalizeWheelEntries(raw: unknown): WheelEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: WheelEntry[] = [];
   for (const item of raw) {
+    if (out.length >= MAX_WHEEL_ENTRIES) break; // cap the wheel size
     if (!item || typeof item !== 'object') continue;
     const e = item as Record<string, unknown>;
-    const label = typeof e.label === 'string' ? e.label.trim() : '';
+    const label = typeof e.label === 'string' ? e.label.trim().slice(0, MAX_WHEEL_LABEL_LEN) : '';
     if (!label) continue;
     const entry: WheelEntry = { label };
-    if (typeof e.weight === 'number' && e.weight > 0) entry.weight = e.weight;
-    if (typeof e.tier === 'string' && e.tier.trim()) entry.tier = e.tier.trim();
-    if (typeof e.imageUrl === 'string' && e.imageUrl.trim()) entry.imageUrl = e.imageUrl.trim();
+    if (typeof e.weight === 'number' && e.weight > 0) entry.weight = Math.min(e.weight, 1_000_000);
+    if (typeof e.tier === 'string' && e.tier.trim()) entry.tier = e.tier.trim().slice(0, MAX_WHEEL_TIER_LEN);
+    if (typeof e.imageUrl === 'string' && e.imageUrl.trim()) entry.imageUrl = e.imageUrl.trim().slice(0, MAX_WHEEL_IMAGE_LEN);
     out.push(entry);
   }
   return out;

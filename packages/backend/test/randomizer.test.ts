@@ -124,6 +124,13 @@ describe('randomizer: normalizeWheelEntries', () => {
     expect('tier' in out[0]!).toBe(false);
   });
 
+  it('caps the wheel size and clamps label length (M9 — realtime-DoS guard)', () => {
+    const huge = Array.from({ length: 500 }, (_, i) => ({ label: `p${i}` }));
+    expect(normalizeWheelEntries(huge).length).toBe(64); // MAX_WHEEL_ENTRIES
+    const longLabel = normalizeWheelEntries([{ label: 'z'.repeat(1000) }]);
+    expect(longLabel[0]!.label.length).toBe(120); // MAX_WHEEL_LABEL_LEN
+  });
+
   it('ignores negative/zero weights and non-string tiers', () => {
     const out = normalizeWheelEntries([{ label: 'A', weight: -5 }, { label: 'B', weight: 2.5, tier: 'Chase' }]);
     expect(out).toEqual([{ label: 'A' }, { label: 'B', weight: 2.5, tier: 'Chase' }]);

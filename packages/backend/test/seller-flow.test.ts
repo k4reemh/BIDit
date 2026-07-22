@@ -78,6 +78,22 @@ describe('seller gate (applied = can sell; verified = badge)', () => {
     await startAuctionFromListing(listing.id, {}, clock, prisma); // QUEUED -> LIVE
     await expect(startAuctionFromListing(listing.id, {}, clock, prisma)).rejects.toThrow();
   });
+
+  it('rejects a non-positive buy-now price at creation, and clamps long input (M7, M9)', async () => {
+    const sellerId = await activeSeller();
+    // M7: a negative/zero buy-now price is refused before it can orphan an order.
+    await expect(
+      createListing(sellerId, { title: 'Bad', startingBid: usdc('5'), buyNowPrice: usdc('-1') }, prisma),
+    ).rejects.toThrow(/greater than 0/);
+    // M9: an over-long title is clamped, and photos are capped.
+    const listing = await createListing(
+      sellerId,
+      { title: 'z'.repeat(500), startingBid: usdc('5'), photos: Array.from({ length: 40 }, (_, i) => `p${i}.png`) },
+      prisma,
+    );
+    expect(listing.title.length).toBe(140);
+    expect(listing.photos.length).toBe(12);
+  });
 });
 
 describe('admin gates & audit', () => {

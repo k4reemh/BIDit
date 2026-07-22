@@ -2,10 +2,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { registerWithEmail, loginWithEmail, completeOnboarding, AuthError } from '../src/authz.js';
 import { issueSession, verifySession, hashPassword, verifyPassword } from '../src/auth.js';
+import { cleanSubject } from '../src/email.js';
 import { resetDb } from './setup.js';
 
 beforeEach(async () => {
   await resetDb();
+});
+
+describe('email subject sanitization (M6)', () => {
+  it('strips CR/LF + control chars and clamps length (no header injection)', () => {
+    const nasty = 'Your order\r\nBcc: attacker@example.com\r\nSubject: spam';
+    const out = cleanSubject(nasty);
+    expect(out).not.toMatch(/[\r\n]/);
+    expect(out).toBe('Your order Bcc: attacker@example.com Subject: spam');
+    expect(cleanSubject('x'.repeat(500)).length).toBe(200);
+  });
 });
 
 describe('email sign-up persists a real account', () => {

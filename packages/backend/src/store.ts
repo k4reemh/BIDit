@@ -14,7 +14,6 @@ import type { Listing, Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale } from './ledger.js';
-import { InsufficientFundsError } from './errors.js';
 import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
 import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
@@ -134,13 +133,15 @@ export async function purchaseListing(
       });
     }
   } catch (err) {
-    if (err instanceof InsufficientFundsError) {
-      await prisma.order.delete({ where: { id: created.id } }).catch(() => {});
-      await prisma.listing.update({
-        where: { id: listingId },
-        data: { quantity: { increment: 1 } },
-      }).catch(() => {});
-    }
+    // Settlement failed (insufficient funds, a bad amount, a chain error…). The
+    // money side is transactional, so nothing moved — undo the order + stock claim
+    // for ANY error, not just InsufficientFundsError, so a failure can never orphan
+    // a PENDING order with permanently-decremented stock.
+    await prisma.order.delete({ where: { id: created.id } }).catch(() => {});
+    await prisma.listing.update({
+      where: { id: listingId },
+      data: { quantity: { increment: 1 } },
+    }).catch(() => {});
     throw err;
   }
 
