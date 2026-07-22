@@ -571,3 +571,29 @@ model DepositReceipt {
   @@index([creditedAt])
   @@index([userId])
 }
+
+/// A live-chat message in a seller's room (roomId = seller's userId). handle is a
+/// snapshot so the feed renders without a User join; deletedAt soft-deletes for
+/// seller moderation. Lightweight, no relations (matches GiveawayEntry style).
+model ChatMessage {
+  id        String    @id @default(cuid())
+  roomId    String // seller's userId (the room)
+  userId    String // sender
+  handle    String // sender handle snapshot
+  text      String    @db.VarChar(300)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([roomId, createdAt])
+  @@index([roomId, userId, createdAt]) // per-user cooldown lookup
+}
+
+/// A seller blocking a user from their chat room. Presence of a row = blocked.
+model ChatBlock {
+  id        String   @id @default(cuid())
+  roomId    String // seller's userId
+  userId    String // blocked user
+  createdAt DateTime @default(now())
+
+  @@unique([roomId, userId])
+}
