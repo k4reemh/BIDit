@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import BidPanel from '../components/BidPanel';
+import ChatPanel from '../components/ChatPanel';
 import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
 import ShopOverlay from '../components/ShopOverlay';
@@ -94,6 +95,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
             <>
               <BidTip />
               <BidPanel room={resolved.room} session={session} onAuth={onAuth} />
+              <ChatPanel room={resolved.room} session={session} onAuth={onAuth} />
             </>
           )}
         </div>

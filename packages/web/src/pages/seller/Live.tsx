@@ -12,8 +12,9 @@ import {
 import { openGiveaway, drawGiveaway, getGiveaway, type GiveawayKind } from '../../api';
 import Avatar from '../../components/Avatar';
 import GiveawayReveal from '../../components/GiveawayReveal';
+import ChatPanel from '../../components/ChatPanel';
 import ImageUpload from '../../components/ImageUpload';
-import { Tag, Gift, Users, Bag } from '../../icons';
+import { Tag, Gift, Users, Bag, Chat } from '../../icons';
 
 interface FeedItem { who: string; amt: string; key: number }
 
@@ -266,6 +267,11 @@ export default function Live() {
           {gErr && <p className="gv-err">{gErr}</p>}
         </div>
       )}
+
+      {/* ---- Live chat ---- */}
+      <h2 className="sl-sec"><Chat width={20} height={20} style={{ verticalAlign: '-3px', marginRight: 6 }} /> Live chat</h2>
+      <p className="muted" style={{ marginTop: -6, marginBottom: 4, fontSize: 13.5 }}>Messages from viewers watching your stream — delete or block with the controls on each message.</p>
+      <ChatPanel room={session.userId} session={session} onAuth={() => {}} />
 
       {winner && (
         <GiveawayReveal win={winner} isMe={winner.winnerUserId === session.userId} onDone={() => setWinner(null)} />

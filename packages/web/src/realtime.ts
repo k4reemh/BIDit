@@ -120,6 +120,14 @@ export interface GiveawayWinner {
   serverNow: number;
 }
 
+export interface ChatLine {
+  id: string;
+  senderId: string;
+  handle: string;
+  text: string;
+  createdAt: number;
+}
+
 interface Handlers {
   onBalance?: (b: Balance) => void;
   room?: string;
@@ -132,6 +140,10 @@ interface Handlers {
   onGiveawayRejected?: (m: { giveawayId: string; reason: string }) => void;
   onBidRejected?: (m: { auctionId: string; reason: string }) => void;
   onSpin?: (m: RandomizerSpin) => void;
+  onChat?: (m: ChatLine) => void;
+  onChatHistory?: (messages: ChatLine[]) => void;
+  onChatDeleted?: (messageId: string) => void;
+  onChatRejected?: (m: { reason: string; retryMs?: number }) => void;
 }
 
 /**
@@ -222,6 +234,18 @@ function dispatch(h: Handlers, raw: string): void {
     case 'BID_REJECTED':
       h.onBidRejected?.(m as unknown as { auctionId: string; reason: string });
       break;
+    case 'CHAT_MESSAGE':
+      h.onChat?.((m as unknown as { line: ChatLine }).line);
+      break;
+    case 'CHAT_HISTORY':
+      h.onChatHistory?.((m as unknown as { messages: ChatLine[] }).messages);
+      break;
+    case 'CHAT_DELETED':
+      h.onChatDeleted?.(m.messageId as string);
+      break;
+    case 'CHAT_REJECTED':
+      h.onChatRejected?.({ reason: m.reason as string, retryMs: m.retryMs as number | undefined });
+      break;
   }
 }
 
@@ -229,6 +253,11 @@ export interface RoomController {
   close: () => void;
   bid: (auctionId: string, amount: string) => void;
   enterGiveaway: (giveawayId: string) => void;
+  /** Post a chat message to the room. */
+  sendChat: (text: string) => void;
+  /** Seller-only: delete a message / block a user in their own room. */
+  deleteChat: (messageId: string) => void;
+  blockUser: (userId: string) => void;
   /** Force a re-subscribe to pull fresh state — used to recover a frozen timer
    *  if a close broadcast was missed. */
   resync: () => void;
@@ -302,6 +331,9 @@ export function openRoom(room: string, h: Omit<Handlers, 'room'>): RoomControlle
     bid: (auctionId, amount) =>
       send({ type: 'BID_INTENT', auctionId, amount, clientNonce: Math.random().toString(36).slice(2) }),
     enterGiveaway: (giveawayId) => send({ type: 'GIVEAWAY_ENTER', giveawayId }),
+    sendChat: (text) => send({ type: 'CHAT_SEND', room, text }),
+    deleteChat: (messageId) => send({ type: 'CHAT_DELETE', room, messageId }),
+    blockUser: (userId) => send({ type: 'CHAT_BLOCK', room, userId }),
     resync: () => { if (ws && ws.readyState === WebSocket.OPEN) resync(); else open(); },
   };
 }
