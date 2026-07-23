@@ -41,6 +41,13 @@ import {
   type GiveawayOpenMessage,
   type GiveawayEntriesMessage,
   type GiveawayWinnerMessage,
+  type ChatSendMessage,
+  type ChatDeleteMessage,
+  type ChatBlockMessage,
+  type ChatMessageMessage,
+  type ChatHistoryMessage,
+  type ChatDeletedMessage,
+  type ChatLine,
 } from '@bidit/shared';
 import { createHash, randomBytes } from 'node:crypto';
 import { prisma as defaultPrisma } from '../db.js';
@@ -55,6 +62,7 @@ import { verifySession, consumeWsTicket, onSessionRevoked } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
+import { postChatMessage, deleteChatMessage, blockChatUser, listRecentChat, ChatError, CHAT_BACKLOG } from '../chat.js';
 
 interface Conn {
   id: string;
@@ -345,6 +353,15 @@ export class RealtimeServer {
       case 'GIVEAWAY_ENTER':
         await this.handleGiveawayEnter(conn, msg);
         break;
+      case 'CHAT_SEND':
+        await this.handleChatSend(conn, msg);
+        break;
+      case 'CHAT_DELETE':
+        await this.handleChatDelete(conn, msg);
+        break;
+      case 'CHAT_BLOCK':
+        await this.handleChatBlock(conn, msg);
+        break;
     }
   }
 
@@ -418,6 +435,78 @@ export class RealtimeServer {
         };
         this.sendToConn(conn, replay);
       }
+    }
+    // Chat backlog: on the first subscribe, send the recent messages so a viewer
+    // (and the seller) opens into an in-progress conversation. Gated so the 12s
+    // heartbeat re-subscribes don't re-send it.
+    if (firstSubscribe) {
+      const history = await listRecentChat(room, CHAT_BACKLOG, this.prisma);
+      if (history.length > 0) {
+        const out: ChatHistoryMessage = {
+          type: 'CHAT_HISTORY',
+          room,
+          messages: history.map((m) => this.toChatLine(m)),
+          serverNow: this.clock.now().getTime(),
+        };
+        this.sendToConn(conn, out);
+      }
+    }
+  }
+
+  private toChatLine(m: { id: string; userId: string; handle: string; text: string; createdAt: Date }): ChatLine {
+    return { id: m.id, senderId: m.userId, handle: m.handle, text: m.text, createdAt: m.createdAt.getTime() };
+  }
+
+  private async handleChatSend(conn: Conn, msg: ChatSendMessage): Promise<void> {
+    if (!conn.rooms.has(msg.room)) return; // must be watching the room to post in it
+    try {
+      const m = await postChatMessage({ room: msg.room, userId: conn.userId, text: msg.text }, this.clock, this.prisma);
+      const out: ChatMessageMessage = {
+        type: 'CHAT_MESSAGE',
+        room: msg.room,
+        line: this.toChatLine(m),
+        serverNow: this.clock.now().getTime(),
+      };
+      await this.bus.publish(roomChannel(msg.room), JSON.stringify(out));
+    } catch (err) {
+      if (err instanceof ChatError) {
+        this.sendToConn(conn, { type: 'CHAT_REJECTED', reason: err.reason, retryMs: err.retryMs });
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /** Seller moderation — delete/block are enforced owner-only in the domain layer;
+   *  a non-owner attempt just throws and is ignored here. */
+  private async handleChatDelete(conn: Conn, msg: ChatDeleteMessage): Promise<void> {
+    try {
+      const ok = await deleteChatMessage({ room: msg.room, messageId: msg.messageId, byUserId: conn.userId }, this.clock, this.prisma);
+      if (ok) {
+        const out: ChatDeletedMessage = { type: 'CHAT_DELETED', room: msg.room, messageId: msg.messageId };
+        await this.bus.publish(roomChannel(msg.room), JSON.stringify(out));
+      }
+    } catch {
+      /* not the room owner / bad id — silently ignore */
+    }
+  }
+
+  private async handleChatBlock(conn: Conn, msg: ChatBlockMessage): Promise<void> {
+    if (conn.userId !== msg.room) return; // owner-only (the domain re-checks too)
+    try {
+      // Snapshot the doomed message ids first so we can tell live clients to drop
+      // them (blockChatUser soft-deletes them, but they're already on screen).
+      const doomed = await this.prisma.chatMessage.findMany({
+        where: { roomId: msg.room, userId: msg.userId, deletedAt: null },
+        select: { id: true },
+      });
+      await blockChatUser({ room: msg.room, userId: msg.userId, byUserId: conn.userId }, this.clock, this.prisma);
+      for (const d of doomed) {
+        const out: ChatDeletedMessage = { type: 'CHAT_DELETED', room: msg.room, messageId: d.id };
+        await this.bus.publish(roomChannel(msg.room), JSON.stringify(out));
+      }
+    } catch {
+      /* not the room owner — silently ignore */
     }
   }
 

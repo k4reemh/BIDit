@@ -23,6 +23,9 @@ export const ClientMessageType = {
   UNSUBSCRIBE: 'UNSUBSCRIBE',
   BID_INTENT: 'BID_INTENT',
   GIVEAWAY_ENTER: 'GIVEAWAY_ENTER',
+  CHAT_SEND: 'CHAT_SEND',
+  CHAT_DELETE: 'CHAT_DELETE',
+  CHAT_BLOCK: 'CHAT_BLOCK',
 } as const;
 export type ClientMessageType = (typeof ClientMessageType)[keyof typeof ClientMessageType];
 
@@ -47,11 +50,32 @@ export interface GiveawayEnterMessage {
   type: 'GIVEAWAY_ENTER';
   giveawayId: string;
 }
+/** A viewer posts a chat message to the room they're watching. */
+export interface ChatSendMessage {
+  type: 'CHAT_SEND';
+  room: string;
+  text: string;
+}
+/** Seller-only: hide a message in their own room. */
+export interface ChatDeleteMessage {
+  type: 'CHAT_DELETE';
+  room: string;
+  messageId: string;
+}
+/** Seller-only: block a user from their own room's chat. */
+export interface ChatBlockMessage {
+  type: 'CHAT_BLOCK';
+  room: string;
+  userId: string;
+}
 export type ClientMessage =
   | SubscribeMessage
   | UnsubscribeMessage
   | BidIntentMessage
-  | GiveawayEnterMessage;
+  | GiveawayEnterMessage
+  | ChatSendMessage
+  | ChatDeleteMessage
+  | ChatBlockMessage;
 
 // --------------------------------------------------------------------------
 // Server -> client (all authoritative)
@@ -68,6 +92,10 @@ export const ServerMessageType = {
   GIVEAWAY_REJECTED: 'GIVEAWAY_REJECTED',
   GIVEAWAY_WINNER: 'GIVEAWAY_WINNER',
   BALANCE_UPDATE: 'BALANCE_UPDATE',
+  CHAT_MESSAGE: 'CHAT_MESSAGE',
+  CHAT_HISTORY: 'CHAT_HISTORY',
+  CHAT_DELETED: 'CHAT_DELETED',
+  CHAT_REJECTED: 'CHAT_REJECTED',
   ERROR: 'ERROR',
 } as const;
 export type ServerMessageType = (typeof ServerMessageType)[keyof typeof ServerMessageType];
@@ -232,6 +260,45 @@ export interface GiveawayWinnerMessage {
   serverNow: number;
 }
 
+// ---- live chat -----------------------------------------------------------
+
+/** One chat line, shared by CHAT_MESSAGE (one) and CHAT_HISTORY (the backlog). */
+export interface ChatLine {
+  id: string;
+  senderId: string;
+  handle: string;
+  text: string;
+  createdAt: number;
+}
+/** A new chat message, broadcast to everyone in the room. */
+export interface ChatMessageMessage {
+  type: 'CHAT_MESSAGE';
+  room: string;
+  line: ChatLine;
+  serverNow: number;
+}
+/** The recent backlog, sent to a viewer when they join a room. */
+export interface ChatHistoryMessage {
+  type: 'CHAT_HISTORY';
+  room: string;
+  messages: ChatLine[];
+  serverNow: number;
+}
+/** A message was removed (seller moderation) — clients drop it from the feed. */
+export interface ChatDeletedMessage {
+  type: 'CHAT_DELETED';
+  room: string;
+  messageId: string;
+}
+export type ChatRejectReason = 'COOLDOWN' | 'BLOCKED' | 'EMPTY' | 'TOO_LONG';
+/** Sent only to the sender whose CHAT_SEND was turned down. */
+export interface ChatRejectedMessage {
+  type: 'CHAT_REJECTED';
+  reason: ChatRejectReason;
+  /** For COOLDOWN: ms to wait before retrying. */
+  retryMs?: number;
+}
+
 /** Sent to a user when their holds/balance change. */
 export interface BalanceUpdateMessage {
   type: 'BALANCE_UPDATE';
@@ -253,6 +320,10 @@ export type ServerMessage =
   | GiveawayRejectedMessage
   | GiveawayWinnerMessage
   | BalanceUpdateMessage
+  | ChatMessageMessage
+  | ChatHistoryMessage
+  | ChatDeletedMessage
+  | ChatRejectedMessage
   | ErrorMessage;
 
 // --------------------------------------------------------------------------
@@ -285,6 +356,18 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case ClientMessageType.GIVEAWAY_ENTER:
       return typeof m.giveawayId === 'string'
         ? { type: 'GIVEAWAY_ENTER', giveawayId: m.giveawayId }
+        : null;
+    case ClientMessageType.CHAT_SEND:
+      return typeof m.room === 'string' && typeof m.text === 'string'
+        ? { type: 'CHAT_SEND', room: m.room, text: m.text }
+        : null;
+    case ClientMessageType.CHAT_DELETE:
+      return typeof m.room === 'string' && typeof m.messageId === 'string'
+        ? { type: 'CHAT_DELETE', room: m.room, messageId: m.messageId }
+        : null;
+    case ClientMessageType.CHAT_BLOCK:
+      return typeof m.room === 'string' && typeof m.userId === 'string'
+        ? { type: 'CHAT_BLOCK', room: m.room, userId: m.userId }
         : null;
     default:
       return null;

@@ -385,3 +385,96 @@ describe('session revocation reaches live sockets (H1)', () => {
     cb.close();
   });
 });
+
+describe('live chat', () => {
+  /** Subscribe a client to a room and wait until it's in (AUCTION_STATE arrives). */
+  async function join(userId: string, room: string): Promise<TestClient> {
+    const c = new TestClient(url(issueSession(userId)));
+    await c.open();
+    c.send({ type: 'SUBSCRIBE', room });
+    await c.waitFor('AUCTION_STATE');
+    return c;
+  }
+
+  it('broadcasts a message to the room and replays the backlog to late joiners', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 60 });
+    const room = auction.sellerId;
+    const a = await makeFundedUser('100');
+    const b = await makeFundedUser('100');
+    const ca = await join(a.userId, room);
+    const cb = await join(b.userId, room);
+
+    ca.send({ type: 'CHAT_SEND', room, text: 'can you bid the art in the background?' });
+    await ca.waitFor('CHAT_MESSAGE');
+    const mB = await cb.waitFor('CHAT_MESSAGE');
+    expect(mB.line.text).toBe('can you bid the art in the background?');
+    expect(mB.line.handle).toBe(a.handle);
+
+    // A late joiner opens straight into the conversation via CHAT_HISTORY.
+    const late = await makeFundedUser('100');
+    const cc = new TestClient(url(issueSession(late.userId)));
+    await cc.open();
+    cc.send({ type: 'SUBSCRIBE', room });
+    const hist = await cc.waitFor('CHAT_HISTORY');
+    expect(hist.messages[hist.messages.length - 1].text).toBe('can you bid the art in the background?');
+
+    ca.close(); cb.close(); cc.close();
+  });
+
+  it('rejects a second message from the same user within the cooldown', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 60 });
+    const room = auction.sellerId;
+    const a = await makeFundedUser('100');
+    const ca = await join(a.userId, room);
+
+    ca.send({ type: 'CHAT_SEND', room, text: 'first' });
+    await ca.waitFor('CHAT_MESSAGE');
+    ca.send({ type: 'CHAT_SEND', room, text: 'too fast' });
+    const rej = await ca.waitFor('CHAT_REJECTED');
+    expect(rej.reason).toBe('COOLDOWN');
+    ca.close();
+  });
+
+  it('lets the seller delete a message (everyone drops it)', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 60 });
+    const room = auction.sellerId; // the seller IS the room owner
+    const heckler = await makeFundedUser('100');
+    const seller = await join(room, room);
+    const cx = await join(heckler.userId, room);
+
+    cx.send({ type: 'CHAT_SEND', room, text: 'spam spam' });
+    const m = await seller.waitFor('CHAT_MESSAGE');
+    await cx.waitFor('CHAT_MESSAGE');
+
+    seller.send({ type: 'CHAT_DELETE', room, messageId: m.line.id });
+    const del = await cx.waitFor('CHAT_DELETED');
+    expect(del.messageId).toBe(m.line.id);
+    seller.close(); cx.close();
+  });
+
+  it('lets the seller block a user (their next message is rejected)', async () => {
+    const clock = new ManualClock(T0);
+    await startServer(clock);
+    const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 60 });
+    const room = auction.sellerId;
+    const heckler = await makeFundedUser('100');
+    const seller = await join(room, room);
+    const cx = await join(heckler.userId, room);
+
+    cx.send({ type: 'CHAT_SEND', room, text: 'one' });
+    await cx.waitFor('CHAT_MESSAGE');
+    seller.send({ type: 'CHAT_BLOCK', room, userId: heckler.userId });
+    await sleep(200); // let the block persist
+
+    cx.send({ type: 'CHAT_SEND', room, text: 'two' });
+    const rej = await cx.waitFor('CHAT_REJECTED');
+    expect(rej.reason).toBe('BLOCKED');
+    seller.close(); cx.close();
+  });
+});
