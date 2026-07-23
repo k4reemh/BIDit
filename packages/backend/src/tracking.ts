@@ -23,18 +23,87 @@ export interface TrackingProvider {
   getStatus(carrier: string, trackingNumber: string): Promise<TrackStatus>;
 }
 
+/**
+ * Shippo needs an EXACT carrier token (`usps`, `ups`, `fedex`, `dhl_express`,
+ * `canada_post`…). Operators type free text ("Canada Post", "DHL"), so map the
+ * common spellings. Naively lowercasing and stripping punctuation silently breaks
+ * every multi-word token (canada_post → canadapost → 404).
+ */
+const CARRIER_TOKENS: Record<string, string> = {
+  usps: 'usps',
+  'united states postal service': 'usps',
+  'us postal service': 'usps',
+  ups: 'ups',
+  fedex: 'fedex',
+  'federal express': 'fedex',
+  dhl: 'dhl_express',
+  'dhl express': 'dhl_express',
+  'dhl ecommerce': 'dhl_ecommerce',
+  'canada post': 'canada_post',
+  canadapost: 'canada_post',
+  purolator: 'purolator',
+  'royal mail': 'royal_mail',
+  'australia post': 'australia_post',
+  ontrac: 'ontrac',
+  lasership: 'lasership',
+};
+
+/** Best-effort carrier guess from the tracking-number shape. The rescue path for
+ *  labels saved before the carrier field was required — without it those shipments
+ *  can never be tracked. Only guesses when the pattern is distinctive. */
+export function guessCarrier(tracking: string): string | null {
+  const t = tracking.replace(/\s+/g, '').toUpperCase();
+  if (/^1Z[0-9A-Z]{16}$/.test(t)) return 'ups';
+  if (/^(94|93|92|95|82)\d{18,20}$/.test(t)) return 'usps';
+  if (/^[A-Z]{2}\d{9}US$/.test(t)) return 'usps'; // USPS international
+  if (/^[A-Z]{2}\d{9}CA$/.test(t)) return 'canada_post';
+  if (/^\d{16}$/.test(t)) return 'canada_post';
+  if (/^\d{12}$/.test(t) || /^\d{15}$/.test(t) || /^\d{20}$/.test(t) || /^\d{22}$/.test(t)) return 'fedex';
+  if (/^\d{10}$/.test(t)) return 'dhl_express';
+  return null;
+}
+
+/** Resolve the Shippo carrier token from what the operator typed, falling back to
+ *  the tracking-number shape. Returns null when we genuinely can't tell — better to
+ *  log loudly than to query the wrong (or the `shippo` TEST) carrier and get 404s. */
+export function resolveCarrierToken(carrier: string | null | undefined, tracking: string): string | null {
+  const raw = (carrier ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+  if (raw) {
+    const mapped = CARRIER_TOKENS[raw];
+    if (mapped) return mapped;
+    // Already an exact Shippo-style token (lowercase, underscores) — pass through.
+    const asToken = raw.replace(/\s+/g, '_');
+    if (/^[a-z][a-z0-9_]{1,}$/.test(asToken)) return asToken;
+  }
+  return guessCarrier(tracking);
+}
+
 /** Real Shippo tracking. Test mode: carrier 'shippo' + tracking 'SHIPPO_DELIVERED'
  *  / 'SHIPPO_TRANSIT' return those statuses. */
 export class ShippoTracker implements TrackingProvider {
   constructor(private readonly apiKey: string) {}
 
   async getStatus(carrier: string, trackingNumber: string): Promise<TrackStatus> {
-    const token = (carrier || 'shippo').toLowerCase().replace(/[^a-z0-9]/g, '') || 'shippo';
+    const token = resolveCarrierToken(carrier, trackingNumber);
+    if (!token) {
+      // Never fall back to Shippo's `shippo` TEST carrier — a real tracking number
+      // 404s there, which is exactly how a delivered package stays "not delivered".
+      console.warn(
+        `[tracking] no carrier for ${trackingNumber} (carrier=${JSON.stringify(carrier)}) — set the carrier on the label so Shippo can be queried`,
+      );
+      return 'unknown';
+    }
     try {
       const res = await fetch(`https://api.goshippo.com/tracks/${token}/${encodeURIComponent(trackingNumber)}`, {
         headers: { Authorization: `ShippoToken ${this.apiKey}` },
       });
-      if (!res.ok) return 'unknown';
+      if (!res.ok) {
+        // Loud on purpose: a silent 401/404 here is invisible, and the shipment just
+        // sits un-tracked forever (401 = bad/!live key, 404 = wrong carrier token).
+        const body = await res.text().catch(() => '');
+        console.error(`[tracking] shippo ${res.status} for ${token}/${trackingNumber}: ${body.slice(0, 200)}`);
+        return 'unknown';
+      }
       const data = (await res.json()) as { tracking_status?: { status?: string } };
       switch (String(data?.tracking_status?.status ?? '').toUpperCase()) {
         case 'DELIVERED':
@@ -49,7 +118,8 @@ export class ShippoTracker implements TrackingProvider {
         default:
           return 'unknown';
       }
-    } catch {
+    } catch (err) {
+      console.error(`[tracking] shippo request failed for ${token}/${trackingNumber}:`, (err as Error)?.message ?? err);
       return 'unknown';
     }
   }

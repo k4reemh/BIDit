@@ -5,7 +5,7 @@ import { DevWalletEscrow } from '../src/escrow.js';
 import { placeBid, closeDueAuctions } from '../src/auction.js';
 import { settleAuction, processOrderTimers, disputeShipment, releaseOrdersForShipment, DISPUTE_WINDOW_MS } from '../src/orders.js';
 import { createAndPayShipment, confirmShipmentForLabel, createShipmentLabel } from '../src/fulfillment.js';
-import { ShipmentTracker, MockTrackingProvider } from '../src/tracking.js';
+import { ShipmentTracker, MockTrackingProvider, resolveCarrierToken, guessCarrier } from '../src/tracking.js';
 import { getSettledBalance, getBuybackPending, getSystemTotal } from '../src/ledger.js';
 import { usdc, OrderStatus, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
@@ -34,6 +34,34 @@ async function shippedEscrowOrder(clock: ManualClock) {
   await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://l/x.pdf', trackingNumber: 'TRK1', carrier: 'shippo' }, clock, prisma);
   return { escrow, order, shipment, buyer, sellerId: auction.sellerId };
 }
+
+describe('Shippo carrier token resolution', () => {
+  it('maps the names an operator actually types to exact Shippo tokens', () => {
+    expect(resolveCarrierToken('UPS', '1Z999AA10123456784')).toBe('ups');
+    expect(resolveCarrierToken('USPS', '9400111899223197428490')).toBe('usps');
+    expect(resolveCarrierToken('FedEx', '123456789012')).toBe('fedex');
+    // Multi-word carriers: the old lowercase+strip turned these into 404s.
+    expect(resolveCarrierToken('Canada Post', '1234567890123456')).toBe('canada_post');
+    expect(resolveCarrierToken('DHL', '1234567890')).toBe('dhl_express');
+    // An exact token passes through untouched.
+    expect(resolveCarrierToken('canada_post', '1234567890123456')).toBe('canada_post');
+  });
+
+  it('falls back to the tracking-number shape when the carrier is blank', () => {
+    // The real-world bug: carrier was optional, so labels were saved without one.
+    expect(resolveCarrierToken('', '1Z999AA10123456784')).toBe('ups');
+    expect(resolveCarrierToken(null, '9400111899223197428490')).toBe('usps');
+    expect(resolveCarrierToken(undefined, 'LN123456789US')).toBe('usps');
+  });
+
+  it('returns null rather than the `shippo` TEST carrier when it cannot tell', () => {
+    // Querying the test carrier with a real number 404s — which is exactly how a
+    // delivered package silently stayed "not delivered".
+    expect(resolveCarrierToken('', 'NOTATRACKINGNUMBER')).toBeNull();
+    expect(resolveCarrierToken('', '')).toBeNull();
+    expect(guessCarrier('random-123')).toBeNull();
+  });
+});
 
 describe('shipment tracking → delivery → escrow release', () => {
   it('delivery opens the 2-day window, then auto-releases 95/4/1', async () => {

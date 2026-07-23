@@ -114,6 +114,9 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
 
   const submit = async () => {
     if (!labelUrl.trim() || !tracking.trim()) { setErr('Paste the label link and the tracking number.'); return; }
+    // Carrier is REQUIRED: Shippo is queried per-carrier, so a label saved without
+    // one can never be tracked and the package silently never turns "delivered".
+    if (!carrier.trim()) { setErr('Pick the carrier — tracking can’t run without it.'); return; }
     setBusy(true); setErr('');
     try { await createLabel(row.id, labelUrl.trim(), tracking.trim(), carrier.trim() || undefined); onDone(); }
     catch (e) { setErr(e instanceof Error ? e.message : 'Could not save the label.'); setBusy(false); }
@@ -159,7 +162,22 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
             </div>
             <div className="fld-row">
               <div className="fld"><label>Tracking number</label><input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="1Z…" /></div>
-              <div className="fld"><label>Carrier <span className="muted">— optional</span></label><input value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="UPS, USPS…" /></div>
+              <div className="fld">
+                <label>Carrier</label>
+                {/* Exact Shippo carrier tokens — tracking is queried per-carrier, so
+                    a dropdown (not free text) guarantees a value Shippo accepts. */}
+                <select value={carrier} onChange={(e) => setCarrier(e.target.value)}>
+                  <option value="">Select carrier…</option>
+                  <option value="usps">USPS</option>
+                  <option value="ups">UPS</option>
+                  <option value="fedex">FedEx</option>
+                  <option value="dhl_express">DHL Express</option>
+                  <option value="canada_post">Canada Post</option>
+                  <option value="purolator">Purolator</option>
+                  <option value="royal_mail">Royal Mail</option>
+                  <option value="australia_post">Australia Post</option>
+                </select>
+              </div>
             </div>
             {err && <div className="auth__error">{err}</div>}
             <div className="acct-actions">

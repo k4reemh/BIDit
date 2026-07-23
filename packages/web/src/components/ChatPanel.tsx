@@ -105,7 +105,7 @@ export default function ChatPanel({
             value={text}
             maxLength={300}
             disabled={blocked}
-            placeholder={blocked ? 'You’re blocked from this chat' : 'Ask the seller something…'}
+            placeholder={blocked ? 'You’re blocked from this chat' : 'Type something…'}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
           />
