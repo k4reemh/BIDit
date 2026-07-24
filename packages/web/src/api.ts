@@ -483,6 +483,18 @@ export interface ListingShipEstimate {
   hasAddress: boolean;
 }
 
+export interface Purchase {
+  id: string;
+  title: string;
+  image: string | null;
+  amount: string;
+  stage: 'to_ship' | 'in_transit' | 'delivered';
+  tracking: string | null;
+  carrier: string | null;
+  deliveredAt: number | null;
+}
+export const getPurchases = () => req<Purchase[]>('/me/purchases');
+
 export const getFulfillment = () => req<Fulfillment>('/me/fulfillment');
 export const estimateShipment = (itemIds: string[], opts?: { private?: boolean }) =>
   req<ShipEstimate>('/shipments/estimate', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });

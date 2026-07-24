@@ -155,34 +155,31 @@ export async function purchaseListing(
     await prisma.listing.update({ where: { id: listingId }, data: { status: ListingStatus.SOLD } });
   }
 
-  // Same physical-fulfillment entry as an auction win (direct mode drives
-  // shipping off FulfillmentItems; escrow mode ships at the order level).
-  if (opts.directPayout) {
-    await createFulfillmentItem(
-      {
-        orderId: created.id,
-        buyerId,
-        sellerId,
-        listingId,
-        title: listing.title,
-        photo: listing.photos[0] ?? null,
-        weightGrams: listing.weightGrams,
-        amount,
-      },
-      clock,
-      prisma,
-    );
-    await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
-  }
+  // Same physical-fulfillment entry as an auction win — in BOTH modes. (This used
+  // to be direct-mode only, so an escrow store buy created an Order but no
+  // FulfillmentItem and vanished from the buyer's Purchases / Ready-to-ship.)
+  await createFulfillmentItem(
+    {
+      orderId: created.id,
+      buyerId,
+      sellerId,
+      listingId,
+      title: listing.title,
+      photo: listing.photos[0] ?? null,
+      weightGrams: listing.weightGrams,
+      amount,
+    },
+    clock,
+    prisma,
+  );
+  await applyWeeklyBundling({ orderId: created.id, buyerId, sellerId }, clock, prisma);
 
   // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
   await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
   const price = `$${formatUsdc(amount)}`;
   await notify(
-    opts.directPayout
-      ? { userId: buyerId, kind: 'won', title: `You bought ${listing.title}`, body: `Paid ${price} from the store. Go to Ready to ship to send it your way.`, href: '/ship' }
-      : { userId: buyerId, kind: 'won', title: `You bought ${listing.title}`, body: `Paid ${price} from the store. The seller ships it to you next.`, href: '/purchases' },
+    { userId: buyerId, kind: 'won', title: `You bought ${listing.title}`, body: `Paid ${price} from the store. Go to Ready to ship to send it your way.`, href: '/ship' },
     prisma,
   );
   await notify(

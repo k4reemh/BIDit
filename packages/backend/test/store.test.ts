@@ -4,6 +4,7 @@ import { ManualClock } from '../src/clock.js';
 import { placeBid } from '../src/auction.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
+import { getBuyerPurchases } from '../src/fulfillment.js';
 import { getSettledBalance, getAvailableBalance, getSystemTotal } from '../src/ledger.js';
 import { InsufficientFundsError } from '../src/errors.js';
 import { usdc, OrderStatus, ListingStatus, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
@@ -170,6 +171,19 @@ describe('store buy-now (escrow payout)', () => {
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20'));
     expect(await getSettledBalance(seller.accountId, prisma)).toBe(0n); // paid on release, not now
     expect(await getSystemTotal(prisma)).toBe(0n);
+
+    // The bug: an ESCROW store buy must ALSO create a ready-to-ship item (it used
+    // to only happen in direct mode, so the purchase vanished from the buyer's UI).
+    const item = await prisma.fulfillmentItem.findFirst({ where: { orderId: order.id } });
+    expect(item).not.toBeNull();
+    expect(item!.status).toBe('READY_TO_SHIP');
+    expect(item!.buyerId).toBe(buyer.userId);
+
+    // …and it shows up in the Purchases overview, in the "to ship" stage.
+    const purchases = await getBuyerPurchases(buyer.userId, prisma);
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0]!.status).toBe('READY_TO_SHIP');
+    expect(purchases[0]!.title).toBe('OP-09 Booster Pack');
   });
 });
 

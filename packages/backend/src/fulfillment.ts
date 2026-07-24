@@ -230,6 +230,46 @@ export async function getBuyerFulfillment(buyerId: string, prisma: PrismaClient 
   return { items, shipments };
 }
 
+export interface BuyerPurchase {
+  id: string;
+  orderId: string;
+  title: string;
+  photo: string | null;
+  amount: bigint;
+  /** FulfillmentItem status: READY_TO_SHIP | IN_SHIPMENT | SHIPPED | DELIVERED. */
+  status: string;
+  shipment: { status: string; trackingNumber: string | null; carrier: string | null; deliveredAt: Date | null } | null;
+}
+
+/** Everything the buyer has won/bought that still exists (not discarded), across the
+ *  whole lifecycle — for the Purchases overview. Each item carries its shipment (if
+ *  any) so the UI can show tracking + the delivered state. `shipmentId` is a loose
+ *  FK (no relation), so shipments are fetched + joined in memory. */
+export async function getBuyerPurchases(buyerId: string, prisma: PrismaClient = defaultPrisma): Promise<BuyerPurchase[]> {
+  const items = await prisma.fulfillmentItem.findMany({
+    where: { buyerId, status: { in: ['READY_TO_SHIP', 'IN_SHIPMENT', 'SHIPPED', 'DELIVERED'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  const shipmentIds = [...new Set(items.map((i) => i.shipmentId).filter((x): x is string => !!x))];
+  const shipments = shipmentIds.length
+    ? await prisma.shipment.findMany({
+        where: { id: { in: shipmentIds } },
+        select: { id: true, status: true, trackingNumber: true, carrier: true, deliveredAt: true },
+      })
+    : [];
+  const byId = new Map(shipments.map((s) => [s.id, s]));
+  return items.map((it) => ({
+    id: it.id,
+    orderId: it.orderId,
+    title: it.title,
+    photo: it.photo,
+    amount: it.amount,
+    status: it.status,
+    shipment: it.shipmentId ? byId.get(it.shipmentId) ?? null : null,
+  }));
+}
+
 export function getSellerShipments(sellerId: string, prisma: PrismaClient = defaultPrisma) {
   return prisma.shipment.findMany({
     where: { sellerId, status: { in: ['PAID', 'LABEL_PENDING', 'LABEL_CREATED', 'SHIPPED'] } },

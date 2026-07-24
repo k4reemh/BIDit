@@ -82,6 +82,7 @@ import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
 import { ChainSettler } from '../src/chain-settle.js';
 import {
   getBuyerFulfillment,
+  getBuyerPurchases,
   getSellerShipments,
   getSellerHeldItems,
   listPrivateShipments,
@@ -631,6 +632,11 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await buyerFulfillmentDto(userId));
+      }
+      if (req.method === 'GET' && p === '/me/purchases') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await buyerPurchasesDto(userId));
       }
       if (req.method === 'POST' && p === '/shipping/quote-listing') {
         const userId = authUser(req);
@@ -1538,6 +1544,30 @@ async function buyerFulfillmentDto(buyerId: string) {
     })),
     shipments: (await Promise.all(shipments.map((s) => shipmentDto(s.id)))).filter(Boolean),
   };
+}
+
+/** The buyer's Purchases overview — every won/bought item across the lifecycle,
+ *  bucketed into a `stage` the UI groups by (to_ship / in_transit / delivered). */
+async function buyerPurchasesDto(buyerId: string) {
+  const rows = await getBuyerPurchases(buyerId, prisma);
+  return rows.map((r) => {
+    const stage =
+      r.status === 'DELIVERED' || r.shipment?.status === 'DELIVERED'
+        ? 'delivered'
+        : r.status === 'READY_TO_SHIP'
+          ? 'to_ship'
+          : 'in_transit';
+    return {
+      id: r.id,
+      title: r.title,
+      image: r.photo,
+      amount: formatUsdc(r.amount),
+      stage,
+      tracking: r.shipment?.trackingNumber ?? null,
+      carrier: r.shipment?.carrier ?? null,
+      deliveredAt: r.shipment?.deliveredAt ? r.shipment.deliveredAt.getTime() : null,
+    };
+  });
 }
 
 /** Shipment DTO. Deliberately omits `privateLeg2` (the buyer's real address on a
