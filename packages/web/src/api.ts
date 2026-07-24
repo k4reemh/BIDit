@@ -341,10 +341,6 @@ export const startAuction = (listingId: string, durationSeconds: number) =>
     body: JSON.stringify({ listingId, durationSeconds, counterBidSeconds: 10 }),
   });
 
-export const shipOrder = (orderId: string, trackingNumber?: string) =>
-  req('/seller/order/ship', { method: 'POST', body: JSON.stringify({ orderId, trackingNumber }) });
-export const deliverOrder = (orderId: string) =>
-  req('/seller/order/deliver', { method: 'POST', body: JSON.stringify({ orderId }) });
 export const setSellerCoin = (coinAddress: string) =>
   req<{ ok: boolean }>('/seller/coin', { method: 'POST', body: JSON.stringify({ coinAddress }) });
 export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null }) =>

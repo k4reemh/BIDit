@@ -995,24 +995,9 @@ async function main() {
           entrantCount: result.entrants.length,
         });
       }
-      if (req.method === 'POST' && p === '/seller/order/ship') {
-        const userId = authUser(req);
-        if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const b = await readJson(req);
-        const order = await prisma.order.findUnique({ where: { id: String(b.orderId) } });
-        if (!order || order.sellerId !== userId) return send(res, 403, { error: 'not your order' });
-        const updated = await markShipped(order.id, String(b.tracking ?? 'TRACKING'), systemClock, prisma);
-        return send(res, 200, { status: updated.status });
-      }
-      if (req.method === 'POST' && p === '/seller/order/deliver') {
-        const userId = authUser(req);
-        if (!userId) return send(res, 401, { error: 'unauthorized' });
-        const b = await readJson(req);
-        const order = await prisma.order.findUnique({ where: { id: String(b.orderId) } });
-        if (!order || order.sellerId !== userId) return send(res, 403, { error: 'not your order' });
-        const updated = await markDelivered(order.id, systemClock, prisma);
-        return send(res, 200, { status: updated.status });
-      }
+      // NOTE: no seller-facing order ship/deliver endpoints. Sellers never mark an
+      // order shipped/delivered or enter a tracking number — the admin creates the
+      // label + tracking and the carrier tracker (or admin override) drives status.
 
       // ---- admin ----
       if (req.method === 'GET' && p === '/admin/sellers') {
