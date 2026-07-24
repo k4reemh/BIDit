@@ -14,7 +14,7 @@ import {
   type GiveawayWinner,
   type RandomizerSpin,
 } from '../realtime';
-import { estimateListingShipping, type Session, type ShippingMode, type ListingShipEstimate } from '../api';
+import { estimateListingShipping, money2, type Session, type ShippingMode, type ListingShipEstimate } from '../api';
 import { Gift, Bolt, Dice, Chevron, Truck } from '../icons';
 
 interface Feed { who: string; amt: string; key: number }
@@ -167,11 +167,11 @@ export default function BidPanel({
   const shipNote: { text: string; warn?: boolean } | null = (() => {
     if (!session || !shipEst) return null;
     if (!shipEst.hasAddress) return { text: 'Add a shipping address to see shipping cost', warn: true };
-    const fee = shipEst.shippingFee;
+    const fee = money2(shipEst.shippingFee);
     if (shipMode === 'WEEKLY_BUNDLE') return { text: `~$${fee} est. shipping · charged when you win` };
     if (shipMode === 'PRIVATE') {
-      const total = (parseFloat(fee) + parseFloat(shipEst.privacyFee)).toFixed(2);
-      return { text: `~$${total} est. shipping (incl. $${shipEst.privacyFee} private) · when you ship` };
+      const total = money2(parseFloat(shipEst.shippingFee) + parseFloat(shipEst.privacyFee));
+      return { text: `~$${total} est. shipping (incl. $${money2(shipEst.privacyFee)} private) · when you ship` };
     }
     return { text: `~$${fee} est. shipping · pay later when you ship` }; // SHIP_LATER
   })();
@@ -215,7 +215,7 @@ export default function BidPanel({
               <Truck width={16} height={16} />
             </button>
           )}
-          {session && <span className="bp__bal" title="Your wallet balance">${balance}</span>}
+          {session && <span className="bp__bal" title="Your wallet balance">${money2(balance)}</span>}
         </div>
       </div>
 

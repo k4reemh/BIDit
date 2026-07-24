@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { updateMe, type ShippingMode } from '../api';
 import { Truck, Shield, Bookmark, Check } from '../icons';
 
@@ -51,7 +52,9 @@ export default function ShippingMenu({
     }
   };
 
-  return (
+  // Portal to <body>: rendered inline it lives inside the sticky .watch__side
+  // stacking context, which traps the fixed scrim BELOW the livestream overlay.
+  return createPortal(
     <div className="modal__scrim" onClick={onClose}>
       <div className="modal shipmenu" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
@@ -76,6 +79,7 @@ export default function ShippingMenu({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

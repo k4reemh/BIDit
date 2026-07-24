@@ -9,6 +9,7 @@ import {
   confirmReceived,
   refreshMe,
   updateMe,
+  money2,
   type Fulfillment,
   type FulfillmentItem,
   type Shipment,
@@ -117,7 +118,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
     setBusy(true); setErr(''); setMsg('');
     try {
       const shipment = await createShipment(ids, priv ? { mode: 'PRIVATE', private: true } : undefined);
-      const total = priv ? `$${shipment.shippingFee} + $${shipment.privacyFee} privacy` : `$${shipment.shippingFee}`;
+      const total = priv ? `$${money2(shipment.shippingFee)} + $${money2(shipment.privacyFee)} privacy` : `$${money2(shipment.shippingFee)}`;
       setMsg(`Shipping paid (${total}). The seller has been notified to ship.`);
       onChanged();
     } catch (e) {
@@ -152,7 +153,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
             {it.image ? <img className="ship-thumb" src={it.image} alt="" /> : <div className="ship-thumb ship-thumb--ph" />}
             <div className="ship-meta">
               <b>{it.title}</b>
-              <span className="muted">Paid ${it.amount}{it.weightGrams ? ` · ~${it.weightGrams}g` : ''}</span>
+              <span className="muted">Paid ${money2(it.amount)}{it.weightGrams ? ` · ~${it.weightGrams}g` : ''}</span>
             </div>
             <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => discard(it.id, it.title)}>Discard</button>
           </label>
@@ -168,13 +169,13 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
         est.hasAddress ? (
           <div className="ship-est">
             <div className="ship-est__row">
-              <span className="muted">Shipping <em className="ship-est__note">UPS est. ${est.carrierRetail} · {est.discountPct}% of retail{sel.size > 1 ? ' · +3% per extra item' : ''}</em></span>
-              <b>${est.shippingFee}</b>
+              <span className="muted">Estimated shipping <em className="ship-est__note">UPS est. ${money2(est.carrierRetail)} · {est.discountPct}% of retail{sel.size > 1 ? ' · +3% per extra item' : ''}</em></span>
+              <b>${money2(est.shippingFee)}</b>
             </div>
             {Number(est.privacyFee) > 0 && (
-              <div className="ship-est__row"><span className="muted">Private shipping fee</span><b>${est.privacyFee}</b></div>
+              <div className="ship-est__row"><span className="muted">Private shipping fee</span><b>${money2(est.privacyFee)}</b></div>
             )}
-            <div className="ship-est__row ship-est__total"><span>You pay</span><b>${est.total}</b></div>
+            <div className="ship-est__row ship-est__total"><span>You pay</span><b>${money2(est.total)}</b></div>
           </div>
         ) : (
           <div className="ship-est ship-est--warn">
@@ -185,7 +186,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
 
       <div className="acct-actions">
         <button className="btn btn-primary" disabled={busy || sel.size === 0} onClick={ship}>
-          {busy ? 'Processing…' : est && est.hasAddress ? `Ship ${sel.size} item${sel.size === 1 ? '' : 's'} · $${est.total}` : `Ship ${sel.size} item${sel.size === 1 ? '' : 's'}`}
+          {busy ? 'Processing…' : est && est.hasAddress ? `Ship ${sel.size} item${sel.size === 1 ? '' : 's'} · $${money2(est.total)}` : `Ship ${sel.size} item${sel.size === 1 ? '' : 's'}`}
         </button>
       </div>
     </div>
@@ -210,7 +211,7 @@ function ShipmentCard({ shipment, onChanged }: { shipment: Shipment; onChanged: 
     <div className="card acct-card">
       <div className="ship-grp__head">
         <h3 className="acct-sub" style={{ margin: 0 }}>{shipment.items.length} item{shipment.items.length > 1 ? 's' : ''} · {label}</h3>
-        <span className="muted" style={{ fontSize: 12 }}>Shipping ${shipment.shippingFee}{Number(shipment.privacyFee) > 0 ? ` + $${shipment.privacyFee} privacy` : ''}</span>
+        <span className="muted" style={{ fontSize: 12 }}>Shipping ${money2(shipment.shippingFee)}{Number(shipment.privacyFee) > 0 ? ` + $${money2(shipment.privacyFee)} privacy` : ''}</span>
       </div>
       <div className="ship-list">
         {shipment.items.map((it) => (

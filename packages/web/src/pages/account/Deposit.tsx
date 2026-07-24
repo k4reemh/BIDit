@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
-import { simulateDeposit, withdraw, refreshMe } from '../../api';
+import { simulateDeposit, withdraw, refreshMe, money2 } from '../../api';
 import { Copy, Check, Wallet, Shield } from '../../icons';
 
 export default function Deposit() {
@@ -68,7 +68,7 @@ export default function Deposit() {
       </div>
 
       <div className="bal-grid bal-grid--one">
-        <div className="bal card"><span className="muted">Wallet balance</span><b>${session.settled}</b></div>
+        <div className="bal card"><span className="muted">Wallet balance</span><b>${money2(session.settled)}</b></div>
       </div>
       <p className="muted acct-note" style={{ marginTop: -6, marginBottom: 18 }}>Your full balance. Placing a bid reserves funds but doesn’t leave your wallet — you’re only charged when you win.</p>
 
@@ -111,7 +111,7 @@ export default function Deposit() {
         </div>
         <div className="acct-actions">
           <button className="btn btn-primary" onClick={doWithdraw} disabled={wBusy || !wAmt || !wTo.trim()}>{wBusy ? 'Sending…' : 'Withdraw'}</button>
-          <span className="muted" style={{ fontSize: 13 }}>Wallet: ${session.settled}</span>
+          <span className="muted" style={{ fontSize: 13 }}>Wallet: ${money2(session.settled)}</span>
         </div>
       </div>
 

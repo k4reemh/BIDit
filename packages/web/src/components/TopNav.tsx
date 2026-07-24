@@ -6,6 +6,7 @@ import ProfileMenu from './ProfileMenu';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import { Search, GitHub, Gift, XLogo, Chevron, Wallet } from '../icons';
+import { money2 } from '../api';
 import type { User } from '../App';
 
 export default function TopNav({
@@ -58,7 +59,7 @@ export default function TopNav({
           <ThemeToggle />
           {user ? (
             <>
-              <Link className="nav__bal" to="/deposit" title="Your wallet balance"><Wallet width={15} height={15} /> ${user.settled}</Link>
+              <Link className="nav__bal" to="/deposit" title="Your wallet balance"><Wallet width={15} height={15} /> ${money2(user.settled)}</Link>
               <NotificationBell />
               <button className="icon-btn" aria-label="Rewards"><Gift /></button>
               <button className="nav__avatar" onClick={() => setMenu((v) => !v)} aria-label="Account">

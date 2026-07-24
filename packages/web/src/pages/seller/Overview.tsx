@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeller } from '../../components/SellerLayout';
-import { getListings, getSellerOrders, getSellerPromo, type SellerListing, type SellerOrder, type SellerPromoStatus } from '../../api';
+import { getListings, getSellerOrders, getSellerPromo, money2, type SellerListing, type SellerOrder, type SellerPromoStatus } from '../../api';
 import { Tag, Dice, Truck, ArrowRight } from '../../icons';
 
 const sum = (xs: string[]) => xs.reduce((a, b) => a + (parseFloat(b) || 0), 0);
@@ -30,7 +30,7 @@ export default function Overview() {
 
   const stats = [
     { label: 'Gross sales', value: money(gmv), sub: `${orders.length} orders` },
-    { label: 'Available balance', value: `$${session.available}`, sub: 'USDC' },
+    { label: 'Available balance', value: `$${money2(session.available)}`, sub: 'USDC' },
     { label: 'Live now', value: String(live), sub: `${queued} queued` },
     { label: '→ $BID buyback', value: money(bid), sub: '4% of sales' },
   ];

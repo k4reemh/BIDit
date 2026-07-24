@@ -1,5 +1,6 @@
 import { useSeller } from '../../components/SellerLayout';
 import EmptyState from '../../components/EmptyState';
+import { money2 } from '../../api';
 import { Wallet } from '../../icons';
 
 export default function Payouts() {
@@ -12,8 +13,8 @@ export default function Payouts() {
       </div>
 
       <div className="bal-grid">
-        <div className="bal card"><span className="muted">Available balance</span><b>${session.available}</b></div>
-        <div className="bal card"><span className="muted">Pending in escrow</span><b>${session.settled}</b></div>
+        <div className="bal card"><span className="muted">Available balance</span><b>${money2(session.available)}</b></div>
+        <div className="bal card"><span className="muted">Pending in escrow</span><b>${money2(session.settled)}</b></div>
       </div>
 
       <div className="card acct-card split">

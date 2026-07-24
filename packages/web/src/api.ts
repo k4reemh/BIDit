@@ -71,6 +71,10 @@ export const logout = () =>
  *  account. Irreversible; caller clears the local token afterward. */
 export const eraseMyData = () => req<{ ok: boolean }>('/me/erase', { method: 'POST', body: '{}' });
 
+/** Display a USDC decimal string with exactly 2 decimals ("5.5"→"5.50", "25"→"25.00"),
+ *  rounded to the nearest cent — for shipping figures and wallet balances. */
+export const money2 = (s: string | number) => Number(s).toFixed(2);
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json', ...(opts.headers as Record<string, string>) };
   const t = getToken();
