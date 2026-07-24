@@ -62,7 +62,7 @@ import { verifySession, consumeWsTicket, onSessionRevoked } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
-import { postChatMessage, deleteChatMessage, blockChatUser, listRecentChat, ChatError, CHAT_BACKLOG } from '../chat.js';
+import { postChatMessage, deleteChatMessage, blockChatUser, listRecentChat, roomChatCooldownMs, ChatError, CHAT_BACKLOG } from '../chat.js';
 
 interface Conn {
   id: string;
@@ -437,19 +437,23 @@ export class RealtimeServer {
       }
     }
     // Chat backlog: on the first subscribe, send the recent messages so a viewer
-    // (and the seller) opens into an in-progress conversation. Gated so the 12s
-    // heartbeat re-subscribes don't re-send it.
+    // (and the seller) opens into an in-progress conversation, plus the room's chat
+    // cooldown so the client throttle matches the seller's setting. Sent even when
+    // empty (so the cooldown always arrives); gated to the first subscribe so the
+    // 12s heartbeat re-subscribes don't re-send it.
     if (firstSubscribe) {
-      const history = await listRecentChat(room, CHAT_BACKLOG, this.prisma);
-      if (history.length > 0) {
-        const out: ChatHistoryMessage = {
-          type: 'CHAT_HISTORY',
-          room,
-          messages: history.map((m) => this.toChatLine(m)),
-          serverNow: this.clock.now().getTime(),
-        };
-        this.sendToConn(conn, out);
-      }
+      const [history, cooldownMs] = await Promise.all([
+        listRecentChat(room, CHAT_BACKLOG, this.prisma),
+        roomChatCooldownMs(room, this.prisma),
+      ]);
+      const out: ChatHistoryMessage = {
+        type: 'CHAT_HISTORY',
+        room,
+        messages: history.map((m) => this.toChatLine(m)),
+        cooldownMs,
+        serverNow: this.clock.now().getTime(),
+      };
+      this.sendToConn(conn, out);
     }
   }
 

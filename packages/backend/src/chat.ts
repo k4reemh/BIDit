@@ -13,7 +13,7 @@ import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 
 export const CHAT_MAX_LEN = 300;
-export const CHAT_COOLDOWN_MS = 4000; // one message per user per 4s
+export const CHAT_COOLDOWN_MS = 5000; // default: one message per user per 5s (seller-configurable)
 export const CHAT_BACKLOG = 10; // messages sent to a viewer on join
 
 export type ChatRejectReason = 'COOLDOWN' | 'BLOCKED' | 'EMPTY' | 'TOO_LONG';
@@ -38,6 +38,13 @@ export function sanitizeChatText(raw: string): string {
   if (!text) throw new ChatError('EMPTY');
   if (text.length > CHAT_MAX_LEN) throw new ChatError('TOO_LONG');
   return text;
+}
+
+/** The room owner's configured chat cooldown in ms (null → CHAT_COOLDOWN_MS default,
+ *  0 → off). Room === the seller's userId, so it's a SellerProfile lookup. */
+export async function roomChatCooldownMs(room: string, prisma: PrismaClient = defaultPrisma): Promise<number> {
+  const profile = await prisma.sellerProfile.findUnique({ where: { userId: room }, select: { chatCooldownMs: true } });
+  return profile?.chatCooldownMs ?? CHAT_COOLDOWN_MS;
 }
 
 /** Whether `userId` is blocked from `room`'s chat. */
@@ -72,19 +79,21 @@ export async function postChatMessage(
   if (await isChatBlocked(params.room, params.userId, prisma)) throw new ChatError('BLOCKED');
   const text = sanitizeChatText(params.text);
 
-  // DB-backed cooldown: the sender's most recent message in this room (deleted or
-  // not — you can't delete your own, so this can't be gamed). Authoritative across
-  // instances, unlike an in-memory timer.
-  const last = await prisma.chatMessage.findFirst({
-    where: { roomId: params.room, userId: params.userId },
-    orderBy: { createdAt: 'desc' },
-    select: { createdAt: true },
-  });
-  const now = clock.now();
-  if (last) {
-    const since = now.getTime() - last.createdAt.getTime();
-    if (since < CHAT_COOLDOWN_MS) throw new ChatError('COOLDOWN', CHAT_COOLDOWN_MS - since);
+  // The room owner (seller) sets the cooldown; 0 = off (skip the check entirely).
+  const cooldown = await roomChatCooldownMs(params.room, prisma);
+  if (cooldown > 0) {
+    // DB-backed cooldown: the sender's most recent message in this room (deleted or
+    // not — you can't delete your own, so this can't be gamed). Authoritative across
+    // instances, unlike an in-memory timer.
+    const last = await prisma.chatMessage.findFirst({
+      where: { roomId: params.room, userId: params.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    const since = last ? clock.now().getTime() - last.createdAt.getTime() : Infinity;
+    if (since < cooldown) throw new ChatError('COOLDOWN', cooldown - since);
   }
+  const now = clock.now();
 
   const handle = (await prisma.user.findUnique({ where: { id: params.userId }, select: { handle: true } }))?.handle ?? 'someone';
   const row = await prisma.chatMessage.create({

@@ -11,6 +11,7 @@ export default function Settings() {
   const [coin, setCoin] = useState(session.pumpCoinAddress ?? '');
   const [title, setTitle] = useState(session.streamTitle ?? '');
   const [category, setCategory] = useState(session.streamCategory ?? '');
+  const [cooldown, setCooldown] = useState(session.chatCooldownMs ?? 5000);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -24,6 +25,7 @@ export default function Settings() {
       const next: Session = await saveStreamSettings({
         streamTitle: title.trim() || null,
         streamCategory: category || null,
+        chatCooldownMs: cooldown,
       });
       setSession(next); // fresh session reflects coin + title + category
       setSaved(true);
@@ -58,6 +60,17 @@ export default function Settings() {
           </div>
         </div>
         <p className="muted acct-note" style={{ marginTop: 0 }}>Leave the title blank to show your coin name instead.</p>
+        <div className="fld">
+          <label>Live chat cooldown</label>
+          <select value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))}>
+            <option value={0}>Off — no limit</option>
+            <option value={3000}>3 seconds between messages</option>
+            <option value={5000}>5 seconds between messages</option>
+            <option value={10000}>10 seconds between messages</option>
+            <option value={30000}>30 seconds between messages</option>
+          </select>
+          <p className="muted acct-note" style={{ marginTop: 6 }}>How long each viewer waits between chat messages on your coin page — turn it up to slow a busy or spammy chat.</p>
+        </div>
         <div className="acct-actions">
           <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save livestream'}</button>
           {saved && <span className="acct-saved"><Check width={16} height={16} /> Saved</span>}

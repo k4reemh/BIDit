@@ -49,6 +49,7 @@ export interface Session {
   pumpCoinAddress: string | null;
   streamTitle?: string | null;
   streamCategory?: string | null;
+  chatCooldownMs?: number;
   website?: string | null;
   socials?: Record<string, string> | null;
   pitch?: string | null;
@@ -343,7 +344,7 @@ export const startAuction = (listingId: string, durationSeconds: number) =>
 
 export const setSellerCoin = (coinAddress: string) =>
   req<{ ok: boolean }>('/seller/coin', { method: 'POST', body: JSON.stringify({ coinAddress }) });
-export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null }) =>
+export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null; chatCooldownMs?: number }) =>
   req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
 
 // ---- giveaways -------------------------------------------------------------

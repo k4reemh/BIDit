@@ -4,7 +4,7 @@ import { openRoom, type RoomController, type ChatLine } from '../realtime';
 import type { Session } from '../api';
 import { Chat, ArrowRight, Trash, Shield } from '../icons';
 
-const COOLDOWN_MS = 4000; // matches CHAT_COOLDOWN_MS on the server
+const DEFAULT_COOLDOWN_MS = 5000; // fallback until CHAT_HISTORY delivers the room's value
 
 /**
  * Live room chat — a Twitch-style feed for the live coin page. Viewers post short
@@ -25,6 +25,7 @@ export default function ChatPanel({
   const [msgs, setMsgs] = useState<ChatLine[]>([]);
   const [text, setText] = useState('');
   const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [cooldownMs, setCooldownMs] = useState(DEFAULT_COOLDOWN_MS); // the room's setting, from CHAT_HISTORY
   const [blocked, setBlocked] = useState(false);
   const [notice, setNotice] = useState('');
   const ctl = useRef<RoomController | null>(null);
@@ -35,12 +36,12 @@ export default function ChatPanel({
   useEffect(() => {
     if (!session) return; // socket is token-gated — signed-out shows the CTA below
     const c = openRoom(room, {
-      onChatHistory: (list) => setMsgs(list),
+      onChatHistory: (list, cd) => { setMsgs(list); setCooldownMs(cd); },
       onChat: (m) => setMsgs((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m].slice(-200))),
       onChatDeleted: (id) => setMsgs((prev) => prev.filter((m) => m.id !== id)),
       onChatRejected: (r) => {
         if (r.reason === 'BLOCKED') { setBlocked(true); setNotice('You can’t chat in this room.'); }
-        else if (r.reason === 'COOLDOWN') setCooldownUntil(Date.now() + (r.retryMs ?? COOLDOWN_MS));
+        else if (r.reason === 'COOLDOWN') setCooldownUntil(Date.now() + (r.retryMs ?? cooldownMs));
         else if (r.reason === 'TOO_LONG') setNotice('That message is too long.');
         else if (r.reason === 'EMPTY') setNotice('Type a message first.');
       },
@@ -70,7 +71,7 @@ export default function ChatPanel({
     ctl.current?.sendChat(t);
     setText('');
     setNotice('');
-    setCooldownUntil(Date.now() + COOLDOWN_MS); // optimistic; the server is authoritative
+    if (cooldownMs > 0) setCooldownUntil(Date.now() + cooldownMs); // optimistic; server is authoritative
   };
 
   return (

@@ -50,6 +50,30 @@ describe('postChatMessage', () => {
     expect(ok.text).toBe('second');
   });
 
+  it('honors the seller’s per-room cooldown (0 = off)', async () => {
+    const seller = await makeUser('seller');
+    await prisma.sellerProfile.create({ data: { userId: seller.userId, chatCooldownMs: 0 } });
+    const u = await makeUser('buyer');
+    const clock = new ManualClock(T0);
+    // Cooldown off → two messages back-to-back both go through.
+    await postChatMessage({ room: seller.userId, userId: u.userId, text: 'a' }, clock, prisma);
+    const b = await postChatMessage({ room: seller.userId, userId: u.userId, text: 'b' }, clock, prisma);
+    expect(b.text).toBe('b');
+  });
+
+  it('honors a custom per-room cooldown longer than the default', async () => {
+    const seller = await makeUser('seller');
+    await prisma.sellerProfile.create({ data: { userId: seller.userId, chatCooldownMs: 10000 } });
+    const u = await makeUser('buyer');
+    const clock = new ManualClock(T0);
+    await postChatMessage({ room: seller.userId, userId: u.userId, text: 'first' }, clock, prisma);
+    clock.advance(CHAT_COOLDOWN_MS); // past the default, but not the 10s custom value
+    await expect(postChatMessage({ room: seller.userId, userId: u.userId, text: 'too soon' }, clock, prisma)).rejects.toThrow(/COOLDOWN/);
+    clock.advance(10000 - CHAT_COOLDOWN_MS);
+    const ok = await postChatMessage({ room: seller.userId, userId: u.userId, text: 'now ok' }, clock, prisma);
+    expect(ok.text).toBe('now ok');
+  });
+
   it('rejects a blocked user', async () => {
     const seller = await makeUser('seller');
     const u = await makeUser('buyer');

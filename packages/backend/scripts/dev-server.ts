@@ -59,6 +59,7 @@ import {
 import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
+import { CHAT_COOLDOWN_MS } from '../src/chat.js';
 import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { reconcileWallets } from '../src/audit.js';
@@ -362,6 +363,7 @@ async function main() {
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
       streamTitle: profile?.streamTitle ?? null,
       streamCategory: profile?.streamCategory ?? null,
+      chatCooldownMs: profile?.chatCooldownMs ?? CHAT_COOLDOWN_MS,
       website: profile?.website ?? null,
       socials: (profile?.socials as Record<string, string> | null) ?? null,
       pitch: profile?.pitch ?? null,
@@ -802,9 +804,15 @@ async function main() {
         const b = await readJson(req);
         const clip = (v: unknown, max: number) =>
           typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
+        // Chat cooldown: only an allowed value is accepted (off / 3 / 5 / 10 / 30s);
+        // anything else leaves it unchanged (undefined → not written).
+        const ALLOWED_COOLDOWNS = [0, 3000, 5000, 10000, 30000];
+        const cd = Number(b.chatCooldownMs);
+        const chatCooldownMs = ALLOWED_COOLDOWNS.includes(cd) ? cd : undefined;
         const data = {
           streamTitle: clip(b.streamTitle, 80),
           streamCategory: clip(b.streamCategory, 40),
+          ...(chatCooldownMs !== undefined ? { chatCooldownMs } : {}),
         };
         await prisma.sellerProfile.upsert({
           where: { userId },

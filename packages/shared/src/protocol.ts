@@ -277,11 +277,15 @@ export interface ChatMessageMessage {
   line: ChatLine;
   serverNow: number;
 }
-/** The recent backlog, sent to a viewer when they join a room. */
+/** The recent backlog, sent to a viewer when they join a room. Also carries the
+ *  room's chat cooldown (ms; 0 = off) so the client's send throttle matches the
+ *  seller's setting. Sent even when `messages` is empty, so the cooldown always
+ *  reaches the client. */
 export interface ChatHistoryMessage {
   type: 'CHAT_HISTORY';
   room: string;
   messages: ChatLine[];
+  cooldownMs: number;
   serverNow: number;
 }
 /** A message was removed (seller moderation) — clients drop it from the feed. */
