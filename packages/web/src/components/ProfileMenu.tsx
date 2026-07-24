@@ -12,7 +12,6 @@ const TILES = [
   { icon: UserCheck, label: 'Become a Seller', to: '/sell' },
   { icon: Truck, label: 'Payments & Shipping', to: '/shipping' },
   { icon: Bookmark, label: 'Saved', to: '/saved' },
-  { icon: Bolt, label: 'Bids & Offers', to: '/bids' },
   { icon: Bag, label: 'Purchases', to: '/purchases' },
   { icon: Shield, label: 'Account Health', to: '/account-health' },
 ];

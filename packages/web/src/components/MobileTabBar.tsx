@@ -3,7 +3,7 @@ import Avatar from './Avatar';
 import { Bolt, Tag, Wallet, Person } from '../icons';
 import type { User } from '../App';
 
-const ACCOUNT_PATHS = ['/profile', '/shipping', '/saved', '/purchases', '/ship', '/bids', '/settings'];
+const ACCOUNT_PATHS = ['/profile', '/shipping', '/saved', '/purchases', '/ship', '/settings'];
 
 /**
  * App-style bottom navigation for phones (hidden on desktop via CSS). Gives the

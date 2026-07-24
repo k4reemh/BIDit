@@ -24,7 +24,6 @@ import Deposit from './pages/account/Deposit';
 import Saved from './pages/account/Saved';
 import Purchases from './pages/account/Purchases';
 import ShipItems from './pages/account/ShipItems';
-import Bids from './pages/account/Bids';
 import SellerOverview from './pages/seller/Overview';
 import SellerLive from './pages/seller/Live';
 import SellerListings from './pages/seller/Listings';
@@ -125,7 +124,6 @@ export default function App() {
             <Route path="/saved" element={<Saved />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/ship" element={<ShipItems />} />
-            <Route path="/bids" element={<Bids />} />
           </Route>
 
           <Route path="/sell" element={<Navigate to="/seller" replace />} />
