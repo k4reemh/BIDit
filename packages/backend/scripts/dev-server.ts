@@ -756,13 +756,19 @@ async function main() {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
+        // Coin linking goes through the guarded setter FIRST (first-claim-wins):
+        // hijacking another seller's coin 409s here, before anything is marked
+        // onboarded. An absent/empty coinAddress never touches the link — an
+        // auto-created coin from the create flow must survive finishing the wizard.
+        if (typeof b.coinAddress === 'string' && b.coinAddress.trim()) {
+          await setSellerCoin(userId, b.coinAddress.trim(), prisma);
+        }
         await submitSellerOnboarding(
           userId,
           {
             website: typeof b.website === 'string' ? b.website : undefined,
             socials: b.socials && typeof b.socials === 'object' ? (b.socials as Record<string, string>) : undefined,
             pitch: typeof b.pitch === 'string' ? b.pitch : undefined,
-            coinAddress: typeof b.coinAddress === 'string' ? b.coinAddress : undefined,
             origin:
               b.origin && typeof b.origin === 'object'
                 ? (b.origin as { country?: string; region?: string; city?: string; postal?: string })

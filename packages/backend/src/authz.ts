@@ -282,14 +282,17 @@ export async function applyAsSeller(
   return user;
 }
 
-/** Save the seller's onboarding / shop profile and mark onboarding complete. */
+/** Save the seller's onboarding / shop profile and mark onboarding complete.
+ *  Deliberately does NOT touch pumpCoinAddress: coin linking must go through
+ *  setSellerCoin (sellers.ts), whose first-claim-wins guard stops a seller from
+ *  hijacking a coin another seller already linked. The /seller/onboarding
+ *  endpoint composes the two. */
 export async function submitSellerOnboarding(
   userId: string,
   input: {
     website?: string;
     socials?: Record<string, string> | null;
     pitch?: string;
-    coinAddress?: string;
     origin?: { country?: string; region?: string; city?: string; postal?: string };
   },
   prisma: PrismaClient = defaultPrisma,
@@ -303,7 +306,6 @@ export async function submitSellerOnboarding(
       ...(input.website !== undefined ? { website: str(input.website) } : {}),
       ...(input.socials !== undefined ? { socials: (input.socials ?? null) as Prisma.InputJsonValue } : {}),
       ...(input.pitch !== undefined ? { pitch: str(input.pitch) } : {}),
-      ...(input.coinAddress !== undefined ? { pumpCoinAddress: str(input.coinAddress) } : {}),
       ...(input.origin !== undefined
         ? { originCountry: str(o.country), originRegion: str(o.region), originCity: str(o.city), originPostal: str(o.postal) }
         : {}),

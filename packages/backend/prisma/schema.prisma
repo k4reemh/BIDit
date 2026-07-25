@@ -128,6 +128,7 @@ model User {
   ordersSold    Order[]      @relation("SellerOrders")
   withdrawals   Withdrawal[]
   pointsEvents  PointsEvent[]
+  pumpCoinCreateAttempts PumpCoinCreateAttempt[]
 }
 
 model SellerProfile {
@@ -146,7 +147,10 @@ model SellerProfile {
   website             String?
   socials             Json?     // { x?, instagram?, tiktok?, youtube? }
   pitch               String?   // what they sell, in their words
-  pumpCoinAddress     String?
+  // The seller's linked pump.fun coin. DB-unique so two sellers can never hold
+  // the same coin even if an app-level guard slips (first-claim-wins lives in
+  // sellers.ts; Postgres allows any number of NULLs here).
+  pumpCoinAddress     String?   @unique
   // Livestream identity shown on the "Live right now" cards. `streamTitle` lets a
   // seller name their stream instead of falling back to the coin name;
   // `streamCategory` drives the small category tag on the card.
@@ -170,6 +174,36 @@ model SellerProfile {
   // promo window, so no flag is needed for that.
   promoBonusPaidAt    DateTime?
   createdAt           DateTime  @default(now())
+}
+
+/// Audit + idempotency for auto-creating a seller's pump.fun coin ("<handle>'s
+/// BIDit Livestream"). The seller's own wallet signs the create tx (they must be
+/// the on-chain creator for pump.fun to let them livestream); the backend only
+/// prepares, vets, and broadcasts. The ephemeral mint keypair is never stored —
+/// txB64 carries the mint-signed transaction, which contains no secrets.
+///   PREPARED   — tx built + mint-signed; awaiting the seller's creator signature.
+///   SUBMITTED  — broadcast; txSig known; awaiting on-chain confirmation.
+///   CONFIRMED  — landed; mint linked as the seller's coin (terminal).
+///   FAILED     — provably dead (on-chain error / blockhash expired); retry allowed (terminal).
+///   SUPERSEDED — replaced by a newer prepare before submit (terminal).
+model PumpCoinCreateAttempt {
+  id                   String   @id @default(cuid())
+  sellerId             String
+  seller               User     @relation(fields: [sellerId], references: [id])
+  mint                 String   @unique // base58 mint pubkey (fresh keypair per attempt)
+  creatorWallet        String?  // wallet that must sign as creator; null in mock mode
+  name                 String
+  symbol               String
+  metadataUri          String?
+  txB64                String?  // partially-signed create tx (mint sig only — no secrets)
+  txSig                String?
+  lastValidBlockHeight BigInt?
+  status               String   @default("PREPARED") // PREPARED | SUBMITTED | CONFIRMED | FAILED | SUPERSEDED
+  lastError            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt @default(now())
+
+  @@index([sellerId, status])
 }
 
 /// One per user (USER kind), plus two singleton system accounts (PLATFORM,
