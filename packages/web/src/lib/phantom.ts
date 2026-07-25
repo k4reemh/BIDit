@@ -1,18 +1,22 @@
 /**
  * Minimal Phantom (window.solana) integration — deliberately NOT the wallet-
  * adapter stack. The only thing BIDit ever asks a wallet to do is sign the
- * coin-create transaction message our backend prepared, so we talk to the
- * injected provider directly: connect() for the pubkey, and the low-level
- * `request({ method: 'signTransaction', params: { message } })` form, which
- * signs a b58-encoded transaction message and returns the signature — no
- * @solana/web3.js in the browser, no transaction parsing client-side.
+ * coin-create transaction our backend prepared.
+ *
+ * Signing uses Phantom's standard object-form `signTransaction(tx)`, which
+ * handles BOTH legacy and versioned (v0) transactions. (The older low-level
+ * `request({method:'signTransaction', params:{message}})` lane chokes on v0
+ * bytes — its legacy parser reads the version prefix as a signer count and
+ * dies with "Reached end of buffer unexpectedly".) @solana/web3.js is loaded
+ * lazily so it only ships to browsers that actually reach the signing step.
  */
+import type { VersionedTransaction } from '@solana/web3.js';
 
 interface PhantomProvider {
   isPhantom?: boolean;
   connect(opts?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: { toString(): string } }>;
   disconnect?(): Promise<void>;
-  request(args: { method: string; params: Record<string, unknown> }): Promise<unknown>;
+  signTransaction?(tx: VersionedTransaction): Promise<VersionedTransaction>;
 }
 
 export type PhantomErrorCode = 'NOT_INSTALLED' | 'REJECTED' | 'UNSUPPORTED';
@@ -50,21 +54,32 @@ export async function connectPhantom(): Promise<string> {
   }
 }
 
-/** Sign a b58 transaction message; returns the b58 signature + signing pubkey. */
-export async function signTxMessage(messageB58: string): Promise<{ signature: string; publicKey: string }> {
+const b64ToBytes = (b64: string): Uint8Array => {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+
+const bytesToB64 = (bytes: Uint8Array): string => {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
+  return btoa(bin);
+};
+
+/** Have Phantom sign the prepared (mint-signed) create transaction; returns the
+ *  fully signed tx, base64-encoded, for the backend to verify and broadcast. */
+export async function signCreateTx(txB64: string): Promise<string> {
   const p = provider();
   if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom is not installed.');
+  if (typeof p.signTransaction !== 'function') {
+    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here — update Phantom and try again.');
+  }
+  const { VersionedTransaction: VTx } = await import('@solana/web3.js');
+  const tx = VTx.deserialize(b64ToBytes(txB64));
   try {
-    const res = (await p.request({ method: 'signTransaction', params: { message: messageB58 } })) as {
-      signature?: unknown;
-      publicKey?: unknown;
-    };
-    if (typeof res?.signature !== 'string' || typeof res?.publicKey !== 'string') {
-      // Some Phantom builds only support the object-form signTransaction; the
-      // caller surfaces the paste fallback instead of guessing.
-      throw new PhantomError('UNSUPPORTED', 'This Phantom version returned an unexpected signature format.');
-    }
-    return { signature: res.signature, publicKey: res.publicKey };
+    const signed = await p.signTransaction(tx);
+    return bytesToB64(signed.serialize());
   } catch (err) {
     if (err instanceof PhantomError) throw err;
     if ((err as { code?: number }).code === 4001) {

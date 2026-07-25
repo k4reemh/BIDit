@@ -843,6 +843,9 @@ async function main() {
           mint: attempt.mint,
           mode: pumpCreate.mode,
           requiresSignature: pumpCreate.mode !== 'mock',
+          // The full mint-signed tx (base64): Phantom's object-form signTransaction
+          // needs it — the b58 message lane can't represent versioned (v0) txs.
+          txB64: attempt.txB64,
           message: messageB58,
           name: attempt.name,
           symbol: attempt.symbol,

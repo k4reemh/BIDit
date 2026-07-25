@@ -1411,31 +1411,21 @@ img { display: block; max-width: 100%; }
 .adm-pool .bad { color: var(--red); }
 
 /* ---- onboarding (split-screen showpiece) ---- */
-.obx { position: fixed; inset: 0; z-index: 200; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg); }
-.obx__brand { position: relative; overflow: hidden; display: flex; flex-direction: column; padding: 40px 48px;
-  background: linear-gradient(158deg, #0b2447 0%, #0a1e3d 55%, #050f22 100%); color: #fff; }
-.obx__brand::before { content: ''; position: absolute; top: -140px; right: -120px; width: 420px; height: 420px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,106,0,0.42), rgba(255,106,0,0) 68%); filter: blur(10px); pointer-events: none; }
-.obx__brand::after { content: ''; position: absolute; bottom: -160px; left: -120px; width: 380px; height: 380px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(43,91,154,0.55), rgba(43,91,154,0) 70%); pointer-events: none; }
-.obx__brandtop { position: relative; z-index: 2; }
-.obx__pitch { position: relative; z-index: 2; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-.obx__pitchhead { font-family: var(--font-display); font-size: clamp(28px, 3.4vw, 44px); line-height: 1.08; letter-spacing: -0.025em; font-weight: 700; max-width: 12ch; }
-.obx__values { list-style: none; margin: 30px 0 0; display: flex; flex-direction: column; gap: 15px; }
-.obx__values li { display: flex; align-items: center; gap: 12px; font-size: 15.5px; font-weight: 500; color: #dbe4f1; }
-.obx__valic { width: 34px; height: 34px; border-radius: 10px; flex: none; display: grid; place-items: center; color: #ff8a3c; background: rgba(255,106,0,0.14); border: 1px solid rgba(255,106,0,0.24); }
-.obx__thumbs { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 30px; }
-.obx__thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
-.obx__brandfoot { position: relative; z-index: 2; margin-top: 22px; font-size: 12.5px; color: #8ca0bd; letter-spacing: 0.02em; }
-
-.obx__panel { display: flex; flex-direction: column; padding: 34px clamp(28px, 5vw, 72px); overflow-y: auto; }
+/* Buyer onboarding — a single centered popup card over the dimmed site (was a
+   full-screen two-column split, which read as broken at wide viewports). */
+.obx { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px;
+  background: rgba(5, 9, 18, 0.62); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+.obx__panel { display: flex; flex-direction: column; width: 100%; max-width: 620px;
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg); padding: 26px 32px 28px; animation: risein 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .obx__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .obx__steps { display: flex; gap: 7px; flex: 1; max-width: 260px; }
 .obx__seg { flex: 1; height: 4px; border-radius: 99px; background: var(--line); transition: background 0.3s; }
 .obx__seg.on { background: var(--accent); }
 .obx__skip { font-size: 13.5px; font-weight: 600; color: var(--muted); background: none; border: 0; cursor: pointer; }
 .obx__skip:hover { color: var(--ink); }
-.obx__body { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 460px; margin: 0 auto; width: 100%; padding: 24px 0; animation: obxin 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.obx__body { display: flex; flex-direction: column; width: 100%; padding: 20px 0 8px; animation: obxin 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes obxin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .obx__eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
 .obx__title { font-size: clamp(27px, 4vw, 36px); letter-spacing: -0.02em; margin: 9px 0 8px; }
@@ -1461,9 +1451,13 @@ img { display: block; max-width: 100%; }
 .obx__wallet-note { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .obx__error { margin-top: 12px; color: #b42318; background: #fdecec; border: 1px solid #f6cfce; padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 500; }
 :root[data-theme="dark"] .obx__error { background: rgba(255,90,106,0.14); color: #ff9aa5; border-color: rgba(255,90,106,0.3); }
-.obx__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 460px; margin: 0 auto; width: 100%; padding-top: 8px; }
+.obx__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding-top: 10px; }
 .obx__next { min-width: 168px; justify-content: center; }
-@media (max-width: 880px) { .obx { grid-template-columns: 1fr; } .obx__brand { display: none; } }
+/* Phones: the popup becomes a full-screen sheet. */
+@media (max-width: 640px) {
+  .obx { padding: 0; }
+  .obx__panel { max-width: none; height: 100vh; height: 100dvh; max-height: none; border-radius: 0; border: 0; padding: 20px 20px calc(24px + env(safe-area-inset-bottom)); }
+}
 
 /* ---- embedded pump.fun stream (LiveKit) ---- */
 .pstream { position: absolute; inset: 0; background: #000; overflow: hidden; }

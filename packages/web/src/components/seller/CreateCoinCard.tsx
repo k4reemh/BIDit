@@ -7,7 +7,7 @@ import {
   ApiError,
   type Session,
 } from '../../api';
-import { hasPhantom, connectPhantom, signTxMessage, PhantomError } from '../../lib/phantom';
+import { hasPhantom, connectPhantom, signCreateTx, PhantomError } from '../../lib/phantom';
 import { Bolt, Check } from '../../icons';
 
 type Stage = 'idle' | 'working' | 'done';
@@ -109,19 +109,15 @@ export default function CreateCoinCard({
       const wallet = await connectPhantom();
       setStep('Preparing your coin…');
       const prep = await prepareCoinCreate(wallet);
-      if (!prep.requiresSignature || !prep.message) {
+      if (!prep.requiresSignature || !prep.txB64) {
         const result = await submitCoinCreate({ attemptId: prep.attemptId });
         if (result.status === 'CONFIRMED' && result.mint) return void finishLinked(result.mint);
         return void pollUntilSettled();
       }
       setStep('Approve the request in Phantom — it costs $0 (dust network fees only).');
-      const signed = await signTxMessage(prep.message);
+      const signedTxB64 = await signCreateTx(prep.txB64);
       setStep('Creating your coin on pump.fun…');
-      const result = await submitCoinCreate({
-        attemptId: prep.attemptId,
-        publicKey: signed.publicKey,
-        signature: signed.signature,
-      });
+      const result = await submitCoinCreate({ attemptId: prep.attemptId, signedTxB64 });
       if (result.status === 'CONFIRMED' && result.mint) return void finishLinked(result.mint);
       setStep('Waiting for the network to confirm…');
       return void pollUntilSettled();

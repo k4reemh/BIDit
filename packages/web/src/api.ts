@@ -372,7 +372,9 @@ export interface CoinCreatePrepared {
   mint: string;
   mode: 'pumpportal' | 'mock';
   requiresSignature: boolean;
-  /** b58 tx-message bytes the creator wallet signs (null in mock mode). */
+  /** The mint-signed create tx (base64) that Phantom signs (null in mock mode). */
+  txB64: string | null;
+  /** b58 tx-message bytes (legacy signing lane; unused by the web client). */
   message: string | null;
   name: string;
   symbol: string;

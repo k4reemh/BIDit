@@ -1,18 +1,13 @@
 import { useState } from 'react';
 import Logo from './Logo';
-import { INTERESTS, CATEGORIES } from '../data';
+import { INTERESTS } from '../data';
 import { completeOnboarding, type Session } from '../api';
-import { Bolt, Truck, Wallet, Shield, Copy, Check, ArrowRight, Gift } from '../icons';
+import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
   { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
   { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds stay put until you win — then the seller ships it straight to your door.' },
   { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
-];
-const VALUES = [
-  { ic: Bolt, t: 'Real-time live auctions' },
-  { ic: Truck, t: 'Win it — seller ships it' },
-  { ic: Shield, t: 'USDC settled · buyer protection' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const LAST = 4;
@@ -66,29 +61,11 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
   };
 
   return (
+    // A centered popup over the site — one focused card, no split-screen.
     <div className="obx">
-      {/* left — brand / value panel */}
-      <aside className="obx__brand">
-        <div className="obx__brandtop"><Logo size={30} /></div>
-        <div className="obx__pitch">
-          <h1 className="obx__pitchhead">The live marketplace for bidding on anything.</h1>
-          <ul className="obx__values">
-            {VALUES.map((v) => (
-              <li key={v.t}><span className="obx__valic"><v.ic width={17} height={17} /></span>{v.t}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="obx__thumbs">
-          {CATEGORIES.slice(0, 4).map((c) => (
-            <img key={c.name} className="obx__thumb" src={c.image} alt="" loading="lazy" />
-          ))}
-        </div>
-        <div className="obx__brandfoot">Settles in USDC · Built on Solana</div>
-      </aside>
-
-      {/* right — step panel */}
       <main className="obx__panel">
         <div className="obx__head">
+          <Logo size={22} />
           <div className="obx__steps">
             {[0, 1, 2, 3, 4].map((i) => <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />)}
           </div>
