@@ -65,6 +65,8 @@ import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { reconcileWallets } from '../src/audit.js';
 import { DevWalletEscrow, ProgramEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
+import { getPumpCreateProvider } from '../src/chain/pump-provider.js';
+import { prepareCoinCreate, submitCoinCreate, getCoinCreateStatus } from '../src/pump-create.js';
 import { ensureDepositAddress, DepositWatcher, registerAllDeposits } from '../src/deposits.js';
 import { requestWithdrawal, WithdrawalError, WithdrawalReconciler } from '../src/withdrawals.js';
 import {
@@ -149,6 +151,17 @@ function moneyRateLimited(userId: string): boolean {
   return recent.length > 20; // >20 money actions / minute / user
 }
 
+// Throttle coin-create PREPAREs per-USER: each one costs two external API calls
+// (pump.fun IPFS + PumpPortal). Submits/status share the money limiter instead.
+const coinCreateHits = new Map<string, number[]>();
+function coinCreateRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const recent = (coinCreateHits.get(userId) ?? []).filter((t) => now - t < 600_000);
+  recent.push(now);
+  coinCreateHits.set(userId, recent);
+  return recent.length > 5; // >5 prepares / 10 min / user
+}
+
 function send(res: http.ServerResponse, status: number, body: unknown, type = 'application/json') {
   const payload = type === 'application/json' ? JSON.stringify(body) : String(body);
   res.writeHead(status, { 'content-type': type }); // CORS headers already set via applyCors()
@@ -212,6 +225,9 @@ async function main() {
   // immediately — no escrow, no 5% fee. Used for the real-money friends test.
   const directPayout = process.env.BIDIT_PAYOUT_MODE === 'direct';
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
+  // Seller coin auto-create ("<handle>'s BIDit Livestream"): PumpPortal on
+  // mainnet, mock elsewhere; BIDIT_PUMP_PROVIDER overrides for spikes.
+  const pumpCreate = getPumpCreateProvider(chain.cluster);
   // In escrow mode use the chain-backed ProgramEscrow (durable ChainTransfer outbox
   // → real wallet segregation); in direct mode nothing calls escrow for settlement,
   // so the ledger-only DevWalletEscrow suffices.
@@ -801,6 +817,58 @@ async function main() {
         await setSellerCoin(userId, String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
       }
+      // ---- seller coin auto-create ("<handle>'s BIDit Livestream") ----------
+      // prepare: build + vet the create tx (the seller's wallet is creator, so
+      // pump.fun grants THEM the livestream button). submit: take the creator
+      // signature, broadcast, confirm, link. status: poll + lazy reconcile.
+      if (req.method === 'POST' && p === '/seller/coin-create/prepare') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        if (coinCreateRateLimited(userId)) {
+          return send(res, 429, { error: 'Too many coin-create attempts — give it a few minutes.' });
+        }
+        const b = await readJson(req);
+        let creatorWallet: string | null = null;
+        if (pumpCreate.mode !== 'mock') {
+          const w = String(b.creatorWallet ?? '').trim();
+          if (!w || !chain.isValidAddress(w)) {
+            return send(res, 400, { error: 'Connect a Solana wallet to create your coin.', code: 'BAD_WALLET' });
+          }
+          creatorWallet = w;
+        }
+        const { attempt, messageB58 } = await prepareCoinCreate(userId, creatorWallet, pumpCreate, prisma);
+        return send(res, 200, {
+          attemptId: attempt.id,
+          mint: attempt.mint,
+          mode: pumpCreate.mode,
+          requiresSignature: pumpCreate.mode !== 'mock',
+          message: messageB58,
+          name: attempt.name,
+          symbol: attempt.symbol,
+        });
+      }
+      if (req.method === 'POST' && p === '/seller/coin-create/submit') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        const proof =
+          typeof b.signedTxB64 === 'string' && b.signedTxB64
+            ? { signedTxB64: b.signedTxB64 }
+            : typeof b.publicKey === 'string' && b.publicKey && typeof b.signature === 'string' && b.signature
+              ? { publicKey: b.publicKey, signatureB58: b.signature }
+              : null;
+        const dto = await submitCoinCreate(userId, String(b.attemptId ?? ''), proof, pumpCreate, prisma);
+        return send(res, 200, dto);
+      }
+      if (req.method === 'GET' && p === '/seller/coin-create/status') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        return send(res, 200, await getCoinCreateStatus(userId, pumpCreate, prisma));
+      }
       // Livestream identity: a custom stream title (shown on the live cards instead
       // of the coin name) and the category tag for the stream.
       if (req.method === 'POST' && p === '/seller/stream-settings') {
@@ -1367,7 +1435,13 @@ async function main() {
       return send(res, 404, { error: 'not found' });
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500;
-      return send(res, status, { error: (err as Error).message });
+      // Our typed domain errors (e.g. PumpCreateError) set BOTH status and a
+      // machine-readable code the client branches on (TX_EXPIRED → re-prepare).
+      // Only those get the code passed through — untyped errors default to 500
+      // above, so Node/Prisma internals (ECONNREFUSED, P2002…) never leak.
+      const code = (err as { code?: unknown }).code;
+      const typedCode = status !== 500 && typeof code === 'string' ? { code } : {};
+      return send(res, status, { error: (err as Error).message, ...typedCode });
     }
   }
 

@@ -107,13 +107,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Build a signable create attempt for this seller. Guards: seller must not
  *  already have a linked coin; any older PREPARED attempt is superseded so
- *  exactly one attempt is ever submittable. */
+ *  exactly one attempt is ever submittable. `messageB58` (what the creator
+ *  wallet signs) is returned alongside but never persisted — a reload just
+ *  prepares again. */
 export async function prepareCoinCreate(
   sellerId: string,
   creatorWallet: string | null,
   provider: PumpCreateProvider,
   prisma: PrismaClient = defaultPrisma,
-): Promise<PumpCoinCreateAttempt> {
+): Promise<{ attempt: PumpCoinCreateAttempt; messageB58: string | null }> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: sellerId }, select: { handle: true } });
 
   // Pre-check under the seller lock (fast fail before any provider round-trip).
@@ -138,7 +140,7 @@ export async function prepareCoinCreate(
   // Insert under the lock, re-checking the link and superseding any PREPARED
   // row that appeared while the provider round-trip ran — the last inserter is
   // the only submittable attempt.
-  return prisma.$transaction(async (tx) => {
+  const attempt = await prisma.$transaction(async (tx) => {
     await takeSellerLock(tx, sellerId);
     const profile = await tx.sellerProfile.findUnique({ where: { userId: sellerId }, select: { pumpCoinAddress: true } });
     if (profile?.pumpCoinAddress) {
@@ -162,6 +164,7 @@ export async function prepareCoinCreate(
       },
     });
   });
+  return { attempt, messageB58: prepared.messageB58 };
 }
 
 /** Mark CONFIRMED and link the mint as the seller's coin — idempotent, and it

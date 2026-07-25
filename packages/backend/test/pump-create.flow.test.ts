@@ -24,7 +24,7 @@ const linkedCoinOf = async (sellerId: string) =>
 describe('coin create — happy path', () => {
   it('prepare → submit confirms, links the mint, and resolves the room', async () => {
     const s = await makeUser('seller');
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     expect(attempt.status).toBe('PREPARED');
     // Handle may be byte-clipped to keep the full name ≤32 bytes.
     expect(attempt.name.endsWith("'s BIDit Livestream")).toBe(true);
@@ -61,8 +61,8 @@ describe('coin create — guards', () => {
 
   it('a newer prepare supersedes the old attempt; the old one cannot submit', async () => {
     const s = await makeUser('seller');
-    const a = await prepareCoinCreate(s.userId, null, provider, prisma);
-    const b = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt: a } = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt: b } = await prepareCoinCreate(s.userId, null, provider, prisma);
 
     const aRow = await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: a.id } });
     expect(aRow.status).toBe('SUPERSEDED');
@@ -85,7 +85,7 @@ describe('coin create — guards', () => {
   it('someone else’s attempt id is a 404', async () => {
     const s1 = await makeUser('seller');
     const s2 = await makeUser('seller');
-    const attempt = await prepareCoinCreate(s1.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s1.userId, null, provider, prisma);
     await expect(submitCoinCreate(s2.userId, attempt.id, null, provider, prisma)).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
@@ -96,20 +96,20 @@ describe('coin create — expiry and wallet mismatch', () => {
   it('an expired blockhash 410s, marks the attempt FAILED, and a fresh attempt succeeds', async () => {
     const s = await makeUser('seller');
     provider.expireNextPrepare();
-    const stale = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
+    const { attempt: stale } = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
     await expect(submitCoinCreate(s.userId, stale.id, null, provider, prisma)).rejects.toMatchObject({
       code: 'TX_EXPIRED',
     });
     expect((await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: stale.id } })).status).toBe('FAILED');
 
-    const fresh = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
+    const { attempt: fresh } = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
     const result = await submitCoinCreate(s.userId, fresh.id, null, provider, prisma);
     expect(result.status).toBe('CONFIRMED');
   });
 
   it('a signature from the wrong wallet is rejected without killing the attempt', async () => {
     const s = await makeUser('seller');
-    const attempt = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, 'WALLET_A', provider, prisma);
 
     await expect(
       submitCoinCreate(s.userId, attempt.id, { publicKey: 'WALLET_B', signatureB58: 'sig' }, provider, prisma),
@@ -131,7 +131,7 @@ describe('coin create — expiry and wallet mismatch', () => {
 describe('coin create — races and ambiguity', () => {
   it('two racing submits broadcast exactly once and both land on the same outcome', async () => {
     const s = await makeUser('seller');
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     const [r1, r2] = await Promise.all([
       submitCoinCreate(s.userId, attempt.id, null, provider, prisma),
       submitCoinCreate(s.userId, attempt.id, null, provider, prisma),
@@ -148,7 +148,7 @@ describe('coin create — races and ambiguity', () => {
   it('an ambiguous broadcast stays SUBMITTED, then the status poll finalizes it (tab-close recovery)', async () => {
     const s = await makeUser('seller');
     provider.ambiguousSubmits();
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     const result = await submitCoinCreate(s.userId, attempt.id, null, provider, prisma);
     expect(result.status).toBe('SUBMITTED');
     expect(await linkedCoinOf(s.userId)).toBeNull(); // not linked yet
@@ -163,7 +163,7 @@ describe('coin create — races and ambiguity', () => {
   it('an ambiguous broadcast that dies on-chain ends FAILED and links nothing', async () => {
     const s = await makeUser('seller');
     provider.ambiguousSubmits();
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     await submitCoinCreate(s.userId, attempt.id, null, provider, prisma);
 
     const row = await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } });
@@ -175,7 +175,7 @@ describe('coin create — races and ambiguity', () => {
 
   it('finalize is idempotent', async () => {
     const s = await makeUser('seller');
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     await submitCoinCreate(s.userId, attempt.id, null, provider, prisma);
     await finalizeConfirmed(attempt.id, prisma);
     await finalizeConfirmed(attempt.id, prisma);
@@ -186,7 +186,7 @@ describe('coin create — races and ambiguity', () => {
   it('a coin pasted mid-confirm wins; the confirmed create never clobbers it', async () => {
     const s = await makeUser('seller');
     provider.ambiguousSubmits();
-    const attempt = await prepareCoinCreate(s.userId, null, provider, prisma);
+    const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     await submitCoinCreate(s.userId, attempt.id, null, provider, prisma); // SUBMITTED
 
     await setSellerCoin(s.userId, 'PASTED_COIN', prisma); // seller pastes in another tab
