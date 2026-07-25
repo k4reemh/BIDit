@@ -1378,9 +1378,12 @@ const pumpCache = new Map<string, { at: number; data: unknown }>();
 // viewer token per call (unique identity) — never cache it, or viewers collide.
 const PUMP_LIVEKIT_HOST = process.env.BIDIT_PUMP_LIVEKIT_HOST ?? 'wss://pump-prod-tg2x8veh.livekit.cloud';
 // pump.fun's APIs sit behind Cloudflare, which 403s Node's default fetch UA
-// ("Just a moment…"). A real browser UA passes the bot check.
+// ("Just a moment…"). A real browser UA passes the bot check; origin/referer
+// make the request look like pump.fun's own site, which matters for the join
+// POST when calling from datacenter IPs (Render) that CF scores as bots.
 const PUMP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+const PUMP_HEADERS = { 'user-agent': PUMP_UA, origin: 'https://pump.fun', referer: 'https://pump.fun/' };
 
 async function pumpStreamInfo(mint: string) {
   const m = mint.trim();
@@ -1390,24 +1393,34 @@ async function pumpStreamInfo(mint: string) {
     // is edge-cached and lags for ~a minute when a stream goes live, so we don't
     // trust its isLive flag.
     const infoRes = await fetch(`https://livestream-api.pump.fun/livestream?mintId=${m}&_=${Date.now()}`, {
-      headers: { accept: 'application/json', 'cache-control': 'no-cache', 'user-agent': PUMP_UA },
+      headers: { accept: 'application/json', 'cache-control': 'no-cache', ...PUMP_HEADERS },
       signal: AbortSignal.timeout(6000),
     }).catch(() => null);
     const info = (infoRes && infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
     const title = (info?.title as string) ?? null;
     const thumbnail = (info?.thumbnail as string) ?? null;
+    const streaming = info?.isLive === true; // pump's own (laggy) flag — debug signal only
     // The join POST is uncached; a returned viewer token is the authoritative
     // "live / joinable" signal (it comes back empty when nobody's streaming).
     const joinRes = await fetch('https://livestream-api.pump.fun/livestream/join', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': PUMP_UA },
+      headers: { 'content-type': 'application/json', accept: 'application/json', ...PUMP_HEADERS },
       body: JSON.stringify({ mintId: m }),
       signal: AbortSignal.timeout(6000),
     });
     const join = (joinRes.ok ? await joinRes.json() : null) as { token?: string } | null;
-    if (!join?.token) return { live: false as const, title, thumbnail };
-    return { live: true as const, title, thumbnail, host: PUMP_LIVEKIT_HOST, token: join.token };
-  } catch {
+    if (!join?.token) {
+      // Loud when it matters: the stream says live but pump won't hand us a
+      // viewer token (blocked/changed API) — this is the "badge says LIVE but
+      // the player says offline" case, so leave a trail in the server logs.
+      if (!joinRes.ok || streaming) {
+        console.warn(`[pump] livestream/join HTTP ${joinRes.status} for ${m}${streaming ? ' — stream reports LIVE but no viewer token' : ''}`);
+      }
+      return { live: false as const, streaming, title, thumbnail };
+    }
+    return { live: true as const, streaming, title, thumbnail, host: PUMP_LIVEKIT_HOST, token: join.token };
+  } catch (err) {
+    console.warn(`[pump] stream lookup failed for ${m}:`, (err as Error).message);
     return { live: false as const };
   }
 }
@@ -1419,7 +1432,7 @@ async function pumpCoinInfo(mint: string) {
   if (cached && Date.now() - cached.at < 15_000) return cached.data;
   try {
     const r = await fetch(`https://frontend-api-v3.pump.fun/coins/${m}`, {
-      headers: { accept: 'application/json', 'user-agent': PUMP_UA },
+      headers: { accept: 'application/json', ...PUMP_HEADERS },
       signal: AbortSignal.timeout(6000),
     });
     if (!r.ok) return { unavailable: true, isLive: false };

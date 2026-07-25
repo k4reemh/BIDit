@@ -29,7 +29,7 @@ export default function ChatPanel({
   const [blocked, setBlocked] = useState(false);
   const [notice, setNotice] = useState('');
   const ctl = useRef<RoomController | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const feedRef = useRef<HTMLDivElement | null>(null);
   const [, setTick] = useState(0);
   const isOwner = !!session && session.userId === room;
 
@@ -50,8 +50,12 @@ export default function ChatPanel({
     return () => c.close();
   }, [room, session?.userId]);
 
-  // Keep the newest message in view.
-  useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end' }); }, [msgs.length]);
+  // Keep the newest message in view by scrolling the feed itself — never
+  // scrollIntoView, which scrolls every ancestor and yanks the whole page.
+  useEffect(() => {
+    const el = feedRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs.length]);
 
   // Tick the cooldown countdown.
   useEffect(() => {
@@ -78,7 +82,7 @@ export default function ChatPanel({
     <aside className="chat card">
       <div className="chat__head"><Chat width={16} height={16} /> Live chat</div>
 
-      <div className="chat__feed">
+      <div className="chat__feed" ref={feedRef}>
         {msgs.length === 0 && <p className="chat__empty">No messages yet — say hi 👋</p>}
         {msgs.map((m) => (
           <div key={m.id} className="chat__msg">
@@ -95,7 +99,6 @@ export default function ChatPanel({
             )}
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
 
       {notice && <div className="chat__notice">{notice}</div>}
