@@ -18,6 +18,12 @@ services:
     runtime: node
     plan: starter # always-on required for WebSockets + background pollers
     healthCheckPath: /
+    # deploy:push runs `prisma db push --accept-data-loss`: db push (no migration
+    # files) is this repo's only schema mechanism, and without the flag Prisma
+    # refuses ANY warning-class change (e.g. adding a unique index) in a
+    # non-interactive build. The flag means DESTRUCTIVE schema edits apply
+    # without a prompt — review schema.prisma diffs before merging, and for
+    # column drops/renames on real data do a manual, verified push instead.
     buildCommand: npm install && npm run prisma:generate -w @bidit/backend && npm run deploy:push -w @bidit/backend
     startCommand: npm run start -w @bidit/backend
     envVars:
