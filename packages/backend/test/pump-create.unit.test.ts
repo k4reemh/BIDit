@@ -8,6 +8,8 @@ import {
 import {
   getPumpCreateProvider,
   MockPumpCreateProvider,
+  MockOffchainProvider,
+  PumpOffchainProvider,
   PumpPortalProvider,
 } from '../src/chain/pump-provider.js';
 
@@ -71,18 +73,22 @@ describe('pumpCoinDescription', () => {
 });
 
 describe('getPumpCreateProvider', () => {
-  it('uses the mock everywhere except mainnet', () => {
+  it('mocks everywhere except mainnet, and never picks the on-chain path by itself', () => {
     delete process.env.BIDIT_PUMP_PROVIDER;
-    expect(getPumpCreateProvider('mock')).toBeInstanceOf(MockPumpCreateProvider);
-    expect(getPumpCreateProvider('devnet')).toBeInstanceOf(MockPumpCreateProvider);
-    expect(getPumpCreateProvider('mainnet-beta')).toBeInstanceOf(PumpPortalProvider);
+    expect(getPumpCreateProvider('mock')).toBeInstanceOf(MockOffchainProvider);
+    expect(getPumpCreateProvider('devnet')).toBeInstanceOf(MockOffchainProvider);
+    // Mainnet sellers get the free, warning-free path — never PumpPortal, which
+    // costs network fees and makes the wallet flash a scary-tx warning.
+    expect(getPumpCreateProvider('mainnet-beta')).toBeInstanceOf(PumpOffchainProvider);
   });
 
-  it('honors the BIDIT_PUMP_PROVIDER override both ways', () => {
+  it('honors the BIDIT_PUMP_PROVIDER override in every direction', () => {
     process.env.BIDIT_PUMP_PROVIDER = 'mock';
     expect(getPumpCreateProvider('mainnet-beta')).toBeInstanceOf(MockPumpCreateProvider);
     process.env.BIDIT_PUMP_PROVIDER = 'pumpportal';
     expect(getPumpCreateProvider('mock')).toBeInstanceOf(PumpPortalProvider);
+    process.env.BIDIT_PUMP_PROVIDER = 'offchain';
+    expect(getPumpCreateProvider('mock')).toBeInstanceOf(PumpOffchainProvider);
   });
 });
 
@@ -97,6 +103,6 @@ describe('MockPumpCreateProvider', () => {
       imagePng: null,
     });
     expect(prepared.mint).toMatch(/^[A-Za-z0-9]{32,50}$/);
-    expect(prepared.requiresSignature).toBe(false);
+    expect(prepared.signMode).toBe('none');
   });
 });

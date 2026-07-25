@@ -190,14 +190,20 @@ model PumpCoinCreateAttempt {
   id                   String   @id @default(cuid())
   sellerId             String
   seller               User     @relation(fields: [sellerId], references: [id])
-  mint                 String   @unique // base58 mint pubkey (fresh keypair per attempt)
-  creatorWallet        String?  // wallet that must sign as creator; null in mock mode
+  // Known up-front for on-chain creates (we generate the keypair); null until
+  // pump.fun answers for off-chain creates, where THEY choose the mint.
+  mint                 String?  @unique
+  creatorWallet        String?  // wallet that signs (as creator, or as pump.fun login); null in mock mode
   name                 String
   symbol               String
   metadataUri          String?
   txB64                String?  // partially-signed create tx (mint sig only — no secrets)
   txSig                String?
   lastValidBlockHeight BigInt?
+  // Off-chain creates only: the ms timestamp baked into the pump.fun sign-in
+  // message. Lets the server rebuild the exact signed text and bound its age.
+  // The signature itself is never stored — it is a session-granting credential.
+  loginTimestamp       BigInt?
   status               String   @default("PREPARED") // PREPARED | SUBMITTED | CONFIRMED | FAILED | SUPERSEDED
   lastError            String?
   createdAt            DateTime @default(now())

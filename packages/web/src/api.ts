@@ -369,10 +369,15 @@ export const setSellerCoin = (coinAddress: string) =>
 // ---- seller coin auto-create ("<handle>'s BIDit Livestream") ---------------
 export interface CoinCreatePrepared {
   attemptId: string;
-  mint: string;
-  mode: 'pumpportal' | 'mock';
-  requiresSignature: boolean;
-  /** The mint-signed create tx (base64) that Phantom signs (null in mock mode). */
+  /** Null on the default (off-chain) path — pump.fun assigns the mint at create. */
+  mint: string | null;
+  mode: 'offchain' | 'pumpportal' | 'mock' | 'mock-offchain';
+  /** What the wallet must sign: a plain pump.fun sign-in message (default, free
+   *  and warning-free), a create transaction (on-chain escape hatch), or nothing. */
+  signMode: 'none' | 'message' | 'transaction';
+  /** The exact text to put in front of the wallet when signMode is 'message'. */
+  loginMessage: string | null;
+  /** The mint-signed create tx (base64) that Phantom signs, when signMode is 'transaction'. */
   txB64: string | null;
   /** b58 tx-message bytes (legacy signing lane; unused by the web client). */
   message: string | null;
@@ -392,8 +397,14 @@ export const prepareCoinCreate = (creatorWallet?: string) =>
     method: 'POST',
     body: JSON.stringify(creatorWallet ? { creatorWallet } : {}),
   });
-export const submitCoinCreate = (p: { attemptId: string; publicKey?: string; signature?: string; signedTxB64?: string }) =>
-  req<CoinCreateStatus>('/seller/coin-create/submit', { method: 'POST', body: JSON.stringify(p) });
+export const submitCoinCreate = (p: {
+  attemptId: string;
+  publicKey?: string;
+  /** base64 signature over the pump.fun sign-in message (default path). */
+  loginSignature?: string;
+  signature?: string;
+  signedTxB64?: string;
+}) => req<CoinCreateStatus>('/seller/coin-create/submit', { method: 'POST', body: JSON.stringify(p) });
 export const getCoinCreateStatus = () => req<CoinCreateStatus>('/seller/coin-create/status');
 export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null; chatCooldownMs?: number }) =>
   req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });

@@ -35,7 +35,7 @@ describe('coin create — happy path', () => {
     expect(result.linkedCoin).toBe(attempt.mint);
     expect(await linkedCoinOf(s.userId)).toBe(attempt.mint);
     // The coin now routes to the seller's room like any hand-pasted coin.
-    expect((await resolveRoomByCoin(attempt.mint, prisma))?.room).toBe(s.userId);
+    expect((await resolveRoomByCoin(attempt.mint!, prisma))?.room).toBe(s.userId);
 
     const row = await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } });
     expect(row.status).toBe('CONFIRMED');

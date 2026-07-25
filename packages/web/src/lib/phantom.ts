@@ -17,6 +17,7 @@ interface PhantomProvider {
   connect(opts?: { onlyIfTrusted?: boolean }): Promise<{ publicKey: { toString(): string } }>;
   disconnect?(): Promise<void>;
   signTransaction?(tx: VersionedTransaction): Promise<VersionedTransaction>;
+  signMessage?(message: Uint8Array, display?: 'utf8' | 'hex'): Promise<{ signature: Uint8Array }>;
 }
 
 export type PhantomErrorCode = 'NOT_INSTALLED' | 'REJECTED' | 'UNSUPPORTED';
@@ -66,6 +67,31 @@ const bytesToB64 = (bytes: Uint8Array): string => {
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
   return btoa(bin);
 };
+
+/** Sign pump.fun's plain sign-in text, so the backend can create the coin under
+ *  the seller's own pump.fun account.
+ *
+ *  This is a MESSAGE signature, not a transaction: Phantom shows the exact words
+ *  being signed, nothing can be spent, and none of the "this dApp may be
+ *  malicious" transaction-simulation warnings appear. The signature is returned
+ *  base64 (keeping a base58 library out of the web bundle) and is single-use —
+ *  the backend verifies it, spends it on one create, and never stores it. */
+export async function signLoginMessage(message: string): Promise<string> {
+  const p = provider();
+  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom is not installed.');
+  if (typeof p.signMessage !== 'function') {
+    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here — update Phantom and try again.');
+  }
+  try {
+    const { signature } = await p.signMessage(new TextEncoder().encode(message), 'utf8');
+    return bytesToB64(signature);
+  } catch (err) {
+    if ((err as { code?: number }).code === 4001) {
+      throw new PhantomError('REJECTED', 'You closed the Phantom popup — nothing was created.');
+    }
+    throw new PhantomError('UNSUPPORTED', (err as Error).message || 'Phantom signing failed.');
+  }
+}
 
 /** Have Phantom sign the prepared (mint-signed) create transaction; returns the
  *  fully signed tx, base64-encoded, for the backend to verify and broadcast. */

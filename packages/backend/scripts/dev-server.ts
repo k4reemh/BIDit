@@ -818,9 +818,10 @@ async function main() {
         return send(res, 200, { ok: true });
       }
       // ---- seller coin auto-create ("<handle>'s BIDit Livestream") ----------
-      // prepare: build + vet the create tx (the seller's wallet is creator, so
-      // pump.fun grants THEM the livestream button). submit: take the creator
-      // signature, broadcast, confirm, link. status: poll + lazy reconcile.
+      // The seller's wallet is the creator either way, because pump.fun only
+      // grants THEM the livestream button. prepare: hand back whatever the
+      // wallet must sign (a pump.fun sign-in message by default; a create tx on
+      // the on-chain escape hatch). submit: verify it and create the coin.
       if (req.method === 'POST' && p === '/seller/coin-create/prepare') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -829,24 +830,32 @@ async function main() {
           return send(res, 429, { error: 'Too many coin-create attempts — give it a few minutes.' });
         }
         const b = await readJson(req);
+        const mockMode = pumpCreate.mode === 'mock' || pumpCreate.mode === 'mock-offchain';
         let creatorWallet: string | null = null;
-        if (pumpCreate.mode !== 'mock') {
+        if (!mockMode) {
           const w = String(b.creatorWallet ?? '').trim();
           if (!w || !chain.isValidAddress(w)) {
             return send(res, 400, { error: 'Connect a Solana wallet to create your coin.', code: 'BAD_WALLET' });
           }
           creatorWallet = w;
         }
-        const { attempt, messageB58 } = await prepareCoinCreate(userId, creatorWallet, pumpCreate, prisma);
+        const { attempt, messageB58, loginMessage, signMode } = await prepareCoinCreate(
+          userId,
+          creatorWallet,
+          pumpCreate,
+          prisma,
+        );
         return send(res, 200, {
           attemptId: attempt.id,
           mint: attempt.mint,
           mode: pumpCreate.mode,
-          requiresSignature: pumpCreate.mode !== 'mock',
+          signMode,
           // The full mint-signed tx (base64): Phantom's object-form signTransaction
           // needs it — the b58 message lane can't represent versioned (v0) txs.
           txB64: attempt.txB64,
           message: messageB58,
+          // Plain text for signMode 'message' — shown verbatim in the wallet.
+          loginMessage,
           name: attempt.name,
           symbol: attempt.symbol,
         });
@@ -857,12 +866,16 @@ async function main() {
         await requireSeller(userId, prisma);
         if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
         const b = await readJson(req);
+        // Three shapes, one per signing lane: pump.fun sign-in signature
+        // (default, base64), a whole signed tx, or a raw tx-message signature.
         const proof =
-          typeof b.signedTxB64 === 'string' && b.signedTxB64
-            ? { signedTxB64: b.signedTxB64 }
-            : typeof b.publicKey === 'string' && b.publicKey && typeof b.signature === 'string' && b.signature
-              ? { publicKey: b.publicKey, signatureB58: b.signature }
-              : null;
+          typeof b.publicKey === 'string' && b.publicKey && typeof b.loginSignature === 'string' && b.loginSignature
+            ? { publicKey: b.publicKey, signatureB64: b.loginSignature }
+            : typeof b.signedTxB64 === 'string' && b.signedTxB64
+              ? { signedTxB64: b.signedTxB64 }
+              : typeof b.publicKey === 'string' && b.publicKey && typeof b.signature === 'string' && b.signature
+                ? { publicKey: b.publicKey, signatureB58: b.signature }
+                : null;
         const dto = await submitCoinCreate(userId, String(b.attemptId ?? ''), proof, pumpCreate, prisma);
         return send(res, 200, dto);
       }

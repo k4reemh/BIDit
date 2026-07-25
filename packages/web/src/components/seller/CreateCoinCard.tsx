@@ -7,16 +7,22 @@ import {
   ApiError,
   type Session,
 } from '../../api';
-import { hasPhantom, connectPhantom, signCreateTx, PhantomError } from '../../lib/phantom';
+import { hasPhantom, connectPhantom, signCreateTx, signLoginMessage, PhantomError } from '../../lib/phantom';
 import { Bolt, Check } from '../../icons';
 
 type Stage = 'idle' | 'working' | 'done';
 
 /**
  * "Create my livestream coin" — one click creates "<handle>'s BIDit Livestream"
- * on pump.fun with the SELLER's wallet as creator (that's what makes pump.fun
- * show THEM the Start-livestream button), $0 initial buy, and auto-links it as
- * their saved coin. In mock/dev mode the whole flow runs with no wallet.
+ * on pump.fun under the SELLER's own pump.fun account (that's what makes
+ * pump.fun show THEM the Start-livestream button) and auto-links it as their
+ * saved coin.
+ *
+ * The seller signs pump.fun's sign-in message — a plain text signature, so it
+ * costs nothing, moves nothing, and raises none of the wallet's scary
+ * transaction warnings. If pump.fun won't play along we say so plainly and
+ * point at the manual route; we never quietly fall back to a path that charges
+ * a fee. In mock/dev mode the whole flow runs with no wallet at all.
  * Mounted in seller onboarding (step 2) and in Settings while no coin is linked.
  */
 export default function CreateCoinCard({
@@ -31,6 +37,7 @@ export default function CreateCoinCard({
   const [stage, setStage] = useState<Stage>('idle');
   const [step, setStep] = useState(''); // human-visible progress line while working
   const [error, setError] = useState('');
+  const [manual, setManual] = useState(false); // show the "do it yourself" route
   const [mint, setMint] = useState('');
   const [imgOk, setImgOk] = useState(true);
   const alive = useRef(true);
@@ -81,7 +88,7 @@ export default function CreateCoinCard({
         if (s.status === 'CONFIRMED' && s.mint) return void finishLinked(s.mint);
         if (s.status === 'FAILED') {
           setStage('idle');
-          setError(s.error || 'The create transaction failed — nothing was charged. Try again.');
+          setError(s.error || 'That didn’t go through — nothing was charged. Try again.');
           return;
         }
       } catch {
@@ -89,11 +96,12 @@ export default function CreateCoinCard({
       }
     }
     setStage('idle');
-    setError('Still waiting on the network — check back in a minute.');
+    setError('Still working on it — check back in a minute.');
   };
 
   const create = async () => {
     setError('');
+    setManual(false);
     setStage('working');
     try {
       if (mockMode) {
@@ -109,7 +117,18 @@ export default function CreateCoinCard({
       const wallet = await connectPhantom();
       setStep('Preparing your coin…');
       const prep = await prepareCoinCreate(wallet);
-      if (!prep.requiresSignature || !prep.txB64) {
+
+      if (prep.signMode === 'message' && prep.loginMessage) {
+        setStep('Approve the pump.fun sign-in in Phantom — it’s just a signature: no fee, nothing spent.');
+        const loginSignature = await signLoginMessage(prep.loginMessage);
+        setStep('Creating your coin on pump.fun…');
+        const result = await submitCoinCreate({ attemptId: prep.attemptId, publicKey: wallet, loginSignature });
+        if (result.status === 'CONFIRMED' && result.mint) return void finishLinked(result.mint);
+        setStep('Finishing up…');
+        return void pollUntilSettled();
+      }
+
+      if (prep.signMode !== 'transaction' || !prep.txB64) {
         const result = await submitCoinCreate({ attemptId: prep.attemptId });
         if (result.status === 'CONFIRMED' && result.mint) return void finishLinked(result.mint);
         return void pollUntilSettled();
@@ -137,6 +156,9 @@ export default function CreateCoinCard({
         );
       } else {
         setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
+        // pump.fun refused or was unreachable. There is no cheaper automatic
+        // route, so point at the manual one instead of pretending otherwise.
+        setManual(err instanceof ApiError && (err.code === 'CREATE_FAILED' || err.code === 'PROVIDER_UNAVAILABLE'));
       }
     }
   };
@@ -170,13 +192,24 @@ export default function CreateCoinCard({
         <div>
           <b className="ccc__name">{session.handle}&rsquo;s BIDit Livestream</b>
           <p className="muted ccc__sub">
-            We create this coin on pump.fun for you — free, $0 buy-in. Your wallet is the creator, so pump.fun
-            gives <i>you</i> the Start-livestream button, and it’s saved as your linked coin here.
+            We create this coin on pump.fun for you — completely free. You’ll just sign pump.fun’s sign-in
+            message in your wallet (a signature, not a payment — nothing can be spent). The coin is created
+            under <i>your</i> pump.fun account, so you get the Start-livestream button, and it’s saved as your
+            linked coin here.
           </p>
         </div>
       </div>
 
       {error && <div className="auth__error">{error}</div>}
+      {manual && (
+        <p className="muted ccc__note">
+          You can also make it yourself: create a coin at{' '}
+          <a href="https://pump.fun/create" target="_blank" rel="noreferrer">
+            pump.fun/create
+          </a>{' '}
+          (a $0 buy costs nothing), then paste its address in Settings to link it.
+        </p>
+      )}
 
       {stage === 'working' ? (
         <div className="ccc__busy"><span className="spinner" /> {step}</div>

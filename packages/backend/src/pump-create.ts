@@ -2,13 +2,20 @@
  * Auto-create a seller's pump.fun livestream coin.
  *
  * The lifecycle lives in PumpCoinCreateAttempt (PREPARED → SUBMITTED →
- * CONFIRMED | FAILED | SUPERSEDED — see schema.prisma). The flow follows the
- * withdrawals durable-settlement stance: the tx signature is fixed BEFORE
- * broadcast, an ambiguous send is never treated as failure, and only the chain
- * (on-chain error, or not-found past the blockhash expiry height) can declare
- * an attempt dead. A per-seller advisory lock serializes prepare/finalize so at
- * most one attempt is submittable and a confirmed create never clobbers a coin
- * the seller linked by other means in the meantime.
+ * CONFIRMED | FAILED | SUPERSEDED — see schema.prisma), and two provider shapes
+ * feed it (see chain/pump-provider.ts):
+ *
+ *  - off-chain (default): the seller signs pump.fun's sign-in message, we create
+ *    the coin through pump.fun's own API. One round trip, settled or not — no
+ *    chain, no fee, no wallet warning.
+ *  - on-chain (escape hatch): the seller signs a create transaction. That path
+ *    follows the withdrawals durable-settlement stance — the tx signature is
+ *    fixed BEFORE broadcast, an ambiguous send is never treated as failure, and
+ *    only the chain can declare an attempt dead.
+ *
+ * A per-seller advisory lock serializes prepare/finalize either way, so at most
+ * one attempt is submittable and a confirmed create never clobbers a coin the
+ * seller linked by other means in the meantime.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -17,11 +24,32 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import type { PumpCoinCreateAttempt } from '@prisma/client';
 import { corsAllowlist } from './http.js';
+import bs58 from 'bs58';
+import nacl from 'tweetnacl';
 import {
   PumpCreateError,
+  pumpLoginMessage,
   type CreatorProof,
   type PumpCreateProvider,
+  type SignMode,
 } from './chain/pump-provider.js';
+
+/** The seller's pump.fun sign-in signature, base64 from the browser (keeps bs58
+ *  out of the web bundle). Never stored: it grants a pump.fun session. */
+export interface LoginSignatureProof {
+  publicKey: string;
+  signatureB64: string;
+}
+export type SubmitProof = CreatorProof | LoginSignatureProof | null;
+
+/** How long a pump.fun sign-in signature stays usable. Short on purpose: the
+ *  seller signs seconds after preparing, and pump.fun rejects stale ones too. */
+const LOGIN_TTL_MS = 5 * 60_000;
+/** Tolerance for a server clock that runs slightly behind the prepare call. */
+const CLOCK_SKEW_MS = 60_000;
+/** An off-chain create is one HTTP call; a SUBMITTED row older than this was
+ *  interrupted mid-flight (process restart) and will never settle itself. */
+const OFFCHAIN_STUCK_MS = 2 * 60_000;
 
 // ---------------------------------------------------------------------------
 // Metadata builders
@@ -64,11 +92,14 @@ export function webOrigin(): string {
   return first ?? 'http://localhost:5174';
 }
 
-/** Coin description shown on pump.fun — sells the stream and links the watch page. */
+/** Coin description shown on pump.fun — sells the stream and links the watch
+ *  page. Off-chain creates don't know their mint when the metadata is uploaded
+ *  (pump.fun assigns it), so an empty mint links the site root instead. */
 export function pumpCoinDescription(handle: string, mint: string): string {
+  const where = mint ? `${webOrigin()}/live/${mint}` : webOrigin();
   return (
     `${handle} runs live card auctions on BIDit. ` +
-    `Watch the stream and bid in real USDC at ${webOrigin()}/live/${mint} — bid it, win it, ship it.`
+    `Watch the stream and bid in real USDC at ${where} — bid it, win it, ship it.`
   );
 }
 
@@ -115,7 +146,12 @@ export async function prepareCoinCreate(
   creatorWallet: string | null,
   provider: PumpCreateProvider,
   prisma: PrismaClient = defaultPrisma,
-): Promise<{ attempt: PumpCoinCreateAttempt; messageB58: string | null }> {
+): Promise<{
+  attempt: PumpCoinCreateAttempt;
+  messageB58: string | null;
+  loginMessage: string | null;
+  signMode: SignMode;
+}> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: sellerId }, select: { handle: true } });
 
   // Pre-check under the seller lock (fast fail before any provider round-trip).
@@ -161,11 +197,17 @@ export async function prepareCoinCreate(
         metadataUri: prepared.metadataUri,
         txB64: prepared.txB64,
         lastValidBlockHeight: prepared.lastValidBlockHeight,
+        loginTimestamp: prepared.loginTimestamp,
         status: 'PREPARED',
       },
     });
   });
-  return { attempt, messageB58: prepared.messageB58 };
+  return {
+    attempt,
+    messageB58: prepared.messageB58,
+    loginMessage: prepared.loginMessage,
+    signMode: prepared.signMode,
+  };
 }
 
 /** Mark CONFIRMED and link the mint as the seller's coin — idempotent, and it
@@ -178,6 +220,10 @@ export async function finalizeConfirmed(
     const attempt = await tx.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attemptId } });
     await takeSellerLock(tx, attempt.sellerId);
     if (attempt.status === 'CONFIRMED') return;
+    if (!attempt.mint) {
+      // Callers set the mint before confirming; nothing to link without one.
+      throw new PumpCreateError(502, 'CREATE_FAILED', 'The coin was created but its address is unknown.');
+    }
     const profile = await tx.sellerProfile.findUnique({
       where: { userId: attempt.sellerId },
       select: { pumpCoinAddress: true },
@@ -220,11 +266,101 @@ async function statusDto(
   return {
     status,
     attemptId: attempt.id,
-    mint: attempt.mint,
+    mint: attempt.mint ?? undefined,
     txSig: attempt.txSig,
     linkedCoin: linked?.pumpCoinAddress ?? null,
     error: attempt.lastError,
   };
+}
+
+/** Off-chain submit: verify the seller's pump.fun sign-in signature ourselves,
+ *  then create the coin through pump.fun in one call. There is no chain and no
+ *  in-flight state to reconcile — it either comes back with a mint or it fails,
+ *  and a failure leaves the seller exactly where they started. */
+async function submitOffchain(
+  attempt: PumpCoinCreateAttempt,
+  proof: SubmitProof,
+  provider: Extract<PumpCreateProvider, { kind: 'offchain' }>,
+  prisma: PrismaClient,
+): Promise<CoinCreateStatusDto> {
+  if (attempt.loginTimestamp === null) {
+    // An attempt prepared under the other provider shape can't be finished here.
+    throw new PumpCreateError(409, 'SUPERSEDED', 'That attempt is out of date — start a fresh one.');
+  }
+
+  // The sign-in text is time-boxed by pump.fun and by us. Too old (or from a
+  // clock ahead of ours) → dead attempt; the client silently prepares a new one.
+  const age = Date.now() - Number(attempt.loginTimestamp);
+  if (age > LOGIN_TTL_MS || age < -CLOCK_SKEW_MS) {
+    await prisma.pumpCoinCreateAttempt.update({
+      where: { id: attempt.id },
+      data: { status: 'FAILED', lastError: 'sign-in message expired before submit' },
+    });
+    throw new PumpCreateError(410, 'TX_EXPIRED', 'That signature request expired — creating a fresh one.');
+  }
+
+  // Verify the signature here, before it is worth anything to anyone: a bad one
+  // never reaches pump.fun, and the attempt stays signable.
+  let signature = new Uint8Array(64);
+  if (attempt.creatorWallet) {
+    const login = proof && 'signatureB64' in proof ? proof : null;
+    if (!login) {
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'Sign the pump.fun sign-in message to create your coin.');
+    }
+    let signer: Uint8Array;
+    try {
+      signature = new Uint8Array(Buffer.from(login.signatureB64, 'base64'));
+      signer = bs58.decode(attempt.creatorWallet);
+    } catch {
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature could not be read — try signing again.');
+    }
+    const message = new TextEncoder().encode(pumpLoginMessage(attempt.loginTimestamp));
+    if (signature.length !== 64 || !nacl.sign.detached.verify(message, signature, signer)) {
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature did not verify — try signing again.');
+    }
+  }
+
+  // Atomic claim: one submit calls pump.fun however many race; the losers read
+  // back the winner's status instead of creating a second coin.
+  const claimed = await prisma.pumpCoinCreateAttempt.updateMany({
+    where: { id: attempt.id, status: 'PREPARED' },
+    data: { status: 'SUBMITTED' },
+  });
+  if (claimed.count === 0) {
+    return statusDto(await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } }), prisma);
+  }
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: attempt.sellerId }, select: { handle: true } });
+  let created: { mint: string; metadataUri: string | null };
+  try {
+    created = await provider.complete({
+      creatorWallet: attempt.creatorWallet,
+      name: attempt.name,
+      symbol: attempt.symbol,
+      describe: (mint) => pumpCoinDescription(user.handle, mint),
+      websiteFor: (mint) => (mint ? `${webOrigin()}/live/${mint}` : webOrigin()),
+      imagePng: loadCoinImage(),
+      login: {
+        publicKey: attempt.creatorWallet ?? 'mock',
+        signature,
+        timestamp: attempt.loginTimestamp,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof PumpCreateError ? err.message : 'pump.fun could not create the coin.';
+    await prisma.pumpCoinCreateAttempt.update({
+      where: { id: attempt.id },
+      data: { status: 'FAILED', lastError: message },
+    });
+    throw err instanceof PumpCreateError ? err : new PumpCreateError(502, 'CREATE_FAILED', message);
+  }
+
+  await prisma.pumpCoinCreateAttempt.update({
+    where: { id: attempt.id },
+    data: { mint: created.mint, metadataUri: created.metadataUri },
+  });
+  await finalizeConfirmed(attempt.id, prisma);
+  return statusDto(await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } }), prisma);
 }
 
 /** Take the seller's creator signature, broadcast, and (briefly) wait for the
@@ -233,7 +369,7 @@ async function statusDto(
 export async function submitCoinCreate(
   sellerId: string,
   attemptId: string,
-  proof: CreatorProof | null,
+  proof: SubmitProof,
   provider: PumpCreateProvider,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<CoinCreateStatusDto> {
@@ -250,14 +386,19 @@ export async function submitCoinCreate(
     throw new PumpCreateError(410, 'ATTEMPT_DEAD', 'That attempt already failed — start a fresh one.');
   }
 
-  // Wallet mismatch (real mode): the tx's fee payer is the original wallet, so a
-  // signature from any other wallet can never make it land.
+  // Wallet mismatch: the attempt is bound to the wallet the seller connected —
+  // for a tx it is the fee payer, for an off-chain create it is the pump.fun
+  // account the coin lands in. Either way another wallet's signature is wrong.
   if (attempt.creatorWallet && proof && 'publicKey' in proof && proof.publicKey !== attempt.creatorWallet) {
     throw new PumpCreateError(
       409,
       'WALLET_MISMATCH',
       'Phantom signed with a different wallet than the one you connected. Switch back, or restart to use this wallet.',
     );
+  }
+
+  if (provider.kind === 'offchain') {
+    return submitOffchain(attempt, proof, provider, prisma);
   }
 
   // Expiry pre-check — don't waste a broadcast on a provably dead blockhash.
@@ -273,7 +414,8 @@ export async function submitCoinCreate(
   }
 
   // Assemble + verify signatures; the tx signature is fixed here, pre-broadcast.
-  const { raw, txSig } = provider.assembleSigned({ txB64: attempt.txB64, mint: attempt.mint }, proof);
+  const txProof = proof && !('signatureB64' in proof) ? proof : null;
+  const { raw, txSig } = provider.assembleSigned({ txB64: attempt.txB64, mint: attempt.mint ?? '' }, txProof);
 
   // Atomic claim: exactly one submit broadcasts; racers get the winner's status.
   const claimed = await prisma.pumpCoinCreateAttempt.updateMany({
@@ -332,7 +474,26 @@ export async function getCoinCreateStatus(
     const profile = await prisma.sellerProfile.findUnique({ where: { userId: sellerId }, select: { pumpCoinAddress: true } });
     return { status: 'NONE', linkedCoin: profile?.pumpCoinAddress ?? null };
   }
-  if (attempt.status === 'SUBMITTED' && attempt.txSig) {
+  // An off-chain create settles inside its own request. A SUBMITTED row that
+  // outlived it means the process died mid-call — mark it dead so the card
+  // offers a retry instead of spinning forever. (If pump.fun did create the
+  // coin, it shows on their profile and can be pasted in Settings.)
+  if (provider.kind === 'offchain' && attempt.status === 'SUBMITTED') {
+    if (Date.now() - attempt.updatedAt.getTime() > OFFCHAIN_STUCK_MS) {
+      await prisma.pumpCoinCreateAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: 'FAILED',
+          lastError:
+            'the create was interrupted — check your pump.fun profile before trying again, in case the coin was made',
+        },
+      });
+      return statusDto(await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } }), prisma);
+    }
+    return statusDto(attempt, prisma);
+  }
+
+  if (provider.kind === 'tx' && attempt.status === 'SUBMITTED' && attempt.txSig) {
     const fate = await provider.getTxStatus(attempt.txSig, attempt.lastValidBlockHeight);
     if (fate === 'confirmed') {
       await finalizeConfirmed(attempt.id, prisma);

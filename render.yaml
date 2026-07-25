@@ -56,8 +56,13 @@ services:
       # coin's pump.fun metadata point here — set to the public web origin.
       - key: BIDIT_WEB_ORIGIN
         sync: false # e.g. https://your-site.vercel.app (falls back to the first BIDIT_ALLOWED_ORIGINS entry)
-      # Optional overrides: BIDIT_PUMP_PROVIDER=mock|pumpportal (default: pumpportal
-      # on mainnet, mock elsewhere) and BIDIT_PUMP_PRIORITY_FEE_SOL (default 0.0001).
+      # Optional override: BIDIT_PUMP_PROVIDER=offchain|pumpportal|mock|mock-offchain.
+      # Default is `offchain` on mainnet (free, no wallet warning — sellers sign a
+      # pump.fun sign-in message, we create the coin through pump.fun's own API)
+      # and a mock everywhere else. `pumpportal` is the on-chain escape hatch: it
+      # works but costs network fees and makes wallets show a scary-transaction
+      # warning, so leave it unset unless the off-chain path breaks.
+      # BIDIT_PUMP_PRIORITY_FEE_SOL (default 0.0001) applies to pumpportal only.
       # ---- secrets: set these in the Render dashboard, never commit ----
       # The server REFUSES TO BOOT on mainnet (or BIDIT_ENV=production) if any of
       # these are missing/weak — see src/config.ts (assertStartupConfig).

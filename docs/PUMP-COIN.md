@@ -1,45 +1,63 @@
 # Seller coin auto-create — how it works + mainnet validation runbook
 
 Every new seller gets a pump.fun coin made for them during onboarding:
-**"<handle>'s BIDit Livestream"**, branded BIDit art, **$0 initial buy** (pump.fun
-moved the deploy cost to the coin's *first buyer* in June 2026, so creating costs
-the seller only dust network fees). The coin is auto-linked as their saved coin
-(`SellerProfile.pumpCoinAddress`), so the watch page, live grid, and stream proxy
-work with zero extra setup.
+**"<handle>'s BIDit Livestream"**, branded BIDit art, created **off-chain and
+completely free** — exactly what pump.fun's own /create page does for a 0-SOL
+launch. The coin is auto-linked as their saved coin (`SellerProfile.pumpCoinAddress`),
+so the watch page, live grid, and stream proxy work with zero extra setup.
 
-**The seller's own wallet signs the create and is the on-chain creator.** That is
+**The coin is created under the seller's own pump.fun account.** That is
 load-bearing: pump.fun only shows the **Start livestream** button to the coin
-creator's logged-in account. It also means the seller keeps pump.fun's creator
-fees, and BIDit never touches private keys.
+creator. It also means the seller keeps pump.fun's creator fees, and BIDit never
+touches private keys.
+
+The seller signs **one plain-text message** — pump.fun's sign-in line — not a
+transaction. So there is no fee, nothing can be spent, and none of the wallet's
+"this dApp may be malicious" transaction warnings appear. That signature grants a
+pump.fun session for their wallet, so it is treated as a credential: verified
+locally, spent on exactly one create, held in memory, **never stored or logged**.
+
+There is deliberately **no automatic fallback to the on-chain path**. If pump.fun
+refuses, the seller is told plainly and pointed at pump.fun/create + paste-in-
+Settings — we never quietly swap in a route that charges a fee or trips a wallet
+warning.
 
 ## Architecture
 
 ```
-browser (Phantom)                 backend                        pump.fun / PumpPortal
-────────────────                  ───────                        ─────────────────────
+browser (Phantom)                 backend                        pump.fun
+────────────────                  ───────                        ────────
                                   POST /seller/coin-create/prepare
-                                    mint keypair (ephemeral)
-                                    metadata + art  ────────────►  pump.fun /api/ipfs
-                                    unsigned create tx  ◄────────  pumpportal trade-local (amount 0)
-                                    VET (fee payer, program
-                                    allowlist, single pump ix)
-                                    fresh blockhash, mint-sign
-     ◄── messageB58 ──────────────  store PREPARED attempt
-sign in Phantom
-     ── signature ───────────────►  POST /seller/coin-create/submit
-                                    merge + verify ALL sigs
-                                    txSig fixed pre-broadcast
-                                    broadcast on our RPC ───────►  Solana
-                                    confirm → link coin (CONFIRMED)
+     ◄── "Sign in to pump.fun:     store PREPARED attempt
+          <timestamp>" ──────────    (timestamp only — no tx, no mint yet)
+sign message in Phantom
+  (no fee, no tx warning)
+     ── signature (base64) ──────►  POST /seller/coin-create/submit
+                                    verify ed25519 locally FIRST
+                                    claim PREPARED→SUBMITTED
+                                    auth/login ─────────────────►  session cookie
+                                    users/register ─────────────►
+                                    ipfs-presign ×2 ────────────►  60s Pinata URLs
+                                    upload art + metadata ──────►  {data:{cid}}
+                                    coins/create-v2 ────────────►  201 {mint}
+                                    link coin (CONFIRMED)
 ```
 
+The wire contract above was verified against real captures, not guessed: the
+sign-in text is the one whose signature validates against a live pump.fun login,
+and the presign/upload shapes came from probing the (unauthenticated) endpoints.
+
 - Lifecycle: `PumpCoinCreateAttempt` — `PREPARED → SUBMITTED → CONFIRMED | FAILED | SUPERSEDED`.
-  Withdrawals stance: ambiguous sends are never failures; only the chain (error, or
-  not-found past `lastValidBlockHeight`) declares death. A closed tab is recovered by
-  the status endpoint's lazy reconcile on the next page view.
-- Provider seam (`src/chain/pump-provider.ts`): `pumpportal` on mainnet, `mock`
-  everywhere else (`BIDIT_PUMP_PROVIDER` overrides). The mock makes the entire flow
-  run in dev/preview/vitest with no chain and no Phantom.
+  An off-chain create settles inside its own request; a SUBMITTED row that outlives
+  it (process died mid-call) is marked FAILED by the next status poll, with copy
+  telling the seller to check pump.fun before retrying, in case it did land.
+- Sign-in signatures expire after 5 minutes (`LOGIN_TTL_MS`); a stale one returns
+  `TX_EXPIRED` and the client silently prepares a fresh one, once.
+- Provider seam (`src/chain/pump-provider.ts`) is a union of two shapes so they
+  can't be confused: `kind: 'offchain'` (default on mainnet) and `kind: 'tx'` (the
+  PumpPortal escape hatch). Mocks of both run the whole flow in dev/preview/vitest
+  with no network and no Phantom — `test/pump-offchain.flow.test.ts` covers the
+  shipping path, signing with a throwaway keypair.
 - Guards: per-seller advisory lock, one submittable attempt at a time, atomic
   PREPARED→SUBMITTED claim (double-submit broadcasts once), `mint` and
   `pumpCoinAddress` DB-unique, first-claim-wins preserved end to end, and a
@@ -49,10 +67,10 @@ sign in Phantom
 
 | var | required | notes |
 |---|---|---|
-| `SOLANA_RPC` | already set | the provider builds/broadcasts on this RPC |
+| `SOLANA_RPC` | already set | unused by the off-chain path; needed by the pumpportal escape hatch |
 | `BIDIT_WEB_ORIGIN` | recommended | e.g. `https://<your-site>.vercel.app` — the coin's metadata links here; falls back to the first `BIDIT_ALLOWED_ORIGINS` entry |
-| `BIDIT_PUMP_PROVIDER` | optional | `mock` / `pumpportal` override (default: pumpportal on mainnet only) |
-| `BIDIT_PUMP_PRIORITY_FEE_SOL` | optional | default `0.0001` |
+| `BIDIT_PUMP_PROVIDER` | optional | `offchain` / `pumpportal` / `mock` / `mock-offchain` (default: `offchain` on mainnet, mock elsewhere) |
+| `BIDIT_PUMP_PRIORITY_FEE_SOL` | optional | default `0.0001`; pumpportal only |
 
 No new secrets.
 
