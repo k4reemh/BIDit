@@ -46,6 +46,12 @@ services:
         sync: false
       - key: BIDIT_PROMO_START
         value: "2026-07-14T00:00:00-06:00" # "$100 to sell" promo opens (3-day enrollment window). Remove/blank to disable.
+      # Seller coin auto-create ("<handle>'s BIDit Livestream"). Links inside the
+      # coin's pump.fun metadata point here — set to the public web origin.
+      - key: BIDIT_WEB_ORIGIN
+        sync: false # e.g. https://your-site.vercel.app (falls back to the first BIDIT_ALLOWED_ORIGINS entry)
+      # Optional overrides: BIDIT_PUMP_PROVIDER=mock|pumpportal (default: pumpportal
+      # on mainnet, mock elsewhere) and BIDIT_PUMP_PRIORITY_FEE_SOL (default 0.0001).
       # ---- secrets: set these in the Render dashboard, never commit ----
       # The server REFUSES TO BOOT on mainnet (or BIDIT_ENV=production) if any of
       # these are missing/weak — see src/config.ts (assertStartupConfig).

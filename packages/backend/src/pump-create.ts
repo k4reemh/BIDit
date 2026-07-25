@@ -134,6 +134,7 @@ export async function prepareCoinCreate(
     name,
     symbol,
     describe: (mint) => pumpCoinDescription(user.handle, mint),
+    websiteFor: (mint) => `${webOrigin()}/live/${mint}`,
     imagePng: loadCoinImage(),
   });
 
