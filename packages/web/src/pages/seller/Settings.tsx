@@ -4,6 +4,7 @@ import { useSeller } from '../../components/SellerLayout';
 import { setSellerCoin, saveStreamSettings, type Session } from '../../api';
 import { Check, ArrowRight } from '../../icons';
 import ShippingSettingsCard from '../../components/seller/ShippingSettingsCard';
+import CreateCoinCard from '../../components/seller/CreateCoinCard';
 import { CATEGORIES } from '../../data';
 
 export default function Settings() {
@@ -45,7 +46,16 @@ export default function Settings() {
       <div className="card acct-card">
         <h3 className="acct-sub">Livestream</h3>
         <p className="muted acct-note">Link the coin you stream on — buyers who open its page see your live BIDit auctions. Give your stream a title and category so it stands out on the live grid.</p>
-        <div className="fld"><label>Coin address</label><input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your pump.fun coin address" /></div>
+        {!session.pumpCoinAddress && <CreateCoinCard session={session} setSession={setSession} />}
+        <div className="fld">
+          <label>Coin address {!session.pumpCoinAddress && <span className="muted">— or paste one you already have</span>}</label>
+          <input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your pump.fun coin address" />
+          {session.pumpCoinAddress && (
+            <span className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              A linked coin can only be moved to another seller by support — clearing it here just unlinks it from your shop.
+            </span>
+          )}
+        </div>
         <div className="fld-row">
           <div className="fld">
             <label>Stream title</label>

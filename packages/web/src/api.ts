@@ -75,13 +75,30 @@ export const eraseMyData = () => req<{ ok: boolean }>('/me/erase', { method: 'PO
  *  rounded to the nearest cent — for shipping figures and wallet balances. */
 export const money2 = (s: string | number) => Number(s).toFixed(2);
 
+/** API failure carrying the backend's machine-readable code (when it sends one)
+ *  so flows can branch (e.g. TX_EXPIRED → silently retry). Still an Error, so
+ *  every existing `err instanceof Error` catch keeps working. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json', ...(opts.headers as Record<string, string>) };
   const t = getToken();
   if (t) headers.authorization = `Bearer ${t}`;
   const r = await fetch(`${API}${path}`, { ...opts, headers });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((data as { error?: string }).error || 'Something went wrong. Try again.');
+  if (!r.ok) {
+    const d = data as { error?: string; code?: string };
+    throw new ApiError(d.error || 'Something went wrong. Try again.', d.code, r.status);
+  }
   return data as T;
 }
 
@@ -348,6 +365,34 @@ export const startAuction = (listingId: string, durationSeconds: number) =>
 
 export const setSellerCoin = (coinAddress: string) =>
   req<{ ok: boolean }>('/seller/coin', { method: 'POST', body: JSON.stringify({ coinAddress }) });
+
+// ---- seller coin auto-create ("<handle>'s BIDit Livestream") ---------------
+export interface CoinCreatePrepared {
+  attemptId: string;
+  mint: string;
+  mode: 'pumpportal' | 'mock';
+  requiresSignature: boolean;
+  /** b58 tx-message bytes the creator wallet signs (null in mock mode). */
+  message: string | null;
+  name: string;
+  symbol: string;
+}
+export interface CoinCreateStatus {
+  status: 'NONE' | 'PREPARED' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED';
+  attemptId?: string;
+  mint?: string;
+  txSig?: string | null;
+  linkedCoin: string | null;
+  error?: string | null;
+}
+export const prepareCoinCreate = (creatorWallet?: string) =>
+  req<CoinCreatePrepared>('/seller/coin-create/prepare', {
+    method: 'POST',
+    body: JSON.stringify(creatorWallet ? { creatorWallet } : {}),
+  });
+export const submitCoinCreate = (p: { attemptId: string; publicKey?: string; signature?: string; signedTxB64?: string }) =>
+  req<CoinCreateStatus>('/seller/coin-create/submit', { method: 'POST', body: JSON.stringify(p) });
+export const getCoinCreateStatus = () => req<CoinCreateStatus>('/seller/coin-create/status');
 export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null; chatCooldownMs?: number }) =>
   req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
 

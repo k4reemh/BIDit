@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Logo from './Logo';
+import CreateCoinCard from './seller/CreateCoinCard';
 import { submitSellerOnboarding, type Session } from '../api';
 import { Bolt, Radio, Truck, Shield, Check, ArrowRight, Tag, UserCheck, Wallet } from '../icons';
 
@@ -23,6 +24,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
   const [website, setWebsite] = useState(session.website ?? '');
   const [pitch, setPitch] = useState(session.pitch ?? '');
   const [coin, setCoin] = useState(session.pumpCoinAddress ?? '');
+  const [usedPaste, setUsedPaste] = useState(false); // only a pasted coin is ever sent on finish
   const [country, setCountry] = useState(session.shipping?.originCountry ?? '');
   const [region, setRegion] = useState(session.shipping?.originRegion ?? '');
   const [city, setCity] = useState(session.shipping?.originCity ?? '');
@@ -39,7 +41,9 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
       const s = await submitSellerOnboarding({
         website: website.trim(),
         pitch: pitch.trim(),
-        coinAddress: coin.trim(),
+        // Only a coin the seller actually PASTED is sent. Sending '' here used
+        // to null the link — which would wipe a coin the create flow just made.
+        ...(usedPaste && coin.trim() ? { coinAddress: coin.trim() } : {}),
         socials,
         origin: { country: country.trim(), region: region.trim(), city: city.trim(), postal: postal.trim() },
       });
@@ -100,9 +104,30 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
         {step === 2 && (
           <>
             <h1 className="display sob__title">Your stream</h1>
-            <p className="muted sob__sub">Paste the pump.fun coin you stream on. Buyers who open its page see your live BIDit auctions, and it links your shop to your stream.</p>
-            <div className="fld"><label>Pump.fun coin address</label><input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your coin address" /></div>
-            <div className="sob__tip"><Radio width={16} height={16} /> No coin yet? You can add it later in Settings — you can still run auctions on the BIDit site.</div>
+            {session.pumpCoinAddress ? (
+              <>
+                <p className="muted sob__sub">Your livestream coin is linked. Buyers who open its pump.fun page see your live BIDit auctions.</p>
+                <div className="sob__tip"><Radio width={16} height={16} /> Linked: <code>{session.pumpCoinAddress}</code></div>
+              </>
+            ) : (
+              <>
+                <p className="muted sob__sub">
+                  Every seller streams on their own pump.fun coin — we’ll make yours right now, or link one you already have.
+                </p>
+                <CreateCoinCard session={session} setSession={setSession} />
+                {!usedPaste ? (
+                  <button type="button" className="sob__alt" onClick={() => setUsedPaste(true)}>
+                    I already have a coin — paste it instead
+                  </button>
+                ) : (
+                  <div className="fld" style={{ marginTop: 12 }}>
+                    <label>Pump.fun coin address</label>
+                    <input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your coin address" autoFocus />
+                  </div>
+                )}
+                <div className="sob__tip"><Radio width={16} height={16} /> No rush — you can also do this later in Settings and still run auctions on the BIDit site.</div>
+              </>
+            )}
           </>
         )}
 

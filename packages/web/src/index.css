@@ -1337,6 +1337,22 @@ img { display: block; max-width: 100%; }
 .sob__verify p { font-size: 13px; line-height: 1.5; margin-top: 3px; }
 .sob__tip { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
 .sob__tip svg { color: var(--accent); flex: none; }
+.sob__alt { margin-top: 10px; font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.sob__alt:hover { color: var(--ink); }
+
+/* ---- Create-my-livestream-coin card (onboarding step 2 + seller Settings) -- */
+.ccc { padding: 16px; margin-bottom: 12px; }
+.ccc__head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.ccc__img { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex: none; }
+.ccc__img--ph { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.ccc__name { font-size: 15px; }
+.ccc__sub { margin-top: 3px; font-size: 13px; line-height: 1.45; }
+.ccc__busy { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--muted); padding: 6px 0; }
+.ccc__busy .spinner { width: 15px; height: 15px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; flex: none; animation: cccspin 0.8s linear infinite; }
+.ccc__mint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 6px; }
+.ccc__mint code { font-size: 12px; color: var(--ink-2); background: var(--surface-2); padding: 4px 8px; border-radius: 7px; overflow-wrap: anywhere; }
+.ccc__note { font-size: 13px; }
+@keyframes cccspin { to { transform: rotate(360deg); } }
 .sob__actions { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; gap: 12px; }
 
 /* ---- admin: seller applications ---- */
