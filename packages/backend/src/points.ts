@@ -189,7 +189,7 @@ export async function claimMission(
 ): Promise<{ points: bigint; total: bigint }> {
   const def = MISSIONS.find((m) => m.id === missionId);
   if (!def) throw new PointsError('Unknown mission.');
-  if (def.comingSoon) throw new PointsError('This mission isn’t live yet — soon!');
+  if (def.comingSoon) throw new PointsError('This mission isn’t live yet. Coming soon.');
   if (!(await missionCompleted(userId, missionId, prisma))) {
     throw new PointsError('Complete the mission first, then claim it.');
   }

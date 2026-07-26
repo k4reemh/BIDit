@@ -30,7 +30,7 @@ export async function maybeVerifySeller(sellerId: string, prisma: PrismaClient =
       userId: sellerId,
       kind: 'verified',
       title: 'You’re now a Verified Seller ✔',
-      body: `You’ve fulfilled ${VERIFY_THRESHOLD} orders — you’ve earned the Verified badge and priority dispute support.`,
+      body: `You’ve fulfilled ${VERIFY_THRESHOLD} orders and earned the Verified badge, plus priority dispute support.`,
       href: '/seller',
     },
     prisma,

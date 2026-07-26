@@ -163,7 +163,7 @@ export class MockPumpCreateProvider implements TxCreateProvider {
   async prepareCreate(input: CreateInput): Promise<PreparedCreate> {
     if (this.failPrepare) {
       this.failPrepare = false;
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
     }
     this.counter += 1;
     const mint = fakeMint(`${input.name}:${input.creatorWallet ?? ''}`, this.counter);
@@ -246,7 +246,7 @@ export class MockOffchainProvider implements OffchainCreateProvider {
   async prepareCreate(input: CreateInput): Promise<PreparedCreate> {
     if (this.failPrepare) {
       this.failPrepare = false;
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
     }
     const timestamp = BigInt(Date.now());
     return {
@@ -326,7 +326,7 @@ export function vetCreateTx(bytes: Uint8Array, creatorWallet: string): Versioned
   try {
     tx = VersionedTransaction.deserialize(bytes);
   } catch {
-    throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+    throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
   }
   const keys = tx.message.staticAccountKeys.map((k) => k.toBase58());
   const problems: string[] = [];
@@ -340,7 +340,7 @@ export function vetCreateTx(bytes: Uint8Array, creatorWallet: string): Versioned
   if (pumpIx !== 1) problems.push(`expected exactly 1 pump instruction (create), got ${pumpIx}`);
   if (problems.length > 0) {
     console.warn('[pump-create] vetting rejected provider tx:', problems.join('; '));
-    throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+    throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
   }
   return tx;
 }
@@ -378,7 +378,7 @@ export function mergeCreatorSignature(
       sig = bs58.decode(proof.signatureB58);
       pk = new PublicKey(proof.publicKey);
     } catch {
-      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature could not be read — try signing again.');
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature could not be read. Try signing again.');
     }
     tx.addSignature(pk, sig);
   }
@@ -389,7 +389,7 @@ export function mergeCreatorSignature(
     const sig = tx.signatures[i];
     const signer = signers[i];
     if (!sig || !signer || sig.every((b) => b === 0) || !nacl.sign.detached.verify(message, sig, signer.toBytes())) {
-      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'The transaction signature did not verify — try signing again.');
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'The transaction signature did not verify. Try signing again.');
     }
   }
   const first = tx.signatures[0];
@@ -447,12 +447,12 @@ export class PumpPortalProvider implements TxCreateProvider {
     });
     if (!ipfsRes?.ok) {
       if (ipfsRes) console.warn(`[pump-create] ipfs upload HTTP ${ipfsRes.status}`);
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
     }
     const ipfs = (await ipfsRes.json()) as { metadataUri?: string };
     if (!ipfs.metadataUri) {
       console.warn('[pump-create] ipfs response had no metadataUri');
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
     }
 
     // 2. Unsigned create tx from PumpPortal's local (self-custody) API. amount 0
@@ -480,7 +480,7 @@ export class PumpPortalProvider implements TxCreateProvider {
     });
     if (!portalRes?.ok) {
       if (portalRes) console.warn(`[pump-create] pumpportal HTTP ${portalRes.status}: ${await portalRes.text().catch(() => '')}`);
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');
     }
     const txBytes = new Uint8Array(await portalRes.arrayBuffer());
 
@@ -630,7 +630,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       return null;
     });
     if (!res) {
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun. Try again in a minute.');
     }
     return res;
   }
@@ -644,26 +644,26 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
     });
     if (!presignRes.ok) {
       console.warn(`[pump-create] ipfs-presign HTTP ${presignRes.status}`);
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun. Try again in a minute.');
     }
     const presign = (await presignRes.json().catch(() => ({}))) as { data?: string };
     // The presigned URL is short-lived (60s) and single-purpose — no secret of
     // ours, but no reason to log it either.
     if (!presign.data) {
       console.warn('[pump-create] ipfs-presign response had no upload URL');
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun. Try again in a minute.');
     }
     const form = new FormData();
     form.append('file', body, filename);
     const upRes = await this.call(presign.data, { method: 'POST', body: form, label: 'ipfs-upload' });
     if (!upRes.ok) {
       console.warn(`[pump-create] ipfs upload HTTP ${upRes.status}`);
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not upload your coin image — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not upload your coin image. Try again in a minute.');
     }
     const up = (await upRes.json().catch(() => ({}))) as { data?: { cid?: string } };
     if (!up.data?.cid) {
       console.warn('[pump-create] ipfs upload response had no cid');
-      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not upload your coin image — try again in a minute.');
+      throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not upload your coin image. Try again in a minute.');
     }
     return up.data.cid;
   }

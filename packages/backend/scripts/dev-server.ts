@@ -306,7 +306,7 @@ async function main() {
     const tracker = new ShipmentTracker(trackingProvider, prisma, systemClock, 120_000, (buyerId) => {
       void realtime.notifyBalance(buyerId).catch(() => {});
       void notify(
-        { userId: buyerId, kind: 'delivered', title: 'Your order was delivered', body: 'If anything’s wrong, report a problem within 2 days — otherwise it’s all set.', href: '/ship' },
+        { userId: buyerId, kind: 'delivered', title: 'Your order was delivered', body: 'If anything’s wrong, report a problem within 2 days. Otherwise you’re all set.', href: '/ship' },
         prisma,
       ).catch(() => {});
     });
@@ -569,7 +569,7 @@ async function main() {
           // reversed — surface it as an error (funds are back) rather than success.
           if (w.status === 'FAILED') {
             return send(res, 502, {
-              error: 'The on-chain transfer could not be sent. Your balance was not charged — please try again.',
+              error: 'The on-chain transfer could not be sent. Your balance was not charged. Try again.',
             });
           }
           return send(res, 200, {
@@ -827,7 +827,7 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         await requireSeller(userId, prisma);
         if (coinCreateRateLimited(userId)) {
-          return send(res, 429, { error: 'Too many coin-create attempts — give it a few minutes.' });
+          return send(res, 429, { error: 'Too many coin-create attempts. Give it a few minutes.' });
         }
         const b = await readJson(req);
         const mockMode = pumpCreate.mode === 'mock' || pumpCreate.mode === 'mock-offchain';
@@ -1314,7 +1314,7 @@ async function main() {
         if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         const b = await readJson(req);
         const released = await releaseOrdersForShipment(String(b.shipmentId ?? ''), escrow, systemClock, prisma);
-        if (released.length === 0) return send(res, 400, { error: 'Nothing to release — no order is in the dispute window.' });
+        if (released.length === 0) return send(res, 400, { error: 'Nothing to release: no order is in the dispute window.' });
         return send(res, 200, { ok: true, released: released.length });
       }
       if (req.method === 'GET' && p === '/admin/orders') {
@@ -1359,7 +1359,7 @@ async function main() {
       // Coins a seller has linked — powers the site's "Live right now" section.
       // "live" here = a BIDit auction or giveaway is currently running on it.
       if (req.method === 'GET' && p === '/live') {
-        return send(res, 200, await liveCoins());
+        return send(res, 200, await liveCoins((room) => realtime.roomViewerCount(room)));
       }
       // Public storefront for a linked coin: the seller's buy-now items.
       if (req.method === 'GET' && p === '/shop') {
@@ -1394,7 +1394,7 @@ async function main() {
         } catch (err) {
           if (err instanceof ItemUnavailableError) return send(res, 409, { error: err.message });
           if (err instanceof InsufficientFundsError) {
-            return send(res, 400, { error: 'Insufficient balance — add funds to buy this item' });
+            return send(res, 400, { error: 'Insufficient balance. Add funds to buy this item.' });
           }
           throw err;
         }
@@ -1548,7 +1548,7 @@ async function pumpCoinInfo(mint: string) {
 }
 
 // Every coin a seller has linked, with whether a BIDit auction/giveaway is live on it.
-async function liveCoins() {
+async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
     where: { pumpCoinAddress: { not: null } },
     include: { user: { select: { id: true, handle: true } } },
@@ -1571,6 +1571,8 @@ async function liveCoins() {
         hasAuction: auction !== null,
         hasGiveaway: giveaway !== null,
         streamLive: pump?.isLive === true,
+        viewers: viewerCount(pf.userId),
+        verified: pf.verified,
         coinName: pump?.name ?? null,
         streamTitle: pf.streamTitle ?? null,
         category: pf.streamCategory ?? null,

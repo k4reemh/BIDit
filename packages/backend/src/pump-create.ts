@@ -99,7 +99,7 @@ export function pumpCoinDescription(handle: string, mint: string): string {
   const where = mint ? `${webOrigin()}/live/${mint}` : webOrigin();
   return (
     `${handle} runs live card auctions on BIDit. ` +
-    `Watch the stream and bid in real USDC at ${where} — bid it, win it, ship it.`
+    `Watch the stream and bid in real USDC at ${where}. Bid it, win it, ship it.`
   );
 }
 
@@ -285,7 +285,7 @@ async function submitOffchain(
 ): Promise<CoinCreateStatusDto> {
   if (attempt.loginTimestamp === null) {
     // An attempt prepared under the other provider shape can't be finished here.
-    throw new PumpCreateError(409, 'SUPERSEDED', 'That attempt is out of date — start a fresh one.');
+    throw new PumpCreateError(409, 'SUPERSEDED', 'That attempt is out of date. Start a fresh one.');
   }
 
   // The sign-in text is time-boxed by pump.fun and by us. Too old (or from a
@@ -296,7 +296,7 @@ async function submitOffchain(
       where: { id: attempt.id },
       data: { status: 'FAILED', lastError: 'sign-in message expired before submit' },
     });
-    throw new PumpCreateError(410, 'TX_EXPIRED', 'That signature request expired — creating a fresh one.');
+    throw new PumpCreateError(410, 'TX_EXPIRED', 'That signature request expired. Creating a fresh one.');
   }
 
   // Verify the signature here, before it is worth anything to anyone: a bad one
@@ -312,11 +312,11 @@ async function submitOffchain(
       signature = new Uint8Array(Buffer.from(login.signatureB64, 'base64'));
       signer = bs58.decode(attempt.creatorWallet);
     } catch {
-      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature could not be read — try signing again.');
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature could not be read. Try signing again.');
     }
     const message = new TextEncoder().encode(pumpLoginMessage(attempt.loginTimestamp));
     if (signature.length !== 64 || !nacl.sign.detached.verify(message, signature, signer)) {
-      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature did not verify — try signing again.');
+      throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature did not verify. Try signing again.');
     }
   }
 
@@ -377,13 +377,13 @@ export async function submitCoinCreate(
   if (!attempt) throw new PumpCreateError(404, 'NOT_FOUND', 'That coin-create attempt does not exist.');
 
   if (attempt.status === 'SUPERSEDED') {
-    throw new PumpCreateError(409, 'SUPERSEDED', 'You started a newer attempt — use that one.');
+    throw new PumpCreateError(409, 'SUPERSEDED', 'You started a newer attempt. Use that one.');
   }
   if (attempt.status === 'SUBMITTED' || attempt.status === 'CONFIRMED') {
     return statusDto(attempt, prisma); // double-click friendly
   }
   if (attempt.status === 'FAILED') {
-    throw new PumpCreateError(410, 'ATTEMPT_DEAD', 'That attempt already failed — start a fresh one.');
+    throw new PumpCreateError(410, 'ATTEMPT_DEAD', 'That attempt already failed. Start a fresh one.');
   }
 
   // Wallet mismatch: the attempt is bound to the wallet the seller connected —
@@ -409,7 +409,7 @@ export async function submitCoinCreate(
         where: { id: attempt.id },
         data: { status: 'FAILED', lastError: 'blockhash expired before submit' },
       });
-      throw new PumpCreateError(410, 'TX_EXPIRED', 'That signature request expired — creating a fresh one.');
+      throw new PumpCreateError(410, 'TX_EXPIRED', 'That signature request expired. Creating a fresh one.');
     }
   }
 
@@ -435,7 +435,7 @@ export async function submitCoinCreate(
       where: { id: attempt.id },
       data: { status: 'FAILED', lastError: `broadcast failed: ${(err as Error).message}` },
     });
-    throw new PumpCreateError(502, 'TX_FAILED', 'Could not send the create transaction — nothing was charged. Try again.');
+    throw new PumpCreateError(502, 'TX_FAILED', 'Could not send the create transaction. Nothing was charged. Try again.');
   }
 
   // Short inline confirm so the happy path returns CONFIRMED in one request;
@@ -451,7 +451,7 @@ export async function submitCoinCreate(
         where: { id: attempt.id },
         data: { status: 'FAILED', lastError: 'create transaction failed on-chain' },
       });
-      throw new PumpCreateError(502, 'TX_FAILED', 'The create transaction failed on-chain — nothing was charged. Try again.');
+      throw new PumpCreateError(502, 'TX_FAILED', 'The create transaction failed on-chain. Nothing was charged. Try again.');
     }
     if (i < 2) await sleep(400);
   }
@@ -485,7 +485,7 @@ export async function getCoinCreateStatus(
         data: {
           status: 'FAILED',
           lastError:
-            'the create was interrupted — check your pump.fun profile before trying again, in case the coin was made',
+            'The create was interrupted. Check your pump.fun profile before trying again, in case the coin already went through',
         },
       });
       return statusDto(await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } }), prisma);

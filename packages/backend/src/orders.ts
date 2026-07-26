@@ -342,7 +342,7 @@ export async function openDispute(
     disputeDetail: report?.detail ?? null,
     disputePhotos: report?.photos ?? [],
   });
-  if (!won) throw new Error('This order can no longer be disputed — it was already resolved.');
+  if (!won) throw new Error('This order can no longer be disputed. It was already resolved.');
   return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 }
 

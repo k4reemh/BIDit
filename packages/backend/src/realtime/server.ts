@@ -174,6 +174,13 @@ export class RealtimeServer {
     await this.sendBalanceUpdate(userId);
   }
 
+  /** Sockets currently subscribed to a room on this instance — the live-grid
+   *  viewer count. Local-only by design: the deploy is single-instance, and a
+   *  slightly-low number under a future multi-instance bus is harmless. */
+  roomViewerCount(room: string): number {
+    return this.localRooms.get(room)?.size ?? 0;
+  }
+
   /** Broadcast a fresh AUCTION_STATE to the room (e.g. after starting an auction). */
   async announceAuction(auctionId: string): Promise<void> {
     const state = await this.buildAuctionState(auctionId);

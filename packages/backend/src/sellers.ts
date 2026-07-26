@@ -172,7 +172,7 @@ export async function startAuctionFromListing(
 ): Promise<{ auctionId: string; room: string }> {
   const listing = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
   await requireSeller(listing.sellerId, prisma);
-  if (listing.quantity <= 0) throw new Error('Out of stock — no units left to auction.');
+  if (listing.quantity <= 0) throw new Error('Out of stock. No units left to auction.');
   if (listing.status !== ListingStatus.QUEUED) {
     throw new Error(`Listing is not QUEUED (${listing.status})`);
   }

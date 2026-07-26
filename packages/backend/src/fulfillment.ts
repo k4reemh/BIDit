@@ -600,7 +600,7 @@ export async function createShipmentLabel(
       userId: s.sellerId,
       kind: 'label_ready',
       title: 'Your shipping label is ready',
-      body: 'Print it, tape it to the package, and drop it at your carrier — tracking takes it from there.',
+      body: 'Print it, tape it to the package, and drop it at your carrier. Tracking takes it from there.',
       href: '/seller/shipments',
     },
     prisma,
