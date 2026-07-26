@@ -37,8 +37,11 @@ services:
           name: bidit-db
           property: connectionString
       # ---- app config (safe to commit) ----
+      # This value WINS over the Render dashboard: every blueprint sync re-applies
+      # it, so editing the mode in the dashboard alone gets silently reverted on
+      # the next render.yaml change. Change it here.
       - key: BIDIT_PAYOUT_MODE
-        value: direct # no escrow, no fee — pay seller 100% on sale
+        value: escrow # hold funds in escrow, 5% platform fee (direct = pay seller 100%, no fee)
       - key: SOLANA_CLUSTER
         value: mainnet-beta
       - key: BIDIT_ALLOW_MAINNET
