@@ -46,7 +46,11 @@ export default function Settings() {
       <div className="card acct-card">
         <h3 className="acct-sub">Livestream</h3>
         <p className="muted acct-note">Link the coin you stream on — buyers who open its page see your live BIDit auctions. Give your stream a title and category so it stands out on the live grid.</p>
-        {!session.pumpCoinAddress && <CreateCoinCard session={session} setSession={setSession} />}
+        {/* Renders the create button, or the linked panel (address + coin-page
+            link) once there is a coin. onLinked keeps the field below in step
+            with a coin created right here — it was seeded on mount, so without
+            this it would sit empty and look unsaved. */}
+        <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
         <div className="fld">
           <label>Coin address {!session.pumpCoinAddress && <span className="muted">— or paste one you already have</span>}</label>
           <input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your pump.fun coin address" />

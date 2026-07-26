@@ -107,14 +107,14 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
             {session.pumpCoinAddress ? (
               <>
                 <p className="muted sob__sub">Your livestream coin is linked. Buyers who open its pump.fun page see your live BIDit auctions.</p>
-                <div className="sob__tip"><Radio width={16} height={16} /> Linked: <code>{session.pumpCoinAddress}</code></div>
+                <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
               </>
             ) : (
               <>
                 <p className="muted sob__sub">
                   Every seller streams on their own pump.fun coin — we’ll make yours right now, or link one you already have.
                 </p>
-                <CreateCoinCard session={session} setSession={setSession} />
+                <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
                 {!usedPaste ? (
                   <button type="button" className="sob__alt" onClick={() => setUsedPaste(true)}>
                     I already have a coin — paste it instead

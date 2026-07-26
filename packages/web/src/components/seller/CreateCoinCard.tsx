@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   prepareCoinCreate,
   submitCoinCreate,
@@ -23,7 +24,9 @@ type Stage = 'idle' | 'working' | 'done';
  * transaction warnings. If pump.fun won't play along we say so plainly and
  * point at the manual route; we never quietly fall back to a path that charges
  * a fee. In mock/dev mode the whole flow runs with no wallet at all.
- * Mounted in seller onboarding (step 2) and in Settings while no coin is linked.
+ * Mounted in seller onboarding (step 2) and in Settings. Once a coin exists it
+ * becomes the linked panel — address, copy button, and a link straight to the
+ * coin page — so both screens show the same thing and neither has to rebuild it.
  */
 export default function CreateCoinCard({
   session,
@@ -38,6 +41,7 @@ export default function CreateCoinCard({
   const [step, setStep] = useState(''); // human-visible progress line while working
   const [error, setError] = useState('');
   const [manual, setManual] = useState(false); // show the "do it yourself" route
+  const [copied, setCopied] = useState(false);
   const [mint, setMint] = useState('');
   const [imgOk, setImgOk] = useState(true);
   const alive = useRef(true);
@@ -163,19 +167,48 @@ export default function CreateCoinCard({
     }
   };
 
-  if (stage === 'done') {
+  // One panel owns "this seller has a coin" — whether it was just created here or
+  // linked long ago — so the coin page is always one click away and the address
+  // is always in reach. Parents mount this card unconditionally.
+  const linkedMint = mint || session.pumpCoinAddress || '';
+  if (linkedMint) {
+    const justMade = stage === 'done';
     return (
       <div className="ccc card ccc--done">
-        <div className="dep-ok"><Check width={15} height={15} /> Your livestream coin is live and linked.</div>
+        <div className="dep-ok">
+          <Check width={15} height={15} />{' '}
+          {justMade ? 'Your livestream coin is live and linked.' : 'Your livestream coin is linked.'}
+        </div>
         <div className="ccc__mint">
-          <code>{mint}</code>
-          <a className="btn btn-ghost btn-sm" href={`https://pump.fun/coin/${mint}`} target="_blank" rel="noreferrer">
-            View on pump.fun ↗
+          <code>{linkedMint}</code>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              navigator.clipboard?.writeText(linkedMint).then(
+                () => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1600);
+                },
+                () => {},
+              );
+            }}
+          >
+            {copied ? 'Copied' : 'Copy address'}
+          </button>
+        </div>
+        <div className="ccc__mint">
+          <a className="btn btn-primary btn-sm" href={`https://pump.fun/coin/${linkedMint}`} target="_blank" rel="noreferrer">
+            Go to your coin page ↗
           </a>
+          <Link className="btn btn-ghost btn-sm" to={`/live/${linkedMint}`}>
+            View your BIDit page
+          </Link>
         </div>
         <p className="muted ccc__note">
-          To go live: open your coin on pump.fun{mockMode ? '' : ' with the wallet you just signed with'} and hit{' '}
-          <b>Start livestream</b>. Your stream and auctions appear on BIDit automatically.
+          To go live: open your coin on pump.fun
+          {justMade && !mockMode ? ' with the wallet you just signed with' : ''} and hit <b>Start livestream</b>. Your
+          stream and auctions appear on BIDit automatically.
         </p>
       </div>
     );

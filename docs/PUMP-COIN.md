@@ -74,9 +74,11 @@ and the presign/upload shapes came from probing the (unauthenticated) endpoints.
 
 No new secrets.
 
-## ⚠️ Before the first deploy of this feature
+## ⚠️ One-time schema note (already shipped)
 
-The schema adds a **unique index on `SellerProfile.pumpCoinAddress`**. If the
+The unique index on `SellerProfile.pumpCoinAddress` went out with the first
+release of this feature. The check below is kept because it is what to run if a
+`prisma db push` ever fails on it again. If the
 production DB has two sellers holding the same coin, `prisma db push` (the Render
 build step) will FAIL. Check first (read-only):
 
@@ -101,41 +103,49 @@ WHERE "pumpCoinAddress" = '<dupe>' AND id <> (
 (The dev DB had exactly this — a stale duplicate of a shared test coin — and the
 same cleanup fixed it.)
 
-## Mainnet validation spike (~15 min, < $2 of SOL)
+## Mainnet validation (~5 min, $0)
 
-Everything below is a one-time proof that the real-provider path works end to end.
-Use a **throwaway** Phantom wallet.
+The off-chain path spends nothing, so this is a functional check, not a cost one.
+Use a **throwaway** Phantom wallet — it will own a real pump.fun coin afterwards.
 
-1. **Dup check** above on prod DB (must be empty).
-2. Create a throwaway Phantom wallet; fund ~0.01 SOL.
-3. Run the backend locally against mainnet with the real provider:
-   `SOLANA_RPC=<rpc> SOLANA_CLUSTER=mainnet-beta BIDIT_ALLOW_MAINNET=yes BIDIT_PUMP_PROVIDER=pumpportal` (+ your strong `AUTH_SECRET`/`BIDIT_WALLET_SEED`
-   per the boot guard), web via `npm -w @bidit/web run dev`.
-4. Sign in → become a seller → onboarding step 3 → **Create my livestream coin**:
-   - Phantom pops with a create-shaped transaction (no transfers beyond fees/rent).
-   - If the flow errors with "unexpected signature format": this Phantom build lacks
-     the low-level API — flip `web/src/lib/phantom.ts` to the object-form fallback
-     (`signedTxB64` lane; the backend already accepts it).
-5. **Cost check:** wallet is down only dust (no dev buy). If PumpPortal rejected
-   `amount: 0`, promote the direct-instruction provider before launch (provider
-   seam is ready for it).
-6. **The decision criterion:** log into pump.fun with the throwaway wallet, open
-   the new coin page → the **Start livestream** button must appear. Start a quick
-   test stream.
-7. BIDit checks: `/live/<mint>` plays the stream; the coin shows on the live grid;
-   Settings shows it linked; coin page name/art/description link back to the site.
-8. Failure drills: reject the Phantom popup (friendly error, retry works); wait
-   >2 min before approving (auto re-prepare, one extra popup); switch Phantom
-   account then sign (WALLET_MISMATCH, attempt survives).
-9. Repeat one **prepare** against the Render deploy (Cloudflare from datacenter
-   egress — the livestream proxy already passes with the same headers, expect OK).
-10. Grep server logs for anything secret-shaped: only pubkeys/signatures may
-    appear. `[pump-create]` warnings identify provider-side failures.
+1. Run the backend locally against mainnet:
+   `SOLANA_CLUSTER=mainnet-beta BIDIT_ALLOW_MAINNET=yes` (+ your strong
+   `AUTH_SECRET`/`BIDIT_WALLET_SEED` per the boot guard). No `BIDIT_PUMP_PROVIDER`
+   — mainnet already defaults to `offchain`. Web via `npm -w @bidit/web run dev`.
+2. Sign in → become a seller → onboarding coin step → **Create my livestream coin**.
+   Phantom should show a **message** signature reading
+   `Sign in to pump.fun: <numbers>` — no fee line, no transaction preview, and no
+   "malicious dApp" warning. If you see a transaction, you are not on the
+   off-chain provider.
+3. **The decision criterion:** click **Go to your coin page** logged into pump.fun
+   as that wallet → the **Start livestream** button must appear. Start a test stream.
+4. BIDit checks: `/live/<mint>` plays it; the coin shows on the live grid; Settings
+   shows it linked with the address filled in; the coin's pump.fun page shows the
+   BIDit name/art/description.
+5. Failure drills: reject the Phantom popup (friendly error, retry works); wait
+   >5 min before approving (auto re-prepare, one extra popup); switch Phantom
+   account then sign (WALLET_MISMATCH, attempt survives, nothing created).
+6. Repeat one create against the **Render** deploy — that is the real test of
+   pump.fun's Cloudflare from datacenter egress (the livestream proxy already
+   passes with the same headers, so expect OK, but confirm it).
+7. Grep server logs: only pubkeys may appear. No cookie values, no signatures.
+   `[pump-create]` warnings identify which pump.fun call failed.
+
+### If pump.fun changes and creates start failing
+
+Sellers see a plain error plus the manual route (pump.fun/create → paste in
+Settings), so nothing is stuck. To diagnose, `[pump-create]` logs name the failing
+step. The likely breakages are the sign-in text (re-verify a fresh capture's
+signature against `pumpLoginMessage`), the presign response field (`data`), the
+upload response field (`data.cid`), or `create-v2`'s body/response shape. As a
+stopgap `BIDIT_PUMP_PROVIDER=pumpportal` restores the on-chain path — but that
+reintroduces network fees and the wallet warning, so treat it as a deliberate,
+temporary choice, not a silent fallback.
 
 ## Notes
 
 - Existing sellers keep their coins; the paste-a-coin path remains everywhere.
-- A FAILED/abandoned attempt is inert: the mint never existed on-chain (the
-  create tx never landed) and each new attempt uses a fresh mint keypair.
+- A FAILED/abandoned attempt is inert: on the off-chain path nothing exists until
+  pump.fun answers 201, and the attempt row holds no mint until then.
 - Admin coin moves stay support-only (`POST /admin/seller-coin` — first-claim-wins
   is never bypassable self-serve).
