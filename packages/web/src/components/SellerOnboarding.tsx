@@ -8,8 +8,8 @@ const LAST = 4;
 
 const HOW = [
   { ic: Radio, t: 'Go live on your stream', d: 'Run auctions and wheel spins right on your pump.fun stream with the BIDit overlay.' },
-  { ic: Bolt, t: 'Buyers bid in real time', d: 'Highest bid at the buzzer wins. Anti-snipe keeps it fair — no last-second steals.' },
-  { ic: Truck, t: 'You ship, you get paid', d: 'Buyers pay shipping; you keep 95% of each sale in USDC, withdrawable anytime.' },
+  { ic: Bolt, t: 'Buyers bid in real time', d: 'Highest bid at the buzzer wins. Anti-snipe keeps it fair: no last-second steals.' },
+  { ic: Truck, t: 'You ship, you get paid', d: 'Buyers pay shipping. You keep 95% of each sale in USDC, withdrawable anytime.' },
 ];
 
 export default function SellerOnboarding({ session, setSession }: { session: Session; setSession: (s: Session) => void }) {
@@ -80,8 +80,8 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
             <div className="sob__verify">
               <span className="sob__verify-ic"><Shield width={22} height={22} /></span>
               <div>
-                <b>Start selling now — get Verified as you go.</b>
-                <p className="muted">You’re approved instantly and can list right away. Fulfill <b>10 orders</b> and you automatically become a <b>Verified Seller</b> — you get the badge, buyers trust you more, and you unlock priority support on disputes.</p>
+                <b>Start selling now. Get Verified as you go.</b>
+                <p className="muted">You’re approved instantly and can list right away. Fulfill <b>10 orders</b> and you automatically become a <b>Verified Seller</b>: you get the badge, buyers trust you more, and you unlock priority support on disputes.</p>
               </div>
             </div>
           </>
@@ -90,13 +90,13 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
         {step === 1 && (
           <>
             <h1 className="display sob__title">Your shop</h1>
-            <p className="muted sob__sub">Link your socials so buyers know it’s really you. All optional — you can add these later in Settings.</p>
+            <p className="muted sob__sub">Link your socials so buyers know it’s really you. All optional. You can add these later in Settings.</p>
             <div className="fld"><label>X / Twitter</label><input value={x} onChange={(e) => setX(e.target.value)} placeholder="@yourhandle" /></div>
             <div className="fld-row">
               <div className="fld"><label>Instagram</label><input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="@yourhandle" /></div>
               <div className="fld"><label>TikTok</label><input value={tt} onChange={(e) => setTt(e.target.value)} placeholder="@yourhandle" /></div>
             </div>
-            <div className="fld"><label>Website <span className="muted">— optional</span></label><input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" /></div>
+            <div className="fld"><label>Website <span className="muted">(optional)</span></label><input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" /></div>
             <div className="fld"><label>What do you sell?</label><textarea rows={2} value={pitch} onChange={(e) => setPitch(e.target.value)} placeholder="Pokémon singles, sealed One Piece, streetwear, tech…" /></div>
           </>
         )}
@@ -112,12 +112,12 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
             ) : (
               <>
                 <p className="muted sob__sub">
-                  Every seller streams on their own pump.fun coin — we’ll make yours right now, or link one you already have.
+                  Every seller streams on their own pump.fun coin. We’ll make yours right now, or link one you already have.
                 </p>
                 <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
                 {!usedPaste ? (
                   <button type="button" className="sob__alt" onClick={() => setUsedPaste(true)}>
-                    I already have a coin — paste it instead
+                    Already have a coin? Paste it instead
                   </button>
                 ) : (
                   <div className="fld" style={{ marginTop: 12 }}>
@@ -125,7 +125,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
                     <input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your coin address" autoFocus />
                   </div>
                 )}
-                <div className="sob__tip"><Radio width={16} height={16} /> No rush — you can also do this later in Settings and still run auctions on the BIDit site.</div>
+                <div className="sob__tip"><Radio width={16} height={16} /> No rush. You can do this later in Settings and still run auctions on the BIDit site.</div>
               </>
             )}
           </>
@@ -150,7 +150,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
           <>
             <h1 className="display sob__title">You’re all set. Here’s how to list.</h1>
             <div className="sob__how">
-              <div className="sob__howstep"><span className="sob__howic"><Tag width={20} height={20} /></span><div><b>Add an item or a wheel</b><p className="muted">In <b>Listings</b>, add a card/item with a photo, starting bid and weight — or build a randomizer wheel.</p></div></div>
+              <div className="sob__howstep"><span className="sob__howic"><Tag width={20} height={20} /></span><div><b>Add an item or a wheel</b><p className="muted">In <b>Listings</b>, add a card or item with a photo, starting bid and weight. Or build a randomizer wheel.</p></div></div>
               <div className="sob__howstep"><span className="sob__howic"><Radio width={20} height={20} /></span><div><b>Go live</b><p className="muted">Open <b>Live</b>, start an auction, and it appears on your stream overlay and the BIDit watch page instantly.</p></div></div>
               <div className="sob__howstep"><span className="sob__howic"><Wallet width={20} height={20} /></span><div><b>Ship &amp; get paid</b><p className="muted">Fulfill from <b>Shipments</b>. Each fulfilled order counts toward your <b>Verified</b> badge.</p></div></div>
             </div>

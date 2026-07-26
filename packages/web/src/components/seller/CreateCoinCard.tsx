@@ -92,7 +92,7 @@ export default function CreateCoinCard({
         if (s.status === 'CONFIRMED' && s.mint) return void finishLinked(s.mint);
         if (s.status === 'FAILED') {
           setStage('idle');
-          setError(s.error || 'That didn’t go through — nothing was charged. Try again.');
+          setError(s.error || 'That didn’t go through. Nothing was charged. Try again.');
           return;
         }
       } catch {
@@ -100,7 +100,7 @@ export default function CreateCoinCard({
       }
     }
     setStage('idle');
-    setError('Still working on it — check back in a minute.');
+    setError('Still working on it. Check back in a minute.');
   };
 
   const create = async () => {
@@ -123,7 +123,7 @@ export default function CreateCoinCard({
       const prep = await prepareCoinCreate(wallet);
 
       if (prep.signMode === 'message' && prep.loginMessage) {
-        setStep('Approve the pump.fun sign-in in Phantom — it’s just a signature: no fee, nothing spent.');
+        setStep('Approve the pump.fun sign-in in Phantom. It’s a signature, not a payment: no fee, nothing spent.');
         const loginSignature = await signLoginMessage(prep.loginMessage);
         setStep('Creating your coin on pump.fun…');
         const result = await submitCoinCreate({ attemptId: prep.attemptId, publicKey: wallet, loginSignature });
@@ -137,7 +137,7 @@ export default function CreateCoinCard({
         if (result.status === 'CONFIRMED' && result.mint) return void finishLinked(result.mint);
         return void pollUntilSettled();
       }
-      setStep('Approve the request in Phantom — it costs $0 (dust network fees only).');
+      setStep('Approve the request in Phantom. It costs $0 (dust network fees only).');
       const signedTxB64 = await signCreateTx(prep.txB64);
       setStep('Creating your coin on pump.fun…');
       const result = await submitCoinCreate({ attemptId: prep.attemptId, signedTxB64 });
@@ -225,8 +225,8 @@ export default function CreateCoinCard({
         <div>
           <b className="ccc__name">{session.handle}&rsquo;s BIDit Livestream</b>
           <p className="muted ccc__sub">
-            We create this coin on pump.fun for you — completely free. You’ll just sign pump.fun’s sign-in
-            message in your wallet (a signature, not a payment — nothing can be spent). The coin is created
+            We create this coin on pump.fun for you, completely free. You sign pump.fun’s sign-in
+            message in your wallet: a signature, not a payment, and nothing can be spent. The coin is created
             under <i>your</i> pump.fun account, so you get the Start-livestream button, and it’s saved as your
             linked coin here.
           </p>

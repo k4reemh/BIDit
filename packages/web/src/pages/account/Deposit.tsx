@@ -6,7 +6,7 @@ import { Copy, Check, Wallet, Shield } from '../../icons';
 export default function Deposit() {
   const { session, setSession } = useAccount();
   const [copied, setCopied] = useState(false);
-  const addr = session.depositAddress ?? '—';
+  const addr = session.depositAddress ?? '…';
   const cluster = session.cluster ?? 'mock';
   const isReal = cluster === 'mainnet-beta' || cluster === 'devnet';
   const netLabel = cluster === 'mainnet-beta' ? 'Mainnet' : cluster === 'devnet' ? 'Devnet' : 'Devnet';
@@ -35,7 +35,7 @@ export default function Deposit() {
     try {
       await simulateDeposit(depAmt);
       await refresh();
-      setDepMsg(`Detected +$${depAmt} — credited to your balance.`);
+      setDepMsg(`Detected +$${depAmt} and credited it to your balance.`);
       setTimeout(() => setDepMsg(''), 3500);
     } finally {
       setDepBusy(false);
@@ -49,7 +49,7 @@ export default function Deposit() {
     try {
       const r = await withdraw(wAmt, wTo.trim());
       await refresh();
-      const label = r.status === 'SUBMITTED' ? 'sent — confirming on-chain' : r.status.toLowerCase();
+      const label = r.status === 'SUBMITTED' ? 'sent, confirming on-chain' : r.status.toLowerCase();
       setWOk(`Withdrawal ${label}${r.txSig ? ` · ${r.txSig.slice(0, 10)}…` : ''}`);
       setWAmt('');
       setTimeout(() => setWOk(''), 4000);
@@ -64,20 +64,20 @@ export default function Deposit() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Deposit &amp; withdraw</h1>
-        <p className="muted">Fund your balance with USDC or SOL, and cash out anytime.</p>
+        <p className="muted">Fund your balance with USDC or SOL. Cash out anytime.</p>
       </div>
 
       <div className="bal-grid bal-grid--one">
         <div className="bal card"><span className="muted">Wallet balance</span><b>${money2(session.settled)}</b></div>
       </div>
-      <p className="muted acct-note" style={{ marginTop: -6, marginBottom: 18 }}>Your full balance. Placing a bid reserves funds but doesn’t leave your wallet — you’re only charged when you win.</p>
+      <p className="muted acct-note" style={{ marginTop: -6, marginBottom: 18 }}>Your full balance. Placing a bid reserves funds, but they don’t leave your wallet. You’re only charged when you win.</p>
 
       <div className="card acct-card">
         <h3 className="acct-sub">Your deposit wallet <span className={`soon-tag${cluster === 'mainnet-beta' ? ' soon-tag--mainnet' : ''}`}>{netLabel}</span></h3>
         <p className="muted acct-note">
           Send <b>USDC (SPL)</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this address from any wallet (Phantom, etc.).
-          It’s detected on-chain and credited to your balance automatically once it confirms.
-          {cluster === 'mainnet-beta' && <> Send only USDC — anything else may be lost.</>}
+          We detect it on-chain and credit your balance automatically once it confirms.
+          {cluster === 'mainnet-beta' && <> Send only USDC. Anything else may be lost.</>}
         </p>
         <div className="addr">
           <code>{addr}</code>
@@ -86,7 +86,7 @@ export default function Deposit() {
 
         {!isReal && (
           <div className="dep-sim">
-            <span className="dep-sim__label">Devnet demo — simulate an incoming deposit:</span>
+            <span className="dep-sim__label">Devnet demo. Simulate an incoming deposit:</span>
             <div className="dep-sim__row">
               <div className="dep-amt"><span>$</span><input type="number" min="1" step="1" value={depAmt} onChange={(e) => setDepAmt(e.target.value)} /></div>
               <button className="btn btn-ghost btn-sm" onClick={doSimulate} disabled={depBusy}>{depBusy ? 'Detecting…' : 'Simulate deposit'}</button>
@@ -101,7 +101,7 @@ export default function Deposit() {
         <p className="muted acct-note">Send USDC from your wallet to any Solana address. Funds reserved by active bids stay put until those auctions end.</p>
         <div className="beta-cap">
           <Shield width={16} height={16} />
-          <span><b>Beta safety limit:</b> withdrawals are capped at <b>$1,000 per day</b> per account while we harden the payout system during BIDit beta. This is a temporary measure and will be lifted.</span>
+          <span><b>Beta safety limit:</b> withdrawals are capped at <b>$1,000 per day</b> per account while we harden the payout system during BIDit beta. It’s temporary and will be lifted.</span>
         </div>
         {wErr && <div className="auth__error">{wErr}</div>}
         {wOk && <div className="dep-ok"><Check width={15} height={15} /> {wOk}</div>}
@@ -119,7 +119,7 @@ export default function Deposit() {
         <span className="deposit-soon__ic"><Wallet width={24} height={24} /></span>
         <div>
           <h3 className="acct-sub" style={{ marginBottom: 4 }}>One-click wallet deposit</h3>
-          <p className="muted">Connect Phantom and top up in a tap — coming soon.</p>
+          <p className="muted">Connect Phantom and top up in a tap. Coming soon.</p>
         </div>
         <button className="btn btn-ghost" disabled>Connect wallet · soon</button>
       </div>

@@ -25,7 +25,7 @@ export default function ShipItems() {
   const [data, setData] = useState<Fulfillment | null>(null);
   const [error, setError] = useState('');
 
-  const load = () => getFulfillment().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+  const load = () => getFulfillment().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your items.'));
   useEffect(() => { void load(); }, []);
 
   const toggleBundle = async () => {
@@ -50,12 +50,12 @@ export default function ShipItems() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Ready to ship</h1>
-        <p className="muted">Cards you’ve won and are being held for you. Ship them whenever you like — bundle a seller’s items to pay shipping once.</p>
+        <p className="muted">Cards you’ve won, held for you. Ship them whenever you like. Bundle a seller’s items to pay shipping once.</p>
       </div>
 
       <label className="ship-priv card acct-card" style={{ alignItems: 'center', padding: '12px 14px' }}>
         <input type="checkbox" checked={session.bundleShipping ?? false} onChange={toggleBundle} />
-        <span><b>Weekly bundling</b> — where a seller offers it, pay shipping just once a week and get all that week’s wins in one package.</span>
+        <span><b>Weekly bundling</b>: where a seller offers it, pay shipping once a week and get all that week’s wins in one package.</span>
       </label>
 
       {error && <div className="auth__error">{error}</div>}
@@ -122,17 +122,17 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
       setMsg(`Shipping paid (${total}). The seller has been notified to ship.`);
       onChanged();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not create shipment.');
+      setErr(e instanceof Error ? e.message : 'Couldn’t create the shipment.');
     } finally {
       setBusy(false);
     }
   };
 
   const discard = async (id: string, title: string) => {
-    if (!window.confirm(`Discard “${title}”? You paid for it, so this forfeits the card — no refund. The seller keeps it.`)) return;
+    if (!window.confirm(`Discard “${title}”? You paid for it, so this forfeits the card. No refund. The seller keeps it.`)) return;
     setBusy(true); setErr('');
     try { await discardFulfillmentItem(id); onChanged(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not discard.'); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t discard the item.'); }
     finally { setBusy(false); }
   };
 
@@ -162,7 +162,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
 
       <label className="ship-priv">
         <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
-        <span>Private secure shipping — the seller never sees your address (adds a small privacy fee)</span>
+        <span>Private secure shipping: the seller never sees your address. Adds a small privacy fee.</span>
       </label>
 
       {est && sel.size > 0 && (
@@ -231,14 +231,14 @@ function ShipmentCard({ shipment, onChanged }: { shipment: Shipment; onChanged: 
       )}
       {shipment.status === 'DELIVERED' && (
         <>
-          <p className="muted acct-note">Delivered. If anything’s wrong, report a problem within 2 days — otherwise you’re all set.</p>
+          <p className="muted acct-note">Delivered. If anything’s wrong, report a problem within 2 days. Otherwise you’re all set.</p>
           <div className="acct-actions">
             <button className="btn btn-ghost" onClick={() => setDispute(true)}>Report a problem</button>
           </div>
         </>
       )}
       {shipment.status === 'DISPUTED' && (
-        <p className="muted acct-note">Problem reported — our team is reviewing it and will be in touch.</p>
+        <p className="muted acct-note">Problem reported. Our team is reviewing it and will be in touch.</p>
       )}
       {dispute && (
         <DisputeModal

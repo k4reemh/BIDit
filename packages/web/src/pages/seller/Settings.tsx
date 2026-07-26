@@ -45,25 +45,25 @@ export default function Settings() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Livestream</h3>
-        <p className="muted acct-note">Link the coin you stream on — buyers who open its page see your live BIDit auctions. Give your stream a title and category so it stands out on the live grid.</p>
+        <p className="muted acct-note">Link the coin you stream on. Buyers who open its page see your live BIDit auctions. Give your stream a title and category so it stands out on the live grid.</p>
         {/* Renders the create button, or the linked panel (address + coin-page
             link) once there is a coin. onLinked keeps the field below in step
             with a coin created right here — it was seeded on mount, so without
             this it would sit empty and look unsaved. */}
         <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
         <div className="fld">
-          <label>Coin address {!session.pumpCoinAddress && <span className="muted">— or paste one you already have</span>}</label>
+          <label>Coin address {!session.pumpCoinAddress && <span className="muted">(or paste one you already have)</span>}</label>
           <input value={coin} onChange={(e) => setCoin(e.target.value)} placeholder="Paste your pump.fun coin address" />
           {session.pumpCoinAddress && (
             <span className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              A linked coin can only be moved to another seller by support — clearing it here just unlinks it from your shop.
+              A linked coin can only be moved to another seller by support. Clearing it here just unlinks it from your shop.
             </span>
           )}
         </div>
         <div className="fld-row">
           <div className="fld">
             <label>Stream title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="e.g. Friday Night Rips — $1 starts" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="e.g. Friday Night Rips: $1 starts" />
           </div>
           <div className="fld">
             <label>Category</label>
@@ -77,13 +77,13 @@ export default function Settings() {
         <div className="fld">
           <label>Live chat cooldown</label>
           <select value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))}>
-            <option value={0}>Off — no limit</option>
+            <option value={0}>Off (no limit)</option>
             <option value={3000}>3 seconds between messages</option>
             <option value={5000}>5 seconds between messages</option>
             <option value={10000}>10 seconds between messages</option>
             <option value={30000}>30 seconds between messages</option>
           </select>
-          <p className="muted acct-note" style={{ marginTop: 6 }}>How long each viewer waits between chat messages on your coin page — turn it up to slow a busy or spammy chat.</p>
+          <p className="muted acct-note" style={{ marginTop: 6 }}>How long each viewer waits between chat messages on your coin page. Turn it up to slow a busy or spammy chat.</p>
         </div>
         <div className="acct-actions">
           <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save livestream'}</button>

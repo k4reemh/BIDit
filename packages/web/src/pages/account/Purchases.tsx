@@ -48,7 +48,7 @@ export default function Purchases() {
   const [items, setItems] = useState<Purchase[] | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
-    getPurchases().then(setItems).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getPurchases().then(setItems).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your purchases.'));
   }, []);
 
   const toShip = (items ?? []).filter((p) => p.stage === 'to_ship');
@@ -68,13 +68,13 @@ export default function Purchases() {
         <EmptyState
           icon={Bag}
           title="No purchases yet"
-          sub="Win an auction or buy from a shop and it’ll show up here — we’ll track it all the way to delivered."
+          sub="Win an auction or buy from a shop and it’ll show up here. We’ll track it all the way to delivered."
           ctaText="Find something to win"
           ctaTo="/"
         />
       )}
 
-      <Section title="Ready to ship" hint="You won these — send them your way." items={toShip} />
+      <Section title="Ready to ship" hint="You won these. Send them your way." items={toShip} />
       <Section title="On the way" hint="Shipped and heading to you." items={inTransit} />
       <Section title="Delivered" items={delivered} />
 

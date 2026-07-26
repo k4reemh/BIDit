@@ -43,13 +43,13 @@ export const hasPhantom = (): boolean => provider() !== null;
 /** Connect (prompting if needed) and return the wallet's base58 public key. */
 export async function connectPhantom(): Promise<string> {
   const p = provider();
-  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom is not installed.');
+  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom isn’t installed.');
   try {
     const { publicKey } = await p.connect();
     return publicKey.toString();
   } catch (err) {
     if ((err as { code?: number }).code === 4001) {
-      throw new PhantomError('REJECTED', 'You closed the Phantom popup — nothing was created.');
+      throw new PhantomError('REJECTED', 'You closed the Phantom popup. Nothing was created.');
     }
     throw new PhantomError('UNSUPPORTED', (err as Error).message || 'Phantom connection failed.');
   }
@@ -78,16 +78,16 @@ const bytesToB64 = (bytes: Uint8Array): string => {
  *  the backend verifies it, spends it on one create, and never stores it. */
 export async function signLoginMessage(message: string): Promise<string> {
   const p = provider();
-  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom is not installed.');
+  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom isn’t installed.');
   if (typeof p.signMessage !== 'function') {
-    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here — update Phantom and try again.');
+    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here. Update Phantom and try again.');
   }
   try {
     const { signature } = await p.signMessage(new TextEncoder().encode(message), 'utf8');
     return bytesToB64(signature);
   } catch (err) {
     if ((err as { code?: number }).code === 4001) {
-      throw new PhantomError('REJECTED', 'You closed the Phantom popup — nothing was created.');
+      throw new PhantomError('REJECTED', 'You closed the Phantom popup. Nothing was created.');
     }
     throw new PhantomError('UNSUPPORTED', (err as Error).message || 'Phantom signing failed.');
   }
@@ -97,9 +97,9 @@ export async function signLoginMessage(message: string): Promise<string> {
  *  fully signed tx, base64-encoded, for the backend to verify and broadcast. */
 export async function signCreateTx(txB64: string): Promise<string> {
   const p = provider();
-  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom is not installed.');
+  if (!p) throw new PhantomError('NOT_INSTALLED', 'Phantom isn’t installed.');
   if (typeof p.signTransaction !== 'function') {
-    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here — update Phantom and try again.');
+    throw new PhantomError('UNSUPPORTED', 'This Phantom version can’t sign here. Update Phantom and try again.');
   }
   const { VersionedTransaction: VTx } = await import('@solana/web3.js');
   const tx = VTx.deserialize(b64ToBytes(txB64));
@@ -109,7 +109,7 @@ export async function signCreateTx(txB64: string): Promise<string> {
   } catch (err) {
     if (err instanceof PhantomError) throw err;
     if ((err as { code?: number }).code === 4001) {
-      throw new PhantomError('REJECTED', 'You closed the Phantom popup — nothing was created.');
+      throw new PhantomError('REJECTED', 'You closed the Phantom popup. Nothing was created.');
     }
     throw new PhantomError('UNSUPPORTED', (err as Error).message || 'Phantom signing failed.');
   }

@@ -69,7 +69,7 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
             </div>
           ) : (
             <button className="lc__storelink" onClick={() => { setPrice(l.buyNowPrice ?? ''); setPriceOpen(true); }}>
-              <Bag width={13} height={13} /> {l.buyNowPrice ? `In your shop at $${l.buyNowPrice} — edit` : 'Sell in your shop (buy now)'}
+              <Bag width={13} height={13} /> {l.buyNowPrice ? `In your shop at $${l.buyNowPrice} · edit` : 'Sell in your shop (buy now)'}
             </button>
           )
         )}

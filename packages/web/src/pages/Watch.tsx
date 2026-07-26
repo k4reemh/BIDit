@@ -54,7 +54,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
                   <div className="theater__scrim" />
                   <div className="theater__center">
                     <div className="theater__eyebrow">{sellerHandle ? `@${sellerHandle} isn’t streaming here right now` : 'Not streaming right now'}</div>
-                    <p className="theater__note">When they go live on pump.fun, the stream plays here automatically — no extension needed. Bidding happens in the panel →</p>
+                    <p className="theater__note">When they go live on pump.fun, the stream plays here automatically. No extension needed. Bidding happens in the panel →</p>
                     <a className="btn btn-ghost" href={pumpUrl} target="_blank" rel="noreferrer">Open on pump.fun ↗</a>
                   </div>
                 </>
@@ -64,7 +64,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
             <div className="theater__top">
               {sellerHandle && <span className="theater__seller"><Avatar handle={sellerHandle} size={22} /> @{sellerHandle}</span>}
               {sellerHandle && (
-                <button className="theater__shop" onClick={() => setShopOpen(true)} aria-label="Open the seller's shop" title="Shop — buy without bidding">
+                <button className="theater__shop" onClick={() => setShopOpen(true)} aria-label="Open the seller's shop" title="Shop: buy without bidding">
                   <Bag width={16} height={16} /> Shop
                 </button>
               )}

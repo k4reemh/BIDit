@@ -66,7 +66,7 @@ export default function Profile() {
           <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" />
         </div>
         <div className="fld">
-          <label>Profile picture <span className="muted">— optional</span></label>
+          <label>Profile picture <span className="muted">(optional)</span></label>
           <ImageUpload
             value={avatarUrl}
             onChange={setAvatarUrl}
@@ -75,7 +75,7 @@ export default function Profile() {
           />
         </div>
         <div className="fld">
-          <label>Bio <span className="muted">— optional</span></label>
+          <label>Bio <span className="muted">(optional)</span></label>
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What do you collect?" rows={3} />
         </div>
         <div className="fld">
@@ -97,10 +97,10 @@ export default function Profile() {
 
       <div className="card acct-card danger-zone">
         <h3 className="acct-sub">Delete my data</h3>
-        <p className="muted acct-note">Permanently remove your personal data — email, name, and saved shipping address — and disable this account. This can’t be undone.</p>
+        <p className="muted acct-note">Permanently remove your email, name, and saved shipping address, and disable this account. This can’t be undone.</p>
         <div className="acct-actions">
           <button className="btn btn-danger" onClick={erase} disabled={erasing}>
-            {erasing ? 'Deleting…' : 'Delete my account &amp; data'}
+            {erasing ? 'Deleting…' : 'Delete my account & data'}
           </button>
         </div>
       </div>

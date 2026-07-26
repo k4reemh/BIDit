@@ -23,7 +23,7 @@ const NAV = [
 
 const PERKS = [
   'Run live auctions + randomizer wheels right on your pump.fun stream',
-  'Get paid in USDC — funds held in escrow until the card ships',
+  'Get paid in USDC, held in escrow until the card ships',
   'Every sale routes 4% into the $BID buyback + 1% to a buyer-protection treasury',
 ];
 
@@ -43,7 +43,7 @@ export default function SellerLayout({
       <main className="container acct-gate">
         <div className="acct-gate__card card">
           <h1 className="display">Sign in to start selling</h1>
-          <p className="muted">Your seller studio, live auctions and payouts live here.</p>
+          <p className="muted">Your seller studio, live auctions and payouts are all in here.</p>
           <button className="btn btn-primary" onClick={onAuth}>Sign in</button>
         </div>
       </main>
@@ -64,7 +64,7 @@ export default function SellerLayout({
         <div className="sell-apply__card card">
           <span className="hero__tag"><span className="dot" /> Seller studio</span>
           <h1 className="display sell-apply__title">Turn your stream into an auction house.</h1>
-          <p className="muted">List anything, run live auctions and wheel spins, and get paid in USDC — setup takes a minute.</p>
+          <p className="muted">List anything, run live auctions and wheel spins, and get paid in USDC. Setup takes a minute.</p>
           <ul className="sell-apply__perks">
             {PERKS.map((p) => (
               <li key={p}><span className="sell-apply__check"><Check width={14} height={14} /></span>{p}</li>

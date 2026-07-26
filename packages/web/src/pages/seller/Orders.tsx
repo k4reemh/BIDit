@@ -33,7 +33,7 @@ export default function Orders() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Orders</h1>
-        <p className="muted">Everything buyers have won from you. To send one, confirm its box size in <Link to="/seller/shipments">Shipments</Link> — we make the label and tracking updates on its own.</p>
+        <p className="muted">Everything buyers have won from you. To send one, confirm its box size in <Link to="/seller/shipments">Shipments</Link>. We create the label, and tracking updates on its own.</p>
       </div>
       {orders === null ? (
         <div className="muted" style={{ padding: 20 }}>Loading…</div>

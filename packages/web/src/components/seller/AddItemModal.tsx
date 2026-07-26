@@ -28,7 +28,7 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
       });
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
       setBusy(false);
     }
   };
@@ -44,10 +44,10 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
         <form onSubmit={submit} className="auth__form">
           <label className="auth__field">
             <span>Title</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Charizard — Base Set Holo" required autoFocus />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Base Set Charizard Holo" required autoFocus />
           </label>
           <div className="auth__field">
-            <span>Photo <em className="muted">— optional</em></span>
+            <span>Photo <em className="muted">(optional)</em></span>
             <ImageUpload value={image} onChange={setImage} label="Add a photo" hint="Drag & drop or click to upload" />
           </div>
           <div className="wheel-row2">
@@ -61,11 +61,11 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
             </label>
           </div>
           <label className="auth__field">
-            <span>Store price (USDC) <em className="muted">— optional: lets viewers buy it now, no auction</em></span>
-            <input type="number" min="0.01" step="0.01" value={buyNow} onChange={(e) => setBuyNow(e.target.value)} placeholder="e.g. 30 — appears in your shop" />
+            <span>Store price (USDC) <em className="muted">· optional, lets viewers buy it now without an auction</em></span>
+            <input type="number" min="0.01" step="0.01" value={buyNow} onChange={(e) => setBuyNow(e.target.value)} placeholder="e.g. 30, appears in your shop" />
           </label>
           <label className="auth__field">
-            <span>Est. shipping weight in grams <em className="muted">— used to quote UPS shipping</em></span>
+            <span>Est. shipping weight in grams <em className="muted">· used to quote UPS shipping</em></span>
             <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 30 (a sleeved card + mailer)" />
           </label>
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={busy}>

@@ -119,7 +119,7 @@ export default function Live() {
       setGPrize('');
       setGImg('');
     } catch (e) {
-      setGErr(e instanceof Error ? e.message : 'Could not start giveaway');
+      setGErr(e instanceof Error ? e.message : 'Couldn’t start the giveaway. Try again.');
     } finally {
       setGBusy(false);
     }
@@ -131,7 +131,7 @@ export default function Live() {
     try {
       await drawGiveaway(giveaway.giveawayId);
     } catch (e) {
-      setGErr(e instanceof Error ? e.message : 'Could not draw');
+      setGErr(e instanceof Error ? e.message : 'Couldn’t draw a winner. Try again.');
     }
   };
 
@@ -139,7 +139,7 @@ export default function Live() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Live monitor</h1>
-        <p className="muted">Watch your running auction in real time — exactly what viewers see in the overlay.</p>
+        <p className="muted">Watch your auction in real time, exactly as viewers see it in the overlay.</p>
       </div>
 
       {closed && (
@@ -153,7 +153,7 @@ export default function Live() {
         <div className="empty card">
           <span className="empty__ic"><Tag width={26} height={26} /></span>
           <h3>No live auction running</h3>
-          <p className="muted">Start an auction from your listings and it’ll appear here — with the bids streaming in live.</p>
+          <p className="muted">Start an auction from your listings and it’ll appear here, bids streaming in live.</p>
           <Link className="btn btn-primary" to="/seller/listings">Go to listings</Link>
         </div>
       ) : (
@@ -167,7 +167,7 @@ export default function Live() {
               </div>
             </div>
             <div className="lm__stats">
-              <div className="lm__stat"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : '—'}</b></div>
+              <div className="lm__stat"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : 'None yet'}</b></div>
               <div className="lm__stat lm__stat--r"><span>Ends in</span><b className={low ? 'lm__timer low' : 'lm__timer'}>{remaining!.toFixed(1)}s</b></div>
             </div>
             <div className="lm__bar"><div className={low ? 'lm__fill low' : 'lm__fill'} style={{ width: `${pct}%` }} /></div>
@@ -197,7 +197,7 @@ export default function Live() {
 
       {!giveaway ? (
         <div className="card gv-launch">
-          <p className="muted gv-launch__lead">Reward the room with a free prize. Pick who can enter, name the prize, and go — the winner is drawn live and provably fair.</p>
+          <p className="muted gv-launch__lead">Reward the room with a free prize. Pick who can enter, name the prize, and go. The winner is drawn live and provably fair.</p>
           <div className="gv-kinds">
             <button className={`gv-kind${gKind === 'PUBLIC' ? ' active' : ''}`} onClick={() => setGKind('PUBLIC')}>
               <span className="gv-kind__ic"><Users width={18} height={18} /></span>
@@ -207,17 +207,17 @@ export default function Live() {
             <button className={`gv-kind${gKind === 'BUYER_ONLY' ? ' active' : ''}`} onClick={() => setGKind('BUYER_ONLY')}>
               <span className="gv-kind__ic"><Bag width={18} height={18} /></span>
               <b>Buyers only</b>
-              <span className="muted">Only people who’ve purchased from you can enter.</span>
+              <span className="muted">Only people who’ve bought from you can enter.</span>
             </button>
           </div>
           <div className="gv-photo">
             <ImageUpload value={gImg} onChange={setGImg} compact />
-            <span className="muted">Prize photo <em>— optional</em></span>
+            <span className="muted">Prize photo <em>(optional)</em></span>
           </div>
           <div className="gv-form">
             <input
               className="gv-input"
-              placeholder="Prize — e.g. Charizard ex Alt Art slab"
+              placeholder="Prize, e.g. Charizard ex Alt Art slab"
               value={gPrize}
               onChange={(e) => setGPrize(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && launch()}
@@ -270,7 +270,7 @@ export default function Live() {
 
       {/* ---- Live chat ---- */}
       <h2 className="sl-sec"><Chat width={20} height={20} style={{ verticalAlign: '-3px', marginRight: 6 }} /> Live chat</h2>
-      <p className="muted" style={{ marginTop: -6, marginBottom: 4, fontSize: 13.5 }}>Messages from viewers watching your stream — delete or block with the controls on each message.</p>
+      <p className="muted" style={{ marginTop: -6, marginBottom: 4, fontSize: 13.5 }}>Messages from viewers watching your stream. Delete or block with the controls on each message.</p>
       <ChatPanel room={session.userId} session={session} onAuth={() => {}} />
 
       {winner && (

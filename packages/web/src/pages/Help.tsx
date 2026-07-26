@@ -4,9 +4,9 @@ import {
 } from '../icons';
 
 const BUYER = [
-  { icon: Wallet, title: 'Add funds', body: 'Deposit USDC to your BIDit wallet — it takes a minute and you only do it once.', to: '/deposit', cta: 'Go to Deposit' },
+  { icon: Wallet, title: 'Add funds', body: 'Deposit USDC to your BIDit wallet. Takes a minute, and you only do it once.', to: '/deposit', cta: 'Go to Deposit' },
   { icon: Radio, title: 'Find a live auction', body: 'Browse “Live right now” on the homepage, or open a seller’s coin to watch and bid.', to: '/', cta: 'Browse live' },
-  { icon: Bolt, title: 'Bid in real time', body: 'Tap to bid. Your funds are only reserved — you’re not charged unless you actually win.', to: '/docs#how', cta: 'How bidding works' },
+  { icon: Bolt, title: 'Bid in real time', body: 'Tap to bid. Your funds are reserved, not charged. You only pay if you actually win.', to: '/docs#how', cta: 'How bidding works' },
   { icon: Truck, title: 'Win → ship it', body: 'Won cards land in “Ready to ship.” Bundle a seller’s wins to pay shipping just once.', to: '/ship', cta: 'Ready to ship' },
 ];
 
@@ -52,8 +52,8 @@ export default function Help() {
     <main className="container help">
       <header className="help__hero">
         <span className="hero__tag"><span className="dot" /> Help &amp; quick start</span>
-        <h1 className="display help__h1">Everything you need to get going.</h1>
-        <p className="help__lead">New to BIDit? Follow the steps below. Want the full picture — escrow, fees, the $BID flywheel — the <Link to="/docs" className="accent">docs</Link> cover it all.</p>
+        <h1 className="display help__h1">Start bidding or selling in four steps.</h1>
+        <p className="help__lead">New to BIDit? Follow the steps below. The <Link to="/docs" className="accent">docs</Link> cover the full picture: escrow, fees, the $BID flywheel.</p>
       </header>
 
       <div className="qs">
@@ -76,7 +76,7 @@ export default function Help() {
         <span className="help__contact-ic"><Gift width={22} height={22} /></span>
         <div>
           <h3 className="acct-sub" style={{ marginBottom: 4 }}>Still stuck?</h3>
-          <p className="muted">DM us on X and we’ll help you out — fast during the beta.</p>
+          <p className="muted">DM us on X and we’ll get you unstuck. Replies are fast during the beta.</p>
         </div>
         <a className="btn btn-primary" href="https://x.com/biditsol" target="_blank" rel="noreferrer"><XLogo width={16} height={16} /> Message @biditsol</a>
       </section>

@@ -7,7 +7,7 @@ const REASONS = [
   { code: 'damaged', label: 'Arrived damaged', sub: 'The card or packaging was damaged in transit' },
   { code: 'wrong_item', label: 'Wrong item', sub: 'You received a different card than you won' },
   { code: 'not_as_described', label: 'Not as described', sub: 'Condition or details don’t match the listing' },
-  { code: 'other', label: 'Something else', sub: 'A different problem — tell us what happened' },
+  { code: 'other', label: 'Something else', sub: 'Not on the list? Tell us what happened' },
 ];
 
 export default function DisputeModal({
@@ -35,7 +35,7 @@ export default function DisputeModal({
       const f = await disputeShipment(shipmentId, { reason, detail: detail.trim(), photos });
       onResolved(f);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not submit your report.');
+      setErr(e instanceof Error ? e.message : 'Couldn’t submit your report. Try again.');
       setBusy(false);
     }
   };
@@ -48,7 +48,7 @@ export default function DisputeModal({
         {step === 1 ? (
           <>
             <h2 className="modal__title">What went wrong?</h2>
-            <p className="modal__sub muted">Pick the closest match — you’ll add details and photos next.</p>
+            <p className="modal__sub muted">Pick the closest match. You’ll add details and photos next.</p>
             <div className="dispute__reasons">
               {REASONS.map((r) => (
                 <button key={r.code} className="dispute__reason" onClick={() => { setReason(r.code); setStep(2); }}>
@@ -66,11 +66,11 @@ export default function DisputeModal({
 
             <div className="fld">
               <label>What happened?</label>
-              <textarea rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="Tell us the details — what you expected and what you got…" />
+              <textarea rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="Tell us the details: what you expected and what you got…" />
             </div>
 
             <div className="fld">
-              <label>Photos <span className="muted">— optional, up to 4</span></label>
+              <label>Photos <span className="muted">(optional, up to 4)</span></label>
               <div className="dispute__photos">
                 {photos.map((p, i) => (
                   <div key={i} className="dispute__photo">

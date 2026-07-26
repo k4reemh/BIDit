@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import Avatar from './Avatar';
-import { Bolt, Tag, Wallet, Person } from '../icons';
+import { Bolt, Grid, Tag, Wallet, Person } from '../icons';
 import type { User } from '../App';
 
 const ACCOUNT_PATHS = ['/profile', '/shipping', '/saved', '/purchases', '/ship', '/settings'];
@@ -27,6 +27,13 @@ export default function MobileTabBar({
       icon: <Bolt width={22} height={22} />,
       active: pathname === '/' || pathname.startsWith('/live'),
       onClick: () => nav('/'),
+    },
+    {
+      key: 'browse',
+      label: 'Browse',
+      icon: <Grid width={22} height={22} />,
+      active: pathname === '/browse',
+      onClick: () => nav('/browse'),
     },
     {
       key: 'sell',

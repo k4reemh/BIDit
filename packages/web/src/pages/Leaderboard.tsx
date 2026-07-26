@@ -11,7 +11,7 @@ export default function Leaderboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getLeaderboard().then(setRows).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getLeaderboard().then(setRows).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load the leaderboard.'));
   }, []);
 
   const podium = rows?.slice(0, 3) ?? [];
@@ -25,7 +25,7 @@ export default function Leaderboard() {
         <span className="lb__eyebrow"><Gift width={15} height={15} /> BIDit Points</span>
         <h1 className="display lb__title">Points Leaderboard</h1>
         <p className="lb__sub">
-          Earn Points For Future Airdrops And Prizes! — <Link to="/docs#points">Learn More In Docs</Link>
+          Earn points for future airdrops and prizes. <Link to="/docs#points">Learn more in Docs</Link>
         </p>
       </header>
 
@@ -35,7 +35,7 @@ export default function Leaderboard() {
         <div className="lb__empty card">
           <Gift width={26} height={26} />
           <b>The board is wide open</b>
-          <p className="muted">No points earned yet — the first bid, win or sale takes the crown.</p>
+          <p className="muted">No points earned yet. The first bid, win or sale takes the crown.</p>
           <Link className="btn btn-primary" to="/points">Start earning points <ArrowRight width={16} height={16} /></Link>
         </div>
       )}

@@ -9,6 +9,7 @@ import Tutorial, { hasSeenTutorial } from './components/Tutorial';
 import AccountLayout from './components/AccountLayout';
 import SellerLayout from './components/SellerLayout';
 import Home from './pages/Home';
+import Browse from './pages/Browse';
 import Docs from './pages/Docs';
 import Help from './pages/Help';
 import Points from './pages/Points';
@@ -55,7 +56,7 @@ export function toUser(s: Session): User {
 const STUBS: Record<string, { title: string; sub: string }> = {
   '/refer': { title: 'Refer friends', sub: 'Invite friends and earn $BID rewards when they bid.' },
   '/friends': { title: 'Friends', sub: 'Find and follow other collectors.' },
-  '/settings': { title: 'Account settings', sub: 'Manage your account, security and notifications.' },
+  '/settings': { title: 'Account settings', sub: 'Your account, security and notifications.' },
   '/account-health': { title: 'Account health', sub: 'Your standing as a buyer and seller on BIDit.' },
 };
 
@@ -107,6 +108,7 @@ export default function App() {
         <TopNav user={user} onAuth={setAuth} onLogout={() => { void logout(); clearToken(); setSession(null); }} onReplayTutorial={() => setTutorial(true)} />
         <Routes>
           <Route path="/" element={<Home onAuth={() => setAuth('signup')} />} />
+          <Route path="/browse" element={<Browse />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/help" element={<Help />} />
           <Route path="/points" element={<Points session={session} onAuth={() => setAuth('signup')} />} />

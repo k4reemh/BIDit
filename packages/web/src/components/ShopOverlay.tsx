@@ -58,7 +58,7 @@ export default function ShopOverlay({
           <span className="shop__ic"><Bag width={18} height={18} /></span>
           <div>
             <h2 className="shop__title">@{sellerHandle}’s shop</h2>
-            <p className="muted shop__sub">Buy it now — no bidding. Paid from your balance, ships like a win.</p>
+            <p className="muted shop__sub">Buy it now, no bidding. Paid from your balance, ships like a win.</p>
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export default function ShopOverlay({
           <div className="shop__empty">
             <Bag width={24} height={24} />
             <b>Nothing in the shop right now</b>
-            <p className="muted">@{sellerHandle} hasn’t priced anything for instant buy — catch the live auctions instead.</p>
+            <p className="muted">@{sellerHandle} hasn’t priced anything for instant buy. Catch the live auctions instead.</p>
           </div>
         ) : (
           <div className="shop__grid">

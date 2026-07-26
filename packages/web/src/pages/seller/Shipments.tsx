@@ -44,7 +44,7 @@ export default function Shipments() {
   const [error, setError] = useState('');
 
   const load = () => {
-    getSellerShipments().then(setShipments).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getSellerShipments().then(setShipments).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load shipments. Refresh to try again.'));
     getSellerHeld().then(setHeld).catch(() => {});
   };
   useEffect(() => { void load(); }, []);
@@ -60,7 +60,7 @@ export default function Shipments() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Shipments</h1>
-        <p className="muted">We create and pay for every shipping label — you just print it, tape it on, and drop it off.</p>
+        <p className="muted">We create and pay for every shipping label. You print it, tape it on, and drop it off.</p>
       </div>
 
       <div className="ship-hero">
@@ -76,31 +76,31 @@ export default function Shipments() {
       {empty && <EmptyState icon={Truck} title="No packages to ship yet" sub="When a buyer pays shipping on a card they won from you, it shows up here to fulfill." />}
 
       {toConfirm.length > 0 && (
-        <Section title="Needs your confirmation" hint="The buyer paid shipping — confirm the package size and we’ll make the label.">
+        <Section title="Needs your confirmation" hint="The buyer paid shipping. Confirm the package size and we’ll make the label.">
           {toConfirm.map((s) => <ConfirmCard key={s.id} shipment={s} onDone={load} />)}
         </Section>
       )}
 
       {making.length > 0 && (
-        <Section title="Preparing your label" hint="We’re generating the label — you’ll get an email the moment it’s ready.">
+        <Section title="Preparing your label" hint="We’re generating the label. You’ll get an email the moment it’s ready.">
           {making.map((s) => (
             <div key={s.id} className="card acct-card ship-card">
               <CardHead shipment={s} pill={<span className="ship-pill is-pending">Making label…</span>} />
               <Items shipment={s} />
-              <p className="muted acct-note ship-hint">Your label is being created. Hang tight — we’ll email you when it’s ready to print.</p>
+              <p className="muted acct-note ship-hint">Your label is being created. Hang tight, we’ll email you when it’s ready to print.</p>
             </div>
           ))}
         </Section>
       )}
 
       {ready.length > 0 && (
-        <Section title="Ready to ship" hint="Print the label, tape it on, and drop it at the carrier — tracking updates on its own from there.">
+        <Section title="Ready to ship" hint="Print the label, tape it on, and drop it at the carrier. Tracking updates on its own from there.">
           {ready.map((s) => <ReadyCard key={s.id} shipment={s} />)}
         </Section>
       )}
 
       {held.length > 0 && (
-        <Section title="Waiting for buyer’s shipping order" hint="Hold these until the buyer pays for shipping — then they’ll move up to be shipped.">
+        <Section title="Waiting for buyer’s shipping order" hint="Hold these until the buyer pays for shipping. Then they’ll move up here, ready to ship.">
           <div className="card acct-card">
             <div className="ship-list">
               {held.map((it) => (
@@ -185,7 +185,7 @@ function ConfirmCard({ shipment, onDone }: { shipment: Shipment; onDone: () => v
     }
     setBusy(true); setErr('');
     try { await confirmShipmentLabel(shipment.id, dims); onDone(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not confirm.'); setBusy(false); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t confirm. Try again.'); setBusy(false); }
   };
 
   return (
@@ -245,7 +245,7 @@ function ReadyCard({ shipment }: { shipment: Shipment }) {
             <a className="btn btn-primary" href={shipment.labelUrl} target="_blank" rel="noreferrer"><DownloadIcon /> Download label</a>
           )}
           <span className="muted ship-hint ship-ready__auto">
-            <Check width={13} height={13} /> That’s it — tracking updates on its own once the carrier scans it.
+            <Check width={13} height={13} /> That’s it. Tracking updates on its own once the carrier scans it.
           </span>
         </div>
       </div>

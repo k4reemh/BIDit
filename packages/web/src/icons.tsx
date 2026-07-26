@@ -15,6 +15,13 @@ const base = (p: SVGProps<SVGSVGElement>) => ({
 export const Search = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.2-3.2" /></svg>
 );
+/** Filled seal-with-check — the verified-seller mark on live cards. */
+export const Verified = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base({ ...p, strokeWidth: 0, fill: 'currentColor', stroke: 'none' })}>
+    <path d="M12 1.8 14.5 4l3.3-.3.9 3.2 2.9 1.7-1.4 3 1.4 3-2.9 1.7-.9 3.2-3.3-.3L12 21.6 9.5 19.4l-3.3.3-.9-3.2-2.9-1.7 1.4-3-1.4-3L5.3 7l.9-3.2 3.3.3L12 1.8Z" />
+    <path d="m8.4 12.1 2.5 2.5 4.7-4.9" fill="none" stroke="var(--surface, #fff)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 export const Moon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" /></svg>
 );

@@ -23,7 +23,7 @@ const originLines = (o: OriginAddr | null | undefined): string[] => {
   if (!o) return [];
   return [[o.originCity, o.originRegion, o.originPostal].filter(Boolean).join(', '), o.originCountry].filter(Boolean) as string[];
 };
-const sizeOf = (d: LabelQueueRow['dims']) => (d.lengthCm ? `${d.lengthCm} × ${d.widthCm} × ${d.heightCm} cm · ${d.weightGrams} g` : '—');
+const sizeOf = (d: LabelQueueRow['dims']) => (d.lengthCm ? `${d.lengthCm} × ${d.widthCm} × ${d.heightCm} cm · ${d.weightGrams} g` : 'n/a');
 
 export default function AdminShipments({ session }: { session: Session | null }) {
   const [queue, setQueue] = useState<LabelQueueRow[] | null>(null);
@@ -47,7 +47,7 @@ export default function AdminShipments({ session }: { session: Session | null })
           <Link to="/admin/shipments" className="active">Shipping</Link>
         </div>
         <h1 className="display acct-title">Shipping labels</h1>
-        <p className="muted">Packages a seller has confirmed and that need a label. Buy the carrier label (seller&nbsp;→&nbsp;buyer, at the size shown), paste its link and tracking number, and hit “Label created” — the seller is emailed to print and ship it.</p>
+        <p className="muted">Packages a seller has confirmed and that need a label. Buy the carrier label (seller&nbsp;→&nbsp;buyer, at the size shown), paste its link and tracking number, and save. The seller gets an email to print and ship it.</p>
       </div>
       {error && <div className="auth__error">{error}</div>}
 
@@ -58,7 +58,7 @@ export default function AdminShipments({ session }: { session: Session | null })
       {inflight.length > 0 && (
         <>
           <h2 className="acct-sub" style={{ margin: '30px 0 4px' }}>Test controls</h2>
-          <p className="muted ship-sec__hint" style={{ marginBottom: 12 }}>Shippo advances these automatically in production — use these to drive a package through shipped → delivered → released by hand while testing.</p>
+          <p className="muted ship-sec__hint" style={{ marginBottom: 12 }}>Shippo advances these automatically in production. Use these to drive a package through shipped → delivered → released by hand while testing.</p>
           {inflight.map((s) => <InflightRow key={s.id} s={s} onDone={load} setError={setError} />)}
         </>
       )}
@@ -116,10 +116,10 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
     if (!labelUrl.trim() || !tracking.trim()) { setErr('Paste the label link and the tracking number.'); return; }
     // Carrier is REQUIRED: Shippo is queried per-carrier, so a label saved without
     // one can never be tracked and the package silently never turns "delivered".
-    if (!carrier.trim()) { setErr('Pick the carrier — tracking can’t run without it.'); return; }
+    if (!carrier.trim()) { setErr('Pick the carrier. Tracking can’t run without it.'); return; }
     setBusy(true); setErr('');
     try { await createLabel(row.id, labelUrl.trim(), tracking.trim(), carrier.trim() || undefined); onDone(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not save the label.'); setBusy(false); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t save the label.'); setBusy(false); }
   };
 
   return (
@@ -143,14 +143,14 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
             <div>
               <span className="adm-lbl__lbl">Package size</span>
               <p>{size}</p>
-              {row.mode === 'PRIVATE' && <p className="muted" style={{ fontSize: 12 }}>Private — the “ship to” below is the hub.</p>}
+              {row.mode === 'PRIVATE' && <p className="muted" style={{ fontSize: 12 }}>Private: the “ship to” below is the hub.</p>}
             </div>
             <div>
-              <span className="adm-lbl__lbl">Ship from — {row.seller.name || `@${row.seller.handle}`}</span>
+              <span className="adm-lbl__lbl">Ship from: {row.seller.name || `@${row.seller.handle}`}</span>
               {originLines(row.seller.origin).length ? originLines(row.seller.origin).map((l, i) => <p key={i}>{l}</p>) : <p className="muted">No origin on file.</p>}
             </div>
             <div>
-              <span className="adm-lbl__lbl">Ship to — @{row.buyer.handle}</span>
+              <span className="adm-lbl__lbl">Ship to: @{row.buyer.handle}</span>
               {addrLines(row.buyer.address as Addr).length ? addrLines(row.buyer.address as Addr).map((l, i) => <p key={i}>{l}</p>) : <p className="muted">No address on file.</p>}
             </div>
           </div>
@@ -181,7 +181,7 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
             </div>
             {err && <div className="auth__error">{err}</div>}
             <div className="acct-actions">
-              <button className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving…' : 'Label created — notify seller'}</button>
+              <button className="btn btn-primary" disabled={busy} onClick={submit}>{busy ? 'Saving…' : 'Save label & notify seller'}</button>
             </div>
           </div>
         </div>

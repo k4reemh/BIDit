@@ -59,15 +59,15 @@ export default function ShippingSettingsCard({
       <div className="ship-opts">
         <label className="ship-priv">
           <input type="checkbox" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} />
-          <span><b>Weekly bundling</b> — buyers pay shipping once a week and you ship their wins together.</span>
+          <span><b>Weekly bundling</b>: buyers pay shipping once a week and you ship their wins together.</span>
         </label>
         <label className="ship-priv">
           <input type="checkbox" checked={shipLater} onChange={(e) => setShipLater(e.target.checked)} />
-          <span><b>Buy now, ship later</b> — hold buyers’ wins up to 14 days so they can bundle before shipping.</span>
+          <span><b>Buy now, ship later</b>: hold buyers’ wins up to 14 days so they can bundle before shipping.</span>
         </label>
         <label className="ship-priv">
           <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
-          <span><b>Private secure shipping</b> — buyers can hide their address; you ship to BIDit and we forward it.</span>
+          <span><b>Private secure shipping</b>: buyers can hide their address; you ship to BIDit and we forward it.</span>
         </label>
       </div>
 

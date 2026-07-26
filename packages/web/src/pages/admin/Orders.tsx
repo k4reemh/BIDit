@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminOrders, adminOrderAction, getLedgerAudit, getWalletAudit, type AdminOrder, type LedgerAudit, type WalletAudit, type Session } from '../../api';
 
-const fmt = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
+const fmt = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'n/a');
 
 /** Valid admin actions per order status (mirrors the escrow state machine). */
 function actionsFor(status: string): { label: string; action: string; danger?: boolean }[] {
@@ -75,7 +75,7 @@ export default function AdminOrders({ session }: { session: Session | null }) {
 
       <div className="card acct-card adm-recon">
         <div className="adm-row__head">
-          <div className="adm-row__id"><b>Wallet reconciliation</b> <span className="muted">on-chain USDC vs the ledger — run before flipping to escrow</span></div>
+          <div className="adm-row__id"><b>Wallet reconciliation</b> <span className="muted">on-chain USDC vs the ledger. Run it before flipping to escrow.</span></div>
           <button className="btn btn-sm btn-primary" disabled={wBusy} onClick={reconcile}>{wBusy ? 'Checking…' : 'Reconcile wallets'}</button>
         </div>
         {wallets && (
@@ -128,7 +128,7 @@ export default function AdminOrders({ session }: { session: Session | null }) {
               <span><b>Seller gets</b> ${o.sellerProceeds}</span>
               <span><b>Fee</b> ${o.platformFee}</span>
               <span><b>Ordered</b> {fmt(o.createdAt)}</span>
-              <span><b>Tracking</b> {o.trackingNumber ?? '—'}</span>
+              <span><b>Tracking</b> {o.trackingNumber ?? 'n/a'}</span>
               {o.status === 'DISPUTE_WINDOW' && <span><b>Auto-releases</b> {fmt(o.disputeWindowEndsAt)}</span>}
               {o.status === 'LOCKED' && <span><b>Ship by</b> {fmt(o.noShipDeadline)}</span>}
             </div>

@@ -69,10 +69,10 @@ export default function Docs() {
         <section id="overview" className="docs__sec">
           <h2 className="docs__h2"><Bolt width={22} height={22} /> What is BIDit</h2>
           <p>
-            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything — cards, clothes,
-            tech, bounties; the BIDit browser overlay drops a live auction panel right onto the stream. Viewers place
+            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything: cards, clothes,
+            tech, bounties. The BIDit browser overlay drops a live auction panel right onto the stream. Viewers place
             bids in real time, the highest bidder when the clock hits zero wins, and the item ships to them. Money moves
-            in USDC — no chat comments, no manual invoicing, no “DM me to pay.”
+            in USDC. No chat comments, no manual invoicing, no “DM me to pay.”
           </p>
           <div className="docs__cards3">
             <div className="docs__mini card">
@@ -88,12 +88,12 @@ export default function Docs() {
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Gift width={18} height={18} /></span>
               <b>Every ship pumps $BID</b>
-              <p className="muted">4% of each shipped sale routes to an on-chain $BID buyback — the flywheel.</p>
+              <p className="muted">4% of each shipped sale routes to an on-chain $BID buyback. That’s the flywheel.</p>
             </div>
           </div>
           <div className="docs__note">
             <Info width={18} height={18} />
-            <p><b>Core principle:</b> the server is authoritative. The overlay and website only render state — every bid,
+            <p><b>Core principle:</b> the server is authoritative. The overlay and website only render state. Every bid,
             hold, and payout is decided and recorded server-side on a double-entry ledger, so balances can never
             drift or double-spend.</p>
           </div>
@@ -126,7 +126,7 @@ export default function Docs() {
               <div>
                 <b>Anti-snipe keeps it fair</b>
                 <p className="muted">A bid in the final seconds nudges the clock forward a beat so there’s always a
-                chance to answer — the timer can never sit more than ~5 seconds out. No last-millisecond steals.</p>
+                chance to answer. The timer can never sit more than ~5 seconds out. No last-millisecond steals.</p>
               </div>
             </li>
             <li>
@@ -134,7 +134,7 @@ export default function Docs() {
               <div>
                 <b>Highest bid at zero wins</b>
                 <p className="muted">When the clock ends, the top bidder wins. Their held bid is <b>captured into
-                escrow</b> — everyone else’s holds are released back to their balance.</p>
+                escrow</b>. Everyone else’s holds are released back to their balance.</p>
               </div>
             </li>
             <li>
@@ -153,7 +153,7 @@ export default function Docs() {
           <h2 className="docs__h2"><Eye width={22} height={22} /> Getting the overlay</h2>
           <p>
             The overlay is a lightweight browser extension. It injects the auction panel onto pump.fun coin pages and
-            talks to BIDit securely in the background — the stream page can’t see or block it.
+            talks to BIDit securely in the background. The stream page can’t see or block it.
           </p>
           <ol className="docs__steps">
             <li>
@@ -170,7 +170,7 @@ export default function Docs() {
               <div>
                 <b>Sign in & fund your balance</b>
                 <p className="muted">Open the BIDit popup, sign in, and deposit USDC to your balance (see
-                <a href="#balance"> Balance & deposits</a>). You bid from this balance — no wallet pop-up per bid.</p>
+                <a href="#balance"> Balance & deposits</a>). You bid from this balance. No wallet pop-up per bid.</p>
               </div>
             </li>
             <li>
@@ -192,7 +192,7 @@ export default function Docs() {
           </ol>
           <div className="docs__note">
             <Info width={18} height={18} />
-            <p>You can also watch and manage auctions from the website — sellers get a live monitor at
+            <p>You can also watch and manage auctions from the website. Sellers get a live monitor at
             <Link to="/seller/live"> Seller → Live</Link>, and every account can track bids and orders from their
             dashboard. The overlay is just the fastest way to bid while watching.</p>
           </div>
@@ -208,7 +208,7 @@ export default function Docs() {
           <div className="docs__deflow">
             <div className="docs__deflow-step"><b>Deposit</b><p className="muted">Send USDC (or SOL) to your deposit address. Incoming funds are detected on-chain and credited to your <b>available</b> balance automatically.</p></div>
             <ArrowRight className="docs__deflow-arrow" width={18} height={18} />
-            <div className="docs__deflow-step"><b>Bid</b><p className="muted">A live bid <b>holds</b> that amount. Held funds sit in your balance but can’t be spent twice — outbid releases them.</p></div>
+            <div className="docs__deflow-step"><b>Bid</b><p className="muted">A live bid <b>holds</b> that amount. Held funds sit in your balance but can’t be spent twice. Get outbid and they release.</p></div>
             <ArrowRight className="docs__deflow-arrow" width={18} height={18} />
             <div className="docs__deflow-step"><b>Withdraw</b><p className="muted">Any available (un-held) balance can be withdrawn back to a Solana address anytime.</p></div>
           </div>
@@ -247,10 +247,10 @@ export default function Docs() {
             ))}
           </div>
           <ul className="docs__ul">
-            <li><b>Buyer protection.</b> Funds are locked in escrow — the seller is only paid after delivery and a short dispute window.</li>
+            <li><b>Buyer protection.</b> Funds are locked in escrow. The seller is only paid after delivery and a short dispute window.</li>
             <li><b>Didn’t ship?</b> If a seller never ships within the deadline, the order auto-cancels and you’re refunded <b>100%</b>.</li>
             <li><b>Something wrong?</b> Open a dispute inside the window; it resolves to either a release to the seller or a full refund to you.</li>
-            <li><b>Refunds carry no fee.</b> The fee is only ever taken on a successful release — a refund returns the entire amount.</li>
+            <li><b>Refunds carry no fee.</b> The fee is only ever taken on a successful release. A refund returns the entire amount.</li>
           </ul>
         </section>
 
@@ -259,7 +259,7 @@ export default function Docs() {
           <h2 className="docs__h2"><Truck width={22} height={22} /> Shipping &amp; delivery</h2>
           <p>
             Win an item and it lands in <b>Ready to ship</b>. The buyer pays shipping (not the seller),
-            and only when you choose to send items your way — so you can let wins pile up and pay once.
+            and only when you choose to send items your way, so you can let wins pile up and pay once.
             Cost is based on the seller’s location and the item’s weight, to your saved address.
           </p>
           <div className="docs__cards3">
@@ -271,18 +271,18 @@ export default function Docs() {
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Gift width={18} height={18} /></span>
               <h3>Weekly bundling</h3>
-              <p className="muted">Where a seller offers it, pay shipping once a week — that week’s wins ship together.</p>
+              <p className="muted">Where a seller offers it, pay shipping once a week. That week’s wins ship together.</p>
             </div>
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Shield width={18} height={18} /></span>
               <h3>Private &amp; secure</h3>
-              <p className="muted">Hide your address — the seller ships to BIDit and we forward it to you.</p>
+              <p className="muted">Hide your address. The seller ships to BIDit and we forward it to you.</p>
             </div>
           </div>
           <ul className="docs__ul">
             <li><b>Buy now, ship later.</b> Let wins sit in Ready to ship (held up to 14 days), then pick which to send and pay shipping once. Don’t want one? Discard it.</li>
             <li><b>One package per seller.</b> Bundling and ship-later group a single seller’s items into one shipment with one shipping charge.</li>
-            <li><b>Delivery.</b> The seller adds tracking and marks it shipped — then you tap <b>Confirm received</b> when it arrives.</li>
+            <li><b>Delivery.</b> The seller adds tracking and marks it shipped. When it arrives, tap <b>Confirm received</b>.</li>
             <li><b>Set your address first.</b> Add it under Payments &amp; Shipping so we can quote and label correctly.</li>
           </ul>
         </section>
@@ -290,22 +290,22 @@ export default function Docs() {
         {/* FEES */}
         <section id="fees" className="docs__sec">
           <h2 className="docs__h2"><Tag width={22} height={22} /> Fees</h2>
-          <p>BIDit’s fee is simple: <b>5% of a shipped sale</b>, taken only when escrow releases to the seller — split into a <b>4% $BID buyback</b> and <b>1% to a community treasury</b> for buyer protection.</p>
+          <p>BIDit’s fee is simple: <b>5% of a shipped sale</b>, taken only when escrow releases to the seller. It splits into a <b>4% $BID buyback</b> and <b>1% to a community treasury</b> for buyer protection.</p>
           <div className="card docs__split">
             <div className="split__bar">
               <span className="split__seller" style={{ width: '95%' }}>95% seller</span>
               <span className="split__fee" style={{ width: '5%' }}>5%</span>
             </div>
             <div className="docs__split-legend">
-              <span><i className="docs__sw docs__sw--seller" /> <b>95%</b> — paid to the seller in USDC</span>
-              <span><i className="docs__sw docs__sw--fee" /> <b>4%</b> — buys back <b className="accent">$BID</b> on-chain</span>
-              <span><i className="docs__sw docs__sw--fee" /> <b>1%</b> — community treasury for buyer protection</span>
+              <span><i className="docs__sw docs__sw--seller" /> <b>95%</b> paid to the seller in USDC</span>
+              <span><i className="docs__sw docs__sw--fee" /> <b>4%</b> buys back <b className="accent">$BID</b> on-chain</span>
+              <span><i className="docs__sw docs__sw--fee" /> <b>1%</b> to the community treasury for buyer protection</span>
             </div>
           </div>
           <ul className="docs__ul">
-            <li><b>Buyers pay no platform fee.</b> You pay your winning bid — nothing on top.</li>
+            <li><b>Buyers pay no platform fee.</b> You pay your winning bid, nothing on top.</li>
             <li><b>The fee is success-based.</b> No sale, no ship, no fee. It’s only deducted on release.</li>
-            <li><b>Nothing is pocketed</b> — 4% goes straight into the $BID buyback below, and 1% funds a community treasury that backs buyer protection.</li>
+            <li><b>Nothing is pocketed.</b> 4% goes straight into the $BID buyback below, and 1% funds a community treasury that backs buyer protection.</li>
           </ul>
         </section>
 
@@ -314,7 +314,7 @@ export default function Docs() {
           <h2 className="docs__h2"><Gift width={22} height={22} /> $BID tokenomics</h2>
           <p>
             <b className="accent">$BID</b> is the platform token, and its core mechanic is a <b>buyback flywheel</b>:
-            real marketplace activity turns into steady on-chain buy pressure. The pitch is one line —
+            real marketplace activity turns into steady on-chain buy pressure. The pitch is one line:
             <b> every item that ships pumps the token.</b>
           </p>
           <div className="docs__fly">
@@ -322,7 +322,7 @@ export default function Docs() {
               ['Bid & win', 'A buyer wins a live auction and pays in USDC.'],
               ['Item ships', 'The seller ships; escrow releases on delivery.'],
               ['4% buys $BID', 'The 4% buyback portion of the fee buys back $BID on-chain.'],
-              ['Everyone benefits', 'More sales → more buybacks → stronger token.'],
+              ['The flywheel spins', 'More sales → more buybacks → stronger token.'],
             ].map(([t, d], i) => (
               <div key={t} className="docs__fly-step card">
                 <span className="docs__fly-n">{i + 1}</span>
@@ -336,7 +336,7 @@ export default function Docs() {
             <li><b>On-chain & auditable.</b> Buyback spends are recorded so the flywheel is transparent, not a promise.</li>
             <li><b>Volume-linked.</b> The more real items move through BIDit, the more $BID gets bought back.</li>
             <li><b>5% locked for the community.</b> At launch, 5% of $BID supply is locked in a community reserve and
-            distributed as airdrops to platform users — allocated by <a href="#points">BIDit Points</a>. The first
+            distributed as airdrops to platform users, allocated by <a href="#points">BIDit Points</a>. The first
             airdrop lands <b>1 month after launch</b>, the next <b>3 months after launch</b>.</li>
           </ul>
           <div className="docs__note">
@@ -351,7 +351,7 @@ export default function Docs() {
           <h2 className="docs__h2"><Gift width={22} height={22} /> BIDit Points &amp; airdrops</h2>
           <p>
             <b className="accent">BIDit Points</b> reward the people who actually use the platform. The more you buy and
-            sell, the more points you stack — and points decide your share of the <b>$BID community airdrops</b> funded
+            sell, the more points you stack. Points decide your share of the <b>$BID community airdrops</b> funded
             by the 5% reserve locked at launch.
           </p>
           <div className="docs__fly">
@@ -368,16 +368,16 @@ export default function Docs() {
               </div>
             ))}
           </div>
-          <p style={{ marginTop: 18 }}><b>Point bonuses</b> — one-time missions you claim from your <Link to="/points">BIDit Points</Link> page:</p>
+          <p style={{ marginTop: 18 }}><b>Point bonuses</b> are one-time missions you claim from your <Link to="/points">BIDit Points</Link> page:</p>
           <ul className="docs__ul">
-            <li><b>+1,000</b> — Deposit USDC into your BIDit wallet.</li>
-            <li><b>+1,000</b> — Place your first bid.</li>
-            <li><b>+3,000</b> — Win your first auction.</li>
-            <li><b>+1,000</b> — Win a live giveaway.</li>
-            <li><b>+5,000</b> — Refer a friend who purchases an item <i>(coming soon)</i>.</li>
-            <li><b>+3,000</b> — Sell and fulfill your first item on BIDit.</li>
-            <li><b>+3,000</b> — Sell and fulfill 10 items.</li>
-            <li><b>+10,000</b> — Become a Verified Seller (sell and fulfill $500 worth of items).</li>
+            <li><b>+1,000</b>: Deposit USDC into your BIDit wallet.</li>
+            <li><b>+1,000</b>: Place your first bid.</li>
+            <li><b>+3,000</b>: Win your first auction.</li>
+            <li><b>+1,000</b>: Win a live giveaway.</li>
+            <li><b>+5,000</b>: Refer a friend who purchases an item <i>(coming soon)</i>.</li>
+            <li><b>+3,000</b>: Sell and fulfill your first item on BIDit.</li>
+            <li><b>+3,000</b>: Sell and fulfill 10 items.</li>
+            <li><b>+10,000</b>: Become a Verified Seller (sell and fulfill $500 worth of items).</li>
           </ul>
           <p>
             See where you stand on the <Link to="/leaderboard">Points Leaderboard</Link>.
@@ -393,7 +393,7 @@ export default function Docs() {
         <section id="randomizer" className="docs__sec">
           <h2 className="docs__h2"><Dice width={22} height={22} /> The randomizer</h2>
           <p>
-            Some listings aren’t a single card — they’re a <b>randomizer</b> (a “bid to win a roll”). You bid on the
+            Some listings aren’t a single card: they’re a <b>randomizer</b> (a “bid to win a roll”). You bid on the
             spot, and the winner triggers a spin that lands on one prize from the seller’s pool.
           </p>
           <ul className="docs__ul">
@@ -401,7 +401,7 @@ export default function Docs() {
             <li><b>Server decides, everyone sees the same spin.</b> On close, the server picks the landing slot and
             broadcasts the reel, so the seller and every viewer watch the identical decelerating roll in sync.</li>
             <li><b>Weighted &amp; tiered.</b> Sellers set prizes with tiers and weights (a chase hits less often than a
-            pack) — shown as colored tiers on the reel.</li>
+            pack), shown as colored tiers on the reel.</li>
             <li><b>Provably fair.</b> Each spin is driven by a hashed random seed, so the outcome can’t be tampered with
             after bids are in.</li>
           </ul>
@@ -410,13 +410,13 @@ export default function Docs() {
         {/* SELLING */}
         <section id="selling" className="docs__sec">
           <h2 className="docs__h2"><UserCheck width={22} height={22} /> Selling on BIDit</h2>
-          <p>Running auctions takes a couple of minutes to set up:</p>
+          <p>Setup takes a couple of minutes:</p>
           <ol className="docs__steps">
             <li><span className="docs__step-n">1</span><div><b>Become a seller</b><p className="muted">Apply from your dashboard. In beta, sellers are auto-approved; KYC verification arrives with mainnet.</p></div></li>
             <li><span className="docs__step-n">2</span><div><b>Link your pump.fun coin</b><p className="muted">Connect the coin/stream you broadcast on so the overlay knows which page to appear on for your viewers.</p></div></li>
-            <li><span className="docs__step-n">3</span><div><b>Build your listings</b><p className="muted">Add a single card, or add a <b>randomizer</b> with a weighted prize pool — the two are separate create flows in your Listings.</p></div></li>
+            <li><span className="docs__step-n">3</span><div><b>Build your listings</b><p className="muted">Add a single card, or add a <b>randomizer</b> with a weighted prize pool. The two are separate create flows in your Listings.</p></div></li>
             <li><span className="docs__step-n">4</span><div><b>Go live & run auctions</b><p className="muted">Start an auction from your queue; watch bids roll in on the <Link to="/seller/live">Live monitor</Link>.</p></div></li>
-            <li><span className="docs__step-n">5</span><div><b>Ship & get paid</b><p className="muted">Mark orders shipped with tracking. On delivery, escrow releases 95% to you in USDC — payouts and the split live under <Link to="/seller/payouts">Payouts</Link>.</p></div></li>
+            <li><span className="docs__step-n">5</span><div><b>Ship & get paid</b><p className="muted">Mark orders shipped with tracking. On delivery, escrow releases 95% to you in USDC. Payouts and the split live under <Link to="/seller/payouts">Payouts</Link>.</p></div></li>
           </ol>
           <Link className="btn btn-primary" to="/seller">Open the Seller Studio <ArrowRight width={17} height={17} /></Link>
         </section>
@@ -425,7 +425,7 @@ export default function Docs() {
         <section id="safety" className="docs__sec">
           <h2 className="docs__h2"><Info width={22} height={22} /> Safety & trust</h2>
           <ul className="docs__ul">
-            <li><b>Server-authoritative.</b> Every bid, hold, and payout is validated and recorded server-side on a double-entry ledger — the client can’t fake a balance or a win.</li>
+            <li><b>Server-authoritative.</b> Every bid, hold, and payout is validated and recorded server-side on a double-entry ledger. The client can’t fake a balance or a win.</li>
             <li><b>Escrow by default.</b> Buyer funds are never handed to a seller before the card is delivered.</li>
             <li><b>No keys, ever.</b> BIDit never asks for your private key. Deposits go to an address; the ledger tracks your balance.</li>
             <li><b>Beta &amp; devnet.</b> The platform currently runs on Solana devnet with test USDC. Mainnet is gated behind a security audit, hardened key custody, an on-chain escrow program, and KYC/AML.</li>
@@ -437,11 +437,11 @@ export default function Docs() {
           <h2 className="docs__h2"><Book width={22} height={22} /> FAQ</h2>
           <div className="docs__faq">
             {[
-              ['Do I need a crypto wallet to bid?', 'You need somewhere to send USDC from. Once your BIDit balance is funded you bid from that balance — no wallet pop-up per bid.'],
+              ['Do I need a crypto wallet to bid?', 'You need somewhere to send USDC from. Once your BIDit balance is funded you bid from that balance. No wallet pop-up per bid.'],
               ['What happens to my money if I get outbid?', 'The hold on your bid releases back to your available balance instantly, ready for your next bid or a withdrawal.'],
-              ['When does the seller actually get paid?', 'Not at win — the winning bid sits in escrow and only releases (95% to the seller) after the item is delivered and the dispute window passes.'],
+              ['When does the seller actually get paid?', 'Not when you win. The winning bid sits in escrow and only releases (95% to the seller) after the item is delivered and the dispute window passes.'],
               ['What if the item never arrives?', 'If a seller doesn’t ship in time the order auto-cancels and you’re refunded 100%. You can also open a dispute within the window.'],
-              ['Is there a fee for buyers?', 'No. Buyers pay only their winning bid. The 5% fee comes out of the seller’s side on shipped sales — 4% funds the $BID buyback and 1% a community treasury for buyer protection.'],
+              ['Is there a fee for buyers?', 'No. Buyers pay only their winning bid. The 5% fee comes out of the seller’s side on shipped sales: 4% funds the $BID buyback and 1% a community treasury for buyer protection.'],
               ['Is this real money right now?', 'It’s live on Solana devnet with test USDC during beta. Real-money mainnet turns on after audit, key custody, and compliance work.'],
             ].map(([q, a]) => (
               <details key={q} className="docs__q">

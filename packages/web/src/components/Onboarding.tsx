@@ -6,15 +6,15 @@ import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
   { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
-  { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds stay put until you win — then the seller ships it straight to your door.' },
+  { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds stay put until you win. Then the seller ships it straight to your door.' },
   { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const LAST = 4;
 const TITLES = ['Welcome to BIDit', 'Claim your username', 'What do you collect?', 'Fund your first bid', 'Earn points, catch airdrops'];
 const POINTS_PERKS = [
-  { pts: '100×', t: 'points on every $1 you spend' },
-  { pts: '20×', t: 'points on every $1 you sell' },
+  { pts: '100×', t: 'on every $1 you spend' },
+  { pts: '20×', t: 'on every $1 you sell' },
   { pts: '+1,000', t: 'deposit USDC into your wallet' },
   { pts: '+3,000', t: 'win your first auction' },
 ];
@@ -78,7 +78,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
 
           {step === 0 && (
             <>
-              <p className="obx__sub">Here’s the whole loop — it takes about twenty seconds.</p>
+              <p className="obx__sub">Here’s the whole loop. Takes about twenty seconds.</p>
               <div className="obx__how">
                 {HOW.map((h) => (
                   <div className="obx__howrow" key={h.t}>
@@ -118,7 +118,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
 
           {step === 3 && (
             <>
-              <p className="obx__sub">We generated a Solana wallet just for you. Send <b>USDC or SOL</b> to it to fund your bids — every auction settles from this balance.</p>
+              <p className="obx__sub">We generated a Solana wallet just for you. Send it <b>USDC or SOL</b> to fund your bids. Every auction settles from this balance.</p>
               <div className="obx__wallet">
                 <span className="obx__wallet-label"><Wallet width={15} height={15} /> Your deposit address</span>
                 <div className="obx__wallet-addr">
@@ -133,7 +133,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
           {step === 4 && (
             <>
               <p className="obx__sub">
-                Everything you do on BIDit earns <b>BIDit Points</b> — and points decide your share of the
+                Everything you do on BIDit earns <b>BIDit Points</b>. Points decide your share of the
                 <b> $BID community airdrops</b> (5% of supply is locked for them, first drop one month after launch).
               </p>
               <div className="obx__how">

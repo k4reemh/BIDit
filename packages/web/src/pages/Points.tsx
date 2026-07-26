@@ -26,7 +26,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
 
   useEffect(() => {
     if (!session) return;
-    getPoints().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Failed to load.'));
+    getPoints().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your points.'));
   }, [session]);
 
   const claim = async (m: Mission) => {
@@ -38,7 +38,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
       setTimeout(() => setJustClaimed(''), 1600);
       setData(await getPoints());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not claim.');
+      setError(e instanceof Error ? e.message : 'Couldn’t claim. Try again.');
     } finally {
       setBusy('');
     }
@@ -53,7 +53,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
           <span className="pts__eyebrow"><Gift width={15} height={15} /> BIDit Points</span>
           <h1 className="display pts__title">Use BIDit. Earn points.<br />Catch the airdrops.</h1>
           <p className="pts__sub">
-            Every dollar you spend earns <b className="accent">100 points</b> — win a $10 auction, pocket 1,000 points.
+            Every dollar you spend earns <b className="accent">100 points</b>. Win a $10 auction, pocket 1,000 points.
             Sellers earn <b className="accent">20 points per $1 sold</b>, so $1,000 sold on stream is 20,000 points.
             Points decide your share of the <b>$BID community airdrops</b>: 5% of supply is locked for holders of these
             points, with the first drop one month after launch.
@@ -77,7 +77,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
           <span className="pts__balance-label">Your points</span>
           {session ? (
             <>
-              <b className="pts__balance-num">{data ? fmt(data.points) : '—'}</b>
+              <b className="pts__balance-num">{data ? fmt(data.points) : '…'}</b>
               <Link to="/leaderboard" className="pts__balance-link">View leaderboard <ArrowRight width={14} height={14} /></Link>
             </>
           ) : (
@@ -94,7 +94,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
         <div className="section__head">
           <div>
             <h2 className="section-title">Point bonuses</h2>
-            <div className="section-sub">One-time missions. Do the thing, then hit claim — points land instantly.</div>
+            <div className="section-sub">One-time missions. Do the thing, then hit claim. Points land instantly.</div>
           </div>
         </div>
         {error && <div className="auth__error" style={{ marginBottom: 14 }}>{error}</div>}
@@ -132,7 +132,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
 
         <div className="pts__foot muted">
           Airdrop one lands <b>1 month after launch</b>; the next follows <b>3 months after launch</b>. Points are a
-          loyalty score for community airdrops and prizes — not a currency, deposit or investment.
+          loyalty score for community airdrops and prizes, not a currency, deposit or investment.
           {' '}<Link to="/docs#points">Read the full breakdown in Docs</Link>.
         </div>
       </section>

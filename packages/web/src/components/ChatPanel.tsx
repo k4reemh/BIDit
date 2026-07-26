@@ -83,7 +83,7 @@ export default function ChatPanel({
       <div className="chat__head"><Chat width={16} height={16} /> Live chat</div>
 
       <div className="chat__feed" ref={feedRef}>
-        {msgs.length === 0 && <p className="chat__empty">No messages yet.</p>}
+        {msgs.length === 0 && <p className="chat__empty">No messages yet. Say hi.</p>}
         {msgs.map((m) => (
           <div key={m.id} className="chat__msg">
             <Avatar handle={m.handle} size={26} />

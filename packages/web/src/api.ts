@@ -438,6 +438,9 @@ export interface LiveCoin {
   hasAuction: boolean;
   hasGiveaway: boolean;
   streamLive: boolean;
+  /** Sockets in the seller's room right now (people on the watch page). */
+  viewers: number;
+  verified: boolean;
   coinName: string | null;
   streamTitle: string | null;
   category: string | null;

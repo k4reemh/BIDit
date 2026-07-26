@@ -42,7 +42,7 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
       await setWheel(listing.id, entries);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
       setBusy(false);
     }
   };
@@ -53,7 +53,7 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="smodal__kicker smodal__kicker--wheel"><Dice width={15} height={15} /> Randomizer</div>
         <h2 className="display modal__title">Add a randomizer wheel</h2>
-        <p className="muted modal__sub">Buyers bid for one roll — the wheel spins on close and assigns their prize.</p>
+        <p className="muted modal__sub">Buyers bid for one roll. The wheel spins on close and picks their prize.</p>
         {error && <div className="auth__error">{error}</div>}
         <form onSubmit={submit} className="auth__form">
           <div className="wheel-row2">
@@ -74,14 +74,14 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
             {prizes.map((p, i) => (
               <div className="wheel-build__row wheel-build__row--v2" key={i}>
                 <ImageUpload value={p.image} onChange={(v) => setPrize(i, { image: v })} compact />
-                <input className="wb-label" value={p.label} onChange={(e) => setPrize(i, { label: e.target.value })} placeholder={i === 0 ? 'Charizard ex — Alt Art' : 'Prize name'} />
-                <input className="wb-qty" value={p.quantity} onChange={(e) => setPrize(i, { quantity: e.target.value.replace(/[^0-9]/g, '') })} placeholder="1" inputMode="numeric" title="How many in the pool — higher = more likely" />
+                <input className="wb-label" value={p.label} onChange={(e) => setPrize(i, { label: e.target.value })} placeholder={i === 0 ? 'Charizard ex Alt Art' : 'Prize name'} />
+                <input className="wb-qty" value={p.quantity} onChange={(e) => setPrize(i, { quantity: e.target.value.replace(/[^0-9]/g, '') })} placeholder="1" inputMode="numeric" title="How many in the pool. More copies, better odds." />
                 <button type="button" className="wb-del" onClick={() => removeRow(i)} disabled={prizes.length <= 2} aria-label="Remove"><Trash width={16} height={16} /></button>
               </div>
             ))}
             <button type="button" className="wheel-build__add" onClick={addRow}><Plus width={15} height={15} /> Add prize</button>
           </div>
-          <p className="muted" style={{ fontSize: 12.5, marginTop: -4 }}>Quantity = how many of that prize are in the pool. A prize with a higher quantity is more likely to be won.</p>
+          <p className="muted" style={{ fontSize: 12.5, marginTop: -4 }}>Quantity is how many of that prize are in the pool. More copies means better odds of landing on it.</p>
 
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={!valid || busy}>
             {busy ? 'Creating…' : 'Create wheel'}

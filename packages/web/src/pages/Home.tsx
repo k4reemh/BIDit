@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import LiveCard from '../components/LiveCard';
 import LiveCoinCard from '../components/LiveCoinCard';
-import { FEATURED, CATEGORIES } from '../data';
+import { CATEGORIES } from '../data';
 import { getLive, getPromo, type LiveCoin, type PromoState } from '../api';
-import { ArrowRight, Bolt, Truck, Wallet, Gift } from '../icons';
+import { ArrowRight, Bolt, Gift, Radio } from '../icons';
+
+const HOW = [
+  {
+    n: '01',
+    t: 'Bid live on stream',
+    d: 'Auctions run right on the seller’s pump.fun stream. Place real USDC bids and watch the price move with the room.',
+  },
+  {
+    n: '02',
+    t: 'Win at the buzzer',
+    d: 'Highest bid when the clock runs out takes it. Anti-snipe extends the timer on late bids, so nobody steals it at 0:01.',
+  },
+  {
+    n: '03',
+    t: 'It ships to your door',
+    d: 'Your money sits in escrow until the item arrives. The seller ships, you confirm, everyone gets paid.',
+  },
+];
 
 export default function Home({ onAuth }: { onAuth: () => void }) {
   const [live, setLive] = useState<LiveCoin[] | null>(null);
@@ -13,20 +30,25 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
     getLive().then(setLive).catch(() => setLive([]));
     getPromo().then(setPromo).catch(() => setPromo(null));
   }, []);
+
+  // Home is a shelf, not the catalog: the 8 most interesting streams, rest on /browse.
+  const streams = live ? [...new Map(live.map((c) => [c.coin, c])).values()].slice(0, 8) : null;
+
   return (
     <main>
       {/* ---- hero ---- */}
       <section className="hero">
         <div className="hero__inner risein">
-          <span className="hero__tag"><span className="dot" /> Now live in beta</span>
-          <h1 className="display hero__title">The live crypto marketplace for bidding on Anything, Anytime, Anywhere.</h1>
+          <span className="hero__tag"><span className="dot" /> Live in beta</span>
+          <h1 className="display hero__title">Bid it. Win it. Ship it.</h1>
           <p className="hero__sub">
-            Bid in real time on Pokémon, One Piece, Clothes, Tech, Bounties, Anything, directly on pump.fun.{' '}
-            <b>Bid it, Win it, Ship it.</b> Buyer protection guaranteed.
+            BIDit turns pump.fun streams into live auctions. Pok&eacute;mon, One Piece, sports cards, tech,
+            anything. Bid in USDC, win at the buzzer, and it ships straight to your door with buyer
+            protection on every order.
           </p>
           <div className="hero__cta">
-            <button className="btn btn-primary btn-lg" onClick={onAuth}>Start bidding — it's free</button>
-            <a className="btn btn-ghost btn-lg" href="#featured">Browse live auctions</a>
+            <button className="btn btn-primary btn-lg" onClick={onAuth}>Start bidding</button>
+            <Link className="btn btn-ghost btn-lg" to="/browse">Watch live auctions</Link>
           </div>
           <div className="hero__trust">
             <span>Settles in USDC</span><span className="d" />
@@ -42,9 +64,9 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
           <a href="/sell" className="promo-band">
             <span className="promo-band__badge"><Bolt width={13} height={13} /> Launch offer · first 3 days</span>
             <div className="promo-band__body">
-              <b className="promo-band__title">Start selling on BIDit — earn a ${promo.bonusUsd} USDC bonus</b>
+              <b className="promo-band__title">Start selling on BIDit, earn a ${promo.bonusUsd} USDC bonus</b>
               <span className="promo-band__sub">
-                Become a seller, fulfill <b>${promo.thresholdUsd}</b> of orders, and we match it with <b>${promo.bonusUsd} USDC</b> — paid straight to your wallet.
+                Become a seller and fulfill <b>${promo.thresholdUsd}</b> of orders. We match it with <b>${promo.bonusUsd} USDC</b> paid straight to your wallet.
               </span>
             </div>
             <span className="promo-band__cta">Start selling <ArrowRight width={18} height={18} /></span>
@@ -52,20 +74,35 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         </section>
       )}
 
-      {/* ---- featured live ---- */}
+      {/* ---- live now ---- */}
       <section id="featured" className="section container">
         <div className="section__head">
           <div>
             <h2 className="section-title">Live right now</h2>
-            <div className="section-sub">Watch the stream and bid — right here, no extension needed.</div>
+            <div className="section-sub">Real auctions on real streams. Tap in and bid.</div>
           </div>
-          <a className="section__all" href="#">Browse all <ArrowRight width={16} height={16} /></a>
+          <Link className="section__all" to="/browse">Browse all <ArrowRight width={16} height={16} /></Link>
         </div>
-        <div className="live-grid">
-          {live && live.length > 0
-            ? [...new Map(live.map((c) => [c.coin, c])).values()].map((c) => <LiveCoinCard key={c.coin} c={c} />)
-            : FEATURED.map((a) => <LiveCard key={a.id} a={a} />)}
-        </div>
+        {streams === null ? (
+          <div className="live-grid">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="live-skel" aria-hidden />
+            ))}
+          </div>
+        ) : streams.length > 0 ? (
+          <div className="live-grid">
+            {streams.map((c) => <LiveCoinCard key={c.coin} c={c} />)}
+          </div>
+        ) : (
+          <div className="home-quiet">
+            <span className="home-quiet__ic"><Radio width={24} height={24} /></span>
+            <div className="home-quiet__body">
+              <b>Nobody&rsquo;s live at this exact moment.</b>
+              <p className="muted">Sellers go live throughout the day. Follow <a href="https://x.com/biditsol" target="_blank" rel="noreferrer">@biditsol</a> to catch the next stream, or start your own.</p>
+            </div>
+            <Link className="btn btn-ghost" to="/sell">Go live yourself</Link>
+          </div>
+        )}
       </section>
 
       {/* ---- categories ---- */}
@@ -73,11 +110,11 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="section__head"><h2 className="section-title">Shop by category</h2></div>
         <div className="cat-grid">
           {CATEGORIES.map((c) => (
-            <a className="cat" href="#" key={c.name}>
+            <Link className="cat" to={`/browse?cat=${encodeURIComponent(c.name)}`} key={c.name}>
               <img className="cat__img" src={c.image} alt="" loading="lazy" />
               <span className="cat__grad" />
               <span className="cat__name">{c.name}</span>
-            </a>
+            </Link>
           ))}
         </div>
       </section>
@@ -87,17 +124,12 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="section__head">
           <div>
             <h2 className="section-title">How BIDit works</h2>
-            <div className="section-sub">Bid live, win, and we handle the rest.</div>
           </div>
         </div>
         <div className="how">
-          {[
-            { ic: Bolt, t: 'Bid live on stream', d: 'Place real USDC bids during the break. Anti-snipe keeps every auction fair to the buzzer.' },
-            { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds sit in escrow until the seller ships and the item lands in your hands.' },
-            { ic: Wallet, t: '4% buys back $BID', d: <>Every shipped sale routes <b>4%</b> to the $BID buyback and <b>1%</b> to a buyer-protection treasury — the more items move, the more it pumps.</> },
-          ].map((s) => (
-            <div className="how__step" key={s.t}>
-              <span className="how__ic"><s.ic width={22} height={22} /></span>
+          {HOW.map((s) => (
+            <div className="how__step" key={s.n}>
+              <span className="how__num">{s.n}</span>
               <h3>{s.t}</h3>
               <p>{s.d}</p>
             </div>
@@ -113,8 +145,8 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
             <span className="pts-band__eyebrow"><Gift width={14} height={14} /> BIDit Points · Community airdrops</span>
             <h2 className="display pts-band__title">Every bid earns a bigger slice of the airdrop.</h2>
             <p className="pts-band__sub">
-              Earn <b>100 points for every $1</b> you spend and <b>20 per $1</b> you sell — plus bonus drops for your
-              first bid, first win and more. <b>5% of $BID supply</b> is locked for community airdrops, and your points
+              Earn <b>100 points per $1</b> you spend and <b>20 per $1</b> you sell, with bonus drops for your
+              first bid and first win. <b>5% of $BID supply</b> is locked for community airdrops. Your points
               decide your share.
             </p>
             <div className="pts-band__cta">
@@ -136,9 +168,9 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
         <div className="cta-band">
           <div>
             <h2 className="display cta-band__title">Turn your stream into an auction house.</h2>
-            <p>List cards, run live auctions and wheel spins, and get paid in USDC. Setup takes minutes.</p>
+            <p>List your cards, run live auctions and wheel spins, and get paid in USDC. Setup takes about five minutes.</p>
           </div>
-          <a className="btn btn-accent btn-lg" href="/sell">Become a seller <ArrowRight width={18} height={18} /></a>
+          <Link className="btn btn-accent btn-lg" to="/sell">Become a seller <ArrowRight width={18} height={18} /></Link>
         </div>
       </section>
     </main>

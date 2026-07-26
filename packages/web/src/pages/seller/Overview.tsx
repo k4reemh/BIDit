@@ -45,7 +45,7 @@ export default function Overview() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Welcome back, {session.displayName || session.handle}</h1>
-        <p className="muted">Here’s your shop at a glance.</p>
+        <p className="muted">Here’s how your shop’s doing.</p>
       </div>
 
       {promo?.enrolled && (
@@ -61,8 +61,8 @@ export default function Overview() {
           {promo.earned ? (
             <p className="promo-card__msg">
               {promo.paid
-                ? `Your $${promo.bonusUsd} USDC bonus has been sent — thanks for selling on BIDit!`
-                : `You fulfilled $${promo.thresholdUsd} of orders — your $${promo.bonusUsd} USDC bonus is on its way to your wallet.`}
+                ? `Your $${promo.bonusUsd} USDC bonus has been sent. Thanks for selling on BIDit!`
+                : `You fulfilled $${promo.thresholdUsd} of orders. Your $${promo.bonusUsd} USDC bonus is on its way to your wallet.`}
             </p>
           ) : (
             <>
@@ -100,7 +100,7 @@ export default function Overview() {
 
       <h2 className="sl-sec">Recent listings</h2>
       {listings.length === 0 ? (
-        <div className="sl-empty card">No listings yet — <Link to="/seller/listings" className="accent">add your first</Link>.</div>
+        <div className="sl-empty card">No listings yet. <Link to="/seller/listings" className="accent">Add your first</Link>.</div>
       ) : (
         <div className="rl">
           {listings.slice(0, 5).map((l) => (

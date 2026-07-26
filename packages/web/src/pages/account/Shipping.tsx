@@ -43,7 +43,7 @@ export default function Shipping() {
           <input value={f.line1} onChange={set('line1')} placeholder="123 Main St" />
         </div>
         <div className="fld">
-          <label>Address line 2 <span className="muted">— optional</span></label>
+          <label>Address line 2 <span className="muted">(optional)</span></label>
           <input value={f.line2} onChange={set('line2')} placeholder="Apt, suite, unit" />
         </div>
         <div className="fld-row">
@@ -64,7 +64,7 @@ export default function Shipping() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Payouts</h3>
-        <p className="muted acct-note">Sellers are paid in USDC to their connected wallet. Connect a payout wallet when you start selling.</p>
+        <p className="muted acct-note">Sellers get paid in USDC to their connected wallet. Connect yours when you start selling.</p>
         <button className="btn btn-ghost" disabled>Connect payout wallet · soon</button>
       </div>
     </>

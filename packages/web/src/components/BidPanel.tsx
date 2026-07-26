@@ -103,7 +103,7 @@ export default function BidPanel({
         if (m.extended) setExtended(Date.now()); // late bid pushed the clock — flash EXTENDED
       },
       onClosed: (m) => {
-        setSoldMsg(m.winnerHandle ? `Sold to @${m.winnerHandle} for $${m.amount}` : 'Auction ended — no sale');
+        setSoldMsg(m.winnerHandle ? `Sold to @${m.winnerHandle} for $${m.amount}` : 'Auction ended, no sale');
         setAuction((a) => (a ? { ...a, status: 'SETTLING' } : a));
         // A wheel auction defers its celebration to the spin; a `replay` is a
         // catch-up for a missed close, so surface the winner but don't re-fire the
@@ -130,7 +130,7 @@ export default function BidPanel({
         setGCount(m.count);
         setGRecent(m.recent);
       },
-      onGiveawayRejected: (m) => setReject(m.reason === 'NOT_ELIGIBLE' ? 'Buyers only — purchase to enter' : 'Entry closed'),
+      onGiveawayRejected: (m) => setReject(m.reason === 'NOT_ELIGIBLE' ? 'Buyers only. Buy something to enter.' : 'Entry closed'),
       onGiveawayWinner: (m) => {
         setGiveaway(null);
         setGWinner(m);
@@ -221,7 +221,7 @@ export default function BidPanel({
 
       {!session ? (
         <div className="bp__gate">
-          <p>Sign in to watch the live auction and place bids — right here, no extension.</p>
+          <p>The live auction runs right here, no extension. Sign in to watch and bid.</p>
           <button className="btn btn-primary bp__gatebtn" onClick={onAuth}>Sign in to bid</button>
         </div>
       ) : (
@@ -265,7 +265,7 @@ export default function BidPanel({
                 <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
                 {low && <BidSparks fill={pct / 100} active={low} />}
               </div>
-              {showExt && <div className="bp__ext" key={extended}>EXTENDED — clock reset!</div>}
+              {showExt && <div className="bp__ext" key={extended}>EXTENDED: clock reset!</div>}
               <div className="bp__leader">
                 {auction!.leaderHandle
                   ? <><Avatar handle={auction!.leaderHandle} size={18} /> <b>@{auction!.leaderHandle}</b> leading</>
@@ -352,10 +352,10 @@ export default function BidPanel({
 
 function rejectText(reason: string): string {
   switch (reason) {
-    case 'TOO_LOW': return 'Bid too low — someone beat you to it.';
+    case 'TOO_LOW': return 'Bid too low. Someone beat you to it.';
     case 'INSUFFICIENT_FUNDS': return 'Not enough balance. Add funds to bid.';
     case 'AUCTION_CLOSED': return 'That auction just closed.';
     case 'RATE_LIMITED': return 'Slow down a touch, then try again.';
-    default: return 'Bid not accepted — try again.';
+    default: return 'Bid not accepted. Try again.';
   }
 }

@@ -85,7 +85,7 @@ function SceneWelcome({ onNext }: { onNext: () => void }) {
     <div className="tut-scene tut-scene--welcome">
       <div className="tut-welcome__logo"><Bolt width={38} height={38} /></div>
       <h2 className="tut-scene__title">Welcome to BIDit</h2>
-      <p className="tut-scene__sub">Here's the whole thing in about a minute — bid live, win the card, and the seller ships it to you. Let's try it.</p>
+      <p className="tut-scene__sub">Here's the whole thing in about a minute: bid live, win the card, the seller ships it to you. Let's try it.</p>
       <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Show me how <ArrowRight width={17} height={17} /></button>
     </div>
   );
@@ -115,7 +115,7 @@ function SceneFund({ onNext }: { onNext: () => void }) {
       icon={<Wallet width={26} height={26} />}
       kicker="Step 1 · your wallet"
       title="Fund your balance"
-      sub="Add USDC once. It just sits in your balance — nothing is spent until you actually win a bid."
+      sub="Add USDC once. It sits in your balance, untouched until you win a bid."
     >
       <div className={`tut-wallet${funded ? ' funded' : ''}`}>
         <span className="tut-wallet__label">Balance</span>
@@ -126,7 +126,7 @@ function SceneFund({ onNext }: { onNext: () => void }) {
         <button className="btn btn-primary btn-lg tut-cta" onClick={add}>Add $50 USDC</button>
       ) : (
         <>
-          <p className="tut-note"><Check width={15} height={15} /> Funded. Your money only leaves when you win — bids just reserve it.</p>
+          <p className="tut-note"><Check width={15} height={15} /> Funded. Bids just reserve your money. It only leaves when you win.</p>
           <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Next <ArrowRight width={17} height={17} /></button>
         </>
       )}
@@ -186,7 +186,7 @@ function SceneBid({ onNext }: { onNext: () => void }) {
       kicker="Step 2 · bid live"
       title="Place a bid"
       sub={bidded
-        ? 'See that? Your late bid pushed the clock back to 8s. That’s anti-snipe — no one can steal it at the buzzer.'
+        ? 'See that? Your late bid pushed the clock back to 8s. That’s anti-snipe. No one steals it at the buzzer.'
         : 'Tap Bid before the timer hits zero. A late bid extends the clock, so bidding stays fair.'}
     >
       <div className="tut-bid">
@@ -194,7 +194,7 @@ function SceneBid({ onNext }: { onNext: () => void }) {
           <img className="tut-bid__thumb" src={CARD_IMG} alt="" />
           <div className="tut-bid__id">
             <span className="live-badge"><span className="dot" /> LIVE</span>
-            <div className="tut-bid__title">Charizard — Base Set Holo</div>
+            <div className="tut-bid__title">Charizard · Base Set Holo</div>
           </div>
         </div>
         <div className="tut-bid__stats">
@@ -236,7 +236,7 @@ function SceneWin({ onNext }: { onNext: () => void }) {
       <h2 className="tut-scene__title tut-win__head">It's yours!</h2>
       <div className="tut-win__item">
         <img src={CARD_IMG} alt="" />
-        <span>Charizard — Base Set Holo</span>
+        <span>Charizard · Base Set Holo</span>
       </div>
       <div className="tut-win__price">$12</div>
       <p className="tut-scene__sub">The sale settles instantly in USDC, and a slice of every sale buys back <b>$BID</b>.</p>
@@ -253,12 +253,12 @@ function SceneReadyShip({ onNext }: { onNext: () => void }) {
       icon={<Truck width={26} height={26} />}
       kicker="Step 3 · shipping"
       title="Ready to ship"
-      sub="Your wins collect in Ready to ship. Send one whenever you like for a flat fee — the seller packs it and ships it to you."
+      sub="Your wins collect in Ready to ship. Send one whenever you like for a flat fee. The seller packs it and ships it to you."
     >
       <div className={`tut-buy${shipped ? ' bought' : ''}`}>
         <img className="tut-buy__thumb" src={CARD_IMG} alt="" />
         <div className="tut-buy__info">
-          <div className="tut-buy__title">Charizard — Base Set Holo</div>
+          <div className="tut-buy__title">Charizard · Base Set Holo</div>
           <div className="tut-buy__won">Won · $12</div>
         </div>
         {shipped
@@ -267,7 +267,7 @@ function SceneReadyShip({ onNext }: { onNext: () => void }) {
       </div>
       <div className="tut-tip">
         <span className="tut-tip__ic"><Bag width={16} height={16} /></span>
-        <span><b>Skip shipping costs with Buy Now, Pay Later</b> — have sellers store your items until you're ready to ship!</span>
+        <span><b>Skip shipping costs with Buy Now, Pay Later.</b> Sellers store your items until you're ready to ship.</span>
       </div>
       {!shipped ? (
         <p className="tut-note tut-note--muted">Tap <b>Ship now</b> to send your win.</p>
@@ -302,7 +302,7 @@ function SceneBuy({ onNext }: { onNext: () => void }) {
         <p className="tut-note tut-note--muted">Tap <b>Buy now</b> to grab it.</p>
       ) : (
         <>
-          <p className="tut-note"><Check width={15} height={15} /> Done — it goes straight to shipping, just like a win.</p>
+          <p className="tut-note"><Check width={15} height={15} /> Done. It goes straight to shipping, just like a win.</p>
           <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Next <ArrowRight width={17} height={17} /></button>
         </>
       )}
@@ -316,8 +316,8 @@ function SceneShip({ onFinish }: { onFinish: () => void }) {
     <Scene
       icon={<Truck width={26} height={26} />}
       kicker="Step 5 · delivery"
-      title="Seller Ships It To You"
-      sub="Once it's shipped it lands at your door — buyer-protected the whole way. That's the loop!"
+      title="The seller ships it to you"
+      sub="It lands at your door, buyer-protected the whole way. That's the loop."
     >
       <div className="tut-ship">
         <div className="tut-ship__track">

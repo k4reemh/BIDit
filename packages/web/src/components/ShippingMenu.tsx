@@ -8,7 +8,7 @@ const OPTIONS: { mode: ShippingMode; Icon: typeof Truck; title: string; sub: str
     mode: 'WEEKLY_BUNDLE',
     Icon: Truck,
     title: 'Ship to my address',
-    sub: 'Pay shipping once on your first auction win — then no extra shipping on any wins after, for the rest of the week.',
+    sub: 'Pay shipping once on your first auction win. After that, no extra shipping on your wins for the rest of the week.',
   },
   {
     mode: 'PRIVATE',
@@ -22,7 +22,7 @@ const OPTIONS: { mode: ShippingMode; Icon: typeof Truck; title: string; sub: str
     Icon: Bookmark,
     title: 'Buy now, ship later',
     rec: true,
-    sub: 'Skip shipping costs until you’re ready — the seller stores your wins for up to 14 days, then ships when you say go.',
+    sub: 'Skip shipping costs until you’re ready. The seller stores your wins for up to 14 days, then ships when you say go.',
   },
 ];
 
@@ -60,7 +60,7 @@ export default function ShippingMenu({
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="smodal__kicker"><Truck width={15} height={15} /> Shipping</div>
         <h2 className="display modal__title">How you get your wins</h2>
-        <p className="muted modal__sub">Pick how the items you win are shipped to you. You can change this anytime.</p>
+        <p className="muted modal__sub">Pick how your wins ship. Change it anytime.</p>
 
         <div className="shipopts">
           {OPTIONS.map((o) => (

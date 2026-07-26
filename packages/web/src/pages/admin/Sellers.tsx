@@ -4,7 +4,7 @@ import { getSellerApplications, verifySellerAdmin, adminReassignCoin, getAdminPr
 import { Check } from '../../icons';
 
 const fmt = (ms: number | null) =>
-  ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'n/a';
 
 export default function AdminSellers({ session }: { session: Session | null }) {
   const [rows, setRows] = useState<SellerApplication[] | null>(null);
@@ -67,7 +67,7 @@ export default function AdminSellers({ session }: { session: Session | null }) {
                     s.paidAt ? (
                       <span className="vbadge"><Check width={12} height={12} /> Bonus paid</span>
                     ) : (
-                      <span className="vbadge vbadge--pending">Eligible — pay ${promo.bonusUsd}</span>
+                      <span className="vbadge vbadge--pending">Eligible: pay ${promo.bonusUsd}</span>
                     )
                   ) : (
                     <span className="muted">${s.fulfilledUsd} / ${promo.bonusUsd} fulfilled</span>
@@ -82,9 +82,9 @@ export default function AdminSellers({ session }: { session: Session | null }) {
               <div className="adm-row__grid">
                 <span><b>Fulfilled</b> ${s.fulfilledUsd} / ${promo.bonusUsd}</span>
                 <span><b>Joined</b> {fmt(s.joinedAt)}</span>
-                <span><b>Email</b> {s.email ?? '—'}</span>
-                <span><b>Payout wallet</b> {s.payoutWalletAddress ? `${s.payoutWalletAddress.slice(0, 10)}…` : '—'}</span>
-                <span><b>Bonus paid</b> {s.paidAt ? fmt(s.paidAt) : '—'}</span>
+                <span><b>Email</b> {s.email ?? 'n/a'}</span>
+                <span><b>Payout wallet</b> {s.payoutWalletAddress ? `${s.payoutWalletAddress.slice(0, 10)}…` : 'n/a'}</span>
+                <span><b>Bonus paid</b> {s.paidAt ? fmt(s.paidAt) : 'not yet'}</span>
               </div>
             </div>
           ))}
@@ -131,14 +131,14 @@ function Row({ r, onVerify, busy, onDone }: { r: SellerApplication; onVerify: (i
         )}
       </div>
       <div className="adm-row__grid">
-        <span><b>Email</b> {r.email ?? '—'}</span>
+        <span><b>Email</b> {r.email ?? 'n/a'}</span>
         <span><b>Applied</b> {fmt(r.appliedAt)}</span>
         <span><b>Fulfilled</b> {r.fulfilledCount}/{r.threshold}</span>
         <span><b>Onboarded</b> {r.onboarded ? 'yes' : 'no'}</span>
-        <span><b>Coin</b> {r.pumpCoinAddress ? `${r.pumpCoinAddress.slice(0, 8)}…` : '—'}</span>
-        <span><b>Ships from</b> {[r.origin.city, r.origin.region, r.origin.country].filter(Boolean).join(', ') || '—'}</span>
-        <span><b>Website</b> {r.website ?? '—'}</span>
-        <span><b>Socials</b> {socialStr || '—'}</span>
+        <span><b>Coin</b> {r.pumpCoinAddress ? `${r.pumpCoinAddress.slice(0, 8)}…` : 'n/a'}</span>
+        <span><b>Ships from</b> {[r.origin.city, r.origin.region, r.origin.country].filter(Boolean).join(', ') || 'n/a'}</span>
+        <span><b>Website</b> {r.website ?? 'n/a'}</span>
+        <span><b>Socials</b> {socialStr || 'n/a'}</span>
       </div>
       {r.pitch && <p className="muted adm-row__pitch">“{r.pitch}”</p>}
       <ReassignCoin userId={r.userId} current={r.pumpCoinAddress} onDone={onDone} />
@@ -157,7 +157,7 @@ function ReassignCoin({ userId, current, onDone }: { userId: string; current: st
     if (!coin.trim()) { setMsg('Enter a coin address.'); return; }
     setBusy(true); setMsg('');
     try { await adminReassignCoin(userId, coin.trim()); setMsg('Coin reassigned.'); onDone(); }
-    catch (e) { setMsg(e instanceof Error ? e.message : 'Could not reassign.'); }
+    catch (e) { setMsg(e instanceof Error ? e.message : 'Couldn’t reassign.'); }
     finally { setBusy(false); }
   };
   return (
