@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Avatar from './Avatar';
 import BidSparks from './BidSparks';
-import { runConfetti } from '../lib/confetti';
+import { runConfetti, CONFETTI } from '../lib/confetti';
 import { Bolt, Wallet, Check, Bag, Truck, ArrowRight } from '../icons';
 
 /**
@@ -226,7 +226,7 @@ function SceneBid({ onNext }: { onNext: () => void }) {
 function SceneWin({ onNext }: { onNext: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    runConfetti(canvas.current, ['#f5c518', '#0e9f6e', '#4f8cff', '#ff7a45', '#ffffff'], 170, 4200);
+    runConfetti(canvas.current, CONFETTI, 170, 4200);
   }, []);
   return (
     <div className="tut-scene tut-scene--win">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Avatar from './Avatar';
-import { runConfetti } from '../lib/confetti';
+import { runConfetti, CONFETTI } from '../lib/confetti';
 import type { RandomizerSpin, ReelSlot } from '../realtime';
 
 /**
@@ -67,7 +67,7 @@ export default function WheelReveal({
         strip.style.filter = 'none';
       }
       setPrize(landedSlot);
-      runConfetti(canvasRef.current, ['#22e0a1', '#4f8cff', '#f5c518', '#ff7a45', '#ffffff'], 96, 3800);
+      runConfetti(canvasRef.current, CONFETTI, 96, 3800);
       window.setTimeout(() => onLand(landedSlot), 850);
       window.setTimeout(() => setLeaving(true), 1600);
       window.setTimeout(onDone, 2050);

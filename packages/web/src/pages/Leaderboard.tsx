@@ -5,7 +5,6 @@ import { getLeaderboard, type LeaderboardRow } from '../api';
 import { Gift, ArrowRight } from '../icons';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
-const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function Leaderboard() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
@@ -45,7 +44,7 @@ export default function Leaderboard() {
         <div className="lb__podium">
           {podiumOrder.map((r) => (
             <div key={r.rank} className={`lb__pod card lb__pod--${r.rank}`}>
-              <span className="lb__pod-medal">{MEDALS[r.rank - 1]}</span>
+              <span className="lb__pod-medal">{r.rank}</span>
               <span className={`lb__pod-ava${r.rank === 1 ? ' gold' : ''}`}>
                 <Avatar handle={r.handle} src={r.avatarUrl} size={r.rank === 1 ? 84 : 64} />
               </span>

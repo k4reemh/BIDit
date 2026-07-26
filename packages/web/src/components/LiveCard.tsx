@@ -27,7 +27,7 @@ export default function LiveCard({ a }: { a: LiveAuction }) {
         </div>
         <div className="live-card__title">{a.title}</div>
         <div className="live-card__tags">
-          <span className="pill" style={{ color: 'var(--cyan)', borderColor: 'rgba(54,200,255,0.25)' }}>{a.category}</span>
+          <span className="pill">{a.category}</span>
           <span className="pill">{a.tag}</span>
         </div>
       </div>

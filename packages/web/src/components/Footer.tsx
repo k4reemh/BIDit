@@ -16,10 +16,9 @@ export default function Footer() {
       <div className="container footer__top">
         <div className="footer__brand">
           <Logo size={30} />
-          <p className="muted">The live auction that lives on the streams you already watch. Bid anything, win it, sellers ship it — 4% pumps $BID.</p>
+          <p className="muted">Live card auctions on pump.fun streams. 4% of every sale buys back $BID.</p>
           <div className="footer__social">
             <a className="icon-btn" href="https://x.com/biditsol" target="_blank" rel="noreferrer" aria-label="BIDit on X"><XLogo width={18} height={18} /></a>
-            <a className="icon-btn" href="#" aria-label="Discord" style={{ fontSize: 18 }}>◇</a>
           </div>
         </div>
         <div className="footer__cols">
@@ -39,7 +38,7 @@ export default function Footer() {
         <span className="muted">© 2026 BIDit. All rights reserved.</span>
         <span className="footer__chips">
           <span className="pill">◎ Built on Solana</span>
-          <span className="pill" style={{ color: 'var(--green)' }}>● Devnet beta</span>
+          <span className="pill"><span className="dot" /> Beta</span>
         </span>
       </div>
     </footer>

@@ -53,7 +53,7 @@ export default function Overview() {
           <div className="promo-card__head">
             <span className="promo-card__badge">Launch bonus</span>
             {promo.earned ? (
-              <span className="promo-card__amt">${promo.bonusUsd} USDC {promo.paid ? 'paid ✓' : 'earned 🎉'}</span>
+              <span className="promo-card__amt">${promo.bonusUsd} USDC {promo.paid ? 'paid' : 'earned'}</span>
             ) : (
               <span className="promo-card__amt">Earn ${promo.bonusUsd} USDC</span>
             )}

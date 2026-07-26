@@ -52,7 +52,7 @@ export default function AdminShipments({ session }: { session: Session | null })
       {error && <div className="auth__error">{error}</div>}
 
       <h2 className="acct-sub" style={{ marginBottom: 12 }}>Needs a label</h2>
-      {queue && queue.length === 0 && <p className="muted">Nothing waiting for a label right now. 🎉</p>}
+      {queue && queue.length === 0 && <p className="muted">Nothing waiting for a label.</p>}
       {(queue ?? []).map((row) => <QueueCard key={row.id} row={row} onDone={load} />)}
 
       {inflight.length > 0 && (

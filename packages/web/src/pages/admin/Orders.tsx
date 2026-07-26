@@ -93,11 +93,11 @@ export default function AdminOrders({ session }: { session: Session | null }) {
             </table>
             <p className="muted acct-note">
               {wallets.reconciled
-                ? '✅ Reconciled — every wallet matches its ledger account.'
+                ? 'Reconciled. Every wallet matches its ledger account.'
                 : wallets.pendingLegs > 0
-                  ? `⏳ ${wallets.pendingLegs} on-chain leg(s) still settling — re-run once they clear.`
-                  : '⚠️ Mismatch with no pending legs — investigate before flipping to escrow.'}
-              {` · cluster: ${wallets.cluster}`}
+                  ? `${wallets.pendingLegs} on-chain leg(s) still settling. Re-run once they clear.`
+                  : 'Mismatch with no pending legs. Investigate before flipping to escrow.'}
+              {` (cluster: ${wallets.cluster})`}
             </p>
           </>
         )}

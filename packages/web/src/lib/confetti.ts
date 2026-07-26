@@ -1,7 +1,11 @@
+/** One palette for every celebration, so wins, wheels and giveaways look related.
+ *  Brand orange leads; the rest are the accent's neighbours plus white. */
+export const CONFETTI = ['#ff6a00', '#ffb020', '#0b2447', '#2fd7a0', '#ffffff'];
+
 /** Shared confetti burst for celebratory overlays (auction win, giveaway, wheel). */
 export function runConfetti(
   canvas: HTMLCanvasElement | null,
-  colors: string[] = ['#f5c518', '#0e9f6e', '#4f8cff', '#ff7a45', '#e5484d', '#ffffff'],
+  colors: string[] = CONFETTI,
   count = 140,
   durationMs = 5600,
 ): void {

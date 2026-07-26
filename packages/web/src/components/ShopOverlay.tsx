@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getShop, buyShopItem, refreshMe, type ShopItem, type Session } from '../api';
-import { Bag, Check } from '../icons';
+import { Bag, Check, X } from '../icons';
 
 /**
  * The seller's shop, opened from the watch page: fixed-price items viewers can
@@ -99,7 +99,7 @@ export default function ShopOverlay({
                       <button className="btn btn-accent btn-sm" disabled={buying === it.id} onClick={() => buy(it)}>
                         {buying === it.id ? 'Buying…' : `Confirm $${it.price}`}
                       </button>
-                      <button className="btn btn-ghost btn-sm" disabled={buying === it.id} onClick={() => setConfirming(null)}>✕</button>
+                      <button className="btn btn-ghost btn-sm" aria-label="Cancel" disabled={buying === it.id} onClick={() => setConfirming(null)}><X width={14} height={14} /></button>
                     </span>
                   ) : (
                     <button
