@@ -9,6 +9,7 @@
  * mirroring how giveaways.ts backs the giveaway handlers.
  */
 import { prisma as defaultPrisma } from './db.js';
+import { mediaUrl } from './media.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 
@@ -107,7 +108,8 @@ export async function postChatMessage(
     data: { roomId: params.room, userId: params.userId, handle, text, createdAt: now },
     select: { id: true, roomId: true, userId: true, handle: true, text: true, createdAt: true },
   });
-  return { ...row, avatarUrl: sender?.avatarUrl ?? null };
+  // A URL, never the inline image: a 50-line backlog of data URLs was megabytes.
+  return { ...row, avatarUrl: mediaUrl('avatar', params.userId, sender?.avatarUrl) };
 }
 
 /**
@@ -241,5 +243,5 @@ export async function listRecentChat(
       (u) => [u.id, u.avatarUrl] as const,
     ),
   );
-  return rows.reverse().map((r) => ({ ...r, avatarUrl: avatars.get(r.userId) ?? null }));
+  return rows.reverse().map((r) => ({ ...r, avatarUrl: mediaUrl('avatar', r.userId, avatars.get(r.userId)) }));
 }

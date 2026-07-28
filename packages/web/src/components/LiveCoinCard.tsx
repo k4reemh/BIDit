@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import { Gift, Bolt, Eye, Verified } from '../icons';
 import { countryFlag } from '../flag';
+import { mediaSrc } from '../config';
 import type { LiveCoin } from '../api';
 
 /** A linked-coin card on the live grid → links to the in-site watch page. */
@@ -14,7 +15,7 @@ export default function LiveCoinCard({ c }: { c: LiveCoin }) {
   return (
     <Link className="live-card" to={`/live/${c.coin}`}>
       <div className="live-card__thumb">
-        {c.image ? <img src={c.image} alt="" loading="lazy" /> : <div className="live-card__ph"><Bolt width={30} height={30} /></div>}
+        {c.image ? <img src={mediaSrc(c.image)} alt="" loading="lazy" /> : <div className="live-card__ph"><Bolt width={30} height={30} /></div>}
         <div className="live-card__overlay" />
         <div className="live-card__topline">
           <span className={`live-badge${live ? '' : ' off'}`}>

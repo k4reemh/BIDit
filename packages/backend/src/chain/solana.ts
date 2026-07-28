@@ -196,10 +196,55 @@ export class SolanaChain implements ChainClient {
    * we sweep it into treasury (treasury pays fees) and emit an event keyed by the
    * sweep signature for idempotent ledger crediting.
    */
+  /**
+   * Sweep any USDC sitting at users' deposit addresses into the treasury, and
+   * report what moved so the ledger can credit it.
+   *
+   * Balance discovery is BATCHED. This used to `await` one RPC call per user in
+   * a serial loop, so cost and wall-clock grew with signups: at 600 users a
+   * single poll made 600 sequential round trips and could not finish inside its
+   * own interval, while burning RPC quota continuously. Associated-token
+   * addresses are derived locally (no network), so one
+   * `getMultipleAccountsInfo` covers 100 users, and only the addresses that
+   * actually hold a balance go on to do transfer work.
+   */
   async pollDeposits(_cursor: string | null): Promise<{ events: DepositEvent[]; cursor: string | null }> {
     const events: DepositEvent[] = [];
     const treasury = this.wallets.treasury;
-    for (const [userId, depositKp] of this.depositOwners) {
+
+    const owners = [...this.depositOwners.entries()];
+    if (owners.length === 0) return { events, cursor: null };
+
+    // 1. Derive every ATA locally, then read them in batches of 100.
+    const atas = await Promise.all(
+      owners.map(([, kp]) => getAssociatedTokenAddress(this.usdcMint, kp.publicKey)),
+    );
+    const funded: { userId: string; depositKp: Keypair }[] = [];
+    const BATCH = 100;
+    for (let i = 0; i < atas.length; i += BATCH) {
+      const slice = atas.slice(i, i + BATCH);
+      let infos: (Awaited<ReturnType<Connection['getMultipleAccountsInfo']>>[number])[] = [];
+      try {
+        infos = await this.conn.getMultipleAccountsInfo(slice);
+      } catch (err) {
+        // A failed batch is retried on the next poll; never abort the sweep.
+        console.error('[deposit-sweep] balance batch failed (will retry):', (err as Error)?.message ?? err);
+        continue;
+      }
+      infos.forEach((info, j) => {
+        if (!info) return; // no ATA yet, so nothing was ever sent here
+        // SPL token account layout: amount is a u64 at offset 64.
+        const amount = info.data.length >= 72 ? info.data.readBigUInt64LE(64) : 0n;
+        if (amount > 0n) {
+          const [userId, depositKp] = owners[i + j]!;
+          funded.push({ userId, depositKp });
+        }
+      });
+    }
+    if (funded.length === 0) return { events, cursor: null };
+
+    // 2. Only addresses actually holding USDC do transfer work.
+    for (const { userId, depositKp } of funded) {
       // Each address is swept in its own try/catch. A failure here (treasury out
       // of SOL for fees, an RPC hiccup, an ATA-creation race) must NEVER abort the
       // poll or crash the process — the user's USDC stays safe at their deposit

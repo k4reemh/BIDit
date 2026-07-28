@@ -10,6 +10,7 @@ import { getOrCreateUserAccount } from './ledger.js';
 import { createAuction, startAuction } from './auction.js';
 import { requireSeller } from './authz.js';
 import { systemClock, type Clock } from './clock.js';
+import { mediaUrl } from './media.js';
 
 export const DEMO_TITLE = 'Charizard — Base Set Holo';
 export const DEMO_IMAGE = 'https://images.pokemontcg.io/base1/4_hires.png';
@@ -53,7 +54,7 @@ export async function resolveRoomByCoin(
     room: profile.user.id,
     sellerHandle: profile.user.handle,
     verified: profile.verified,
-    sellerAvatar: profile.user.avatarUrl ?? null,
+    sellerAvatar: mediaUrl('avatar', profile.user.id, profile.user.avatarUrl),
   };
 }
 

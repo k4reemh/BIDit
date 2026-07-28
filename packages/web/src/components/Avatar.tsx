@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { mediaSrc } from '../config';
 
 export default function Avatar({
   handle,
@@ -23,8 +24,9 @@ export default function Avatar({
     boxShadow: ring ? '0 0 0 2px rgba(255,255,255,0.14)' : 'none',
   };
 
-  if (src && !failed) {
-    return <img src={src} alt="" onError={() => setFailed(true)} style={{ ...common, objectFit: 'cover', display: 'block' }} />;
+  const resolved = mediaSrc(src);
+  if (resolved && !failed) {
+    return <img src={resolved} alt="" onError={() => setFailed(true)} style={{ ...common, objectFit: 'cover', display: 'block' }} />;
   }
 
   let h = 0;

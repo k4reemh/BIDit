@@ -64,6 +64,7 @@ import { verifySession, consumeWsTicket, onSessionRevoked } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
+import { mediaUrl } from '../media.js';
 import {
   postChatMessage,
   deleteChatMessage,
@@ -832,7 +833,8 @@ export class RealtimeServer {
       where: { id: userId },
       select: { handle: true, avatarUrl: true },
     });
-    return { handle: user?.handle ?? null, avatarUrl: user?.avatarUrl ?? null };
+    // A media URL, not the inline image — these ride in every bid broadcast.
+    return { handle: user?.handle ?? null, avatarUrl: mediaUrl('avatar', userId, user?.avatarUrl) };
   }
 
   private sendToConn(conn: Conn, message: ServerMessage): void {

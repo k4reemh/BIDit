@@ -51,6 +51,7 @@ import {
 import { exportDepositSecretKey } from '../src/wallet.js';
 import { requestPasswordReset, resetPassword } from '../src/password-reset.js';
 import { sendEmail, emailShell, paragraph, emailEnabled, emailFrom } from '../src/email.js';
+import { decodeDataUrl, mediaUrl, MEDIA_MAX_AGE_S } from '../src/media.js';
 import {
   sendVerificationCode,
   verifyEmailCode,
@@ -456,6 +457,37 @@ async function main() {
       return;
     }
     const p = url.pathname;
+    /**
+     * User-uploaded images, served as files rather than inlined in JSON.
+     * Public by design: avatars and stream cover art are already shown to every
+     * visitor. Cached hard — the URL carries a content hash, so an edited image
+     * gets a different URL and can never be served stale.
+     */
+    if (req.method === 'GET' && (p === '/media/avatar' || p === '/media/cover' || p === '/media/listing')) {
+      const id = url.searchParams.get('id') ?? '';
+      if (!id) return send(res, 400, { error: 'missing id' });
+      const stored =
+        p === '/media/avatar'
+          ? (await prisma.user.findUnique({ where: { id }, select: { avatarUrl: true } }))?.avatarUrl
+          : p === '/media/cover'
+            ? (await prisma.sellerProfile.findUnique({ where: { userId: id }, select: { streamImage: true } }))
+                ?.streamImage
+            : (await prisma.listing.findUnique({ where: { id }, select: { photos: true } }))?.photos[0];
+      const img = decodeDataUrl(stored);
+      if (!img) return send(res, 404, { error: 'not found' });
+      // A matching ETag means the client already holds these exact bytes.
+      if (req.headers['if-none-match'] === img.etag) {
+        res.writeHead(304, { etag: img.etag, 'cache-control': `public, max-age=${MEDIA_MAX_AGE_S}` });
+        return res.end();
+      }
+      res.writeHead(200, {
+        'content-type': img.contentType,
+        'content-length': String(img.body.length),
+        etag: img.etag,
+        'cache-control': `public, max-age=${MEDIA_MAX_AGE_S}, stale-while-revalidate=86400`,
+      });
+      return res.end(img.body);
+    }
     // Operational transparency: which chain/payout/dev mode is this process in.
     // Unauthenticated + cheap; exposes only mode flags, never secrets or balances.
     if (req.method === 'GET' && p === '/health') {
@@ -1599,7 +1631,7 @@ async function main() {
       // Coins a seller has linked — powers the site's "Live right now" section.
       // "live" here = a BIDit auction or giveaway is currently running on it.
       if (req.method === 'GET' && p === '/live') {
-        return send(res, 200, await liveCoins((room) => realtime.roomViewerCount(room)));
+        return send(res, 200, await liveCoinsCached((room) => realtime.roomViewerCount(room)));
       }
       // Public storefront for a linked coin: the seller's buy-now items.
       if (req.method === 'GET' && p === '/shop') {
@@ -1711,6 +1743,10 @@ async function main() {
 // pump.fun coin metadata + live status, proxied server-side (their API sends no
 // CORS headers) and cached briefly so the homepage/watch page can't hammer it.
 const pumpCache = new Map<string, { at: number; data: unknown }>();
+/** How long pump.fun coin metadata (name, art, is-live) is reused. Their API is
+ *  Cloudflare-fronted and rate-limits; at 100 linked coins a 15s TTL meant ~7
+ *  requests/second forever. A live badge a minute stale is a fair trade. */
+const PUMP_CACHE_MS = 60_000;
 // Pump.fun runs streams on LiveKit. `/livestream/join` mints a fresh watch-only
 // viewer token per call (unique identity) — never cache it, or viewers collide.
 const PUMP_LIVEKIT_HOST = process.env.BIDIT_PUMP_LIVEKIT_HOST ?? 'wss://pump-prod-tg2x8veh.livekit.cloud';
@@ -1766,7 +1802,7 @@ async function pumpCoinInfo(mint: string) {
   const m = mint.trim();
   if (!/^[A-Za-z0-9]{32,50}$/.test(m)) return { unavailable: true, isLive: false };
   const cached = pumpCache.get(m);
-  if (cached && Date.now() - cached.at < 15_000) return cached.data;
+  if (cached && Date.now() - cached.at < PUMP_CACHE_MS) return cached.data;
   try {
     const r = await fetch(`https://frontend-api-v3.pump.fun/coins/${m}`, {
       headers: { accept: 'application/json', ...PUMP_HEADERS },
@@ -1788,46 +1824,120 @@ async function pumpCoinInfo(mint: string) {
   }
 }
 
-// Every coin a seller has linked, with whether a BIDit auction/giveaway is live on it.
+/**
+ * Short-lived cache in front of liveCoins.
+ *
+ * Every visitor's home page and the Browse poll hit this, so without a cache the
+ * work scales with viewers × sellers. Ten seconds is under the auction cadence
+ * that matters (bids and closes arrive over the WebSocket, not from here), so
+ * the grid stays live while the database sees one build per interval no matter
+ * how many people are watching. Concurrent callers share the in-flight promise
+ * rather than each starting their own rebuild.
+ */
+const LIVE_CACHE_MS = 10_000;
+let liveCache: { at: number; rows: unknown[] } | null = null;
+let liveInFlight: Promise<unknown[]> | null = null;
+
+async function liveCoinsCached(viewerCount: (room: string) => number): Promise<unknown[]> {
+  const now = Date.now();
+  if (liveCache && now - liveCache.at < LIVE_CACHE_MS) {
+    // Viewer counts are free and change fastest, so refresh just those on a hit.
+    return (liveCache.rows as { room: string; viewers: number }[]).map((r) => ({
+      ...r,
+      viewers: viewerCount(r.room),
+    }));
+  }
+  if (!liveInFlight) {
+    liveInFlight = liveCoins(viewerCount)
+      .then((rows) => {
+        liveCache = { at: Date.now(), rows };
+        return rows as unknown[];
+      })
+      .finally(() => {
+        liveInFlight = null;
+      });
+  }
+  return liveInFlight;
+}
+
+/**
+ * Every coin a seller has linked, with whether a BIDit auction/giveaway is live.
+ *
+ * Written to stay flat as sellers are added. Two things used to make this scale
+ * badly, both of which mattered at launch volume:
+ *
+ *  1. It ran two queries PER SELLER. 100 sellers meant ~200 round trips per
+ *     request, multiplied by every viewer loading the page. Now it's three
+ *     queries total, regardless of seller count.
+ *  2. It inlined cover art and avatars as base64, so a 100-seller response was
+ *     tens of megabytes. Those are URLs now (see media.ts) and the browser
+ *     caches each image once instead of re-downloading it inside every payload.
+ *
+ * The result is cached briefly on top of that — see liveCoinsCached.
+ */
 async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
     where: { pumpCoinAddress: { not: null } },
     include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
-  const rows = await Promise.all(
-    profiles.map(async (pf) => {
-      const [auction, giveaway, pump] = await Promise.all([
-        prisma.auction.findFirst({
-          where: { status: AuctionStatus.RUNNING, listing: { sellerId: pf.userId } },
-          include: { listing: { select: { title: true, photos: true } } },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.giveaway.findFirst({ where: { sellerId: pf.userId, status: 'OPEN' } }),
-        pumpCoinInfo(pf.pumpCoinAddress!) as Promise<{ name?: string | null; image?: string | null; isLive?: boolean }>,
-      ]);
-      return {
-        coin: pf.pumpCoinAddress!,
-        sellerHandle: pf.user.handle,
-        sellerAvatar: pf.user.avatarUrl ?? null,
-        room: pf.userId,
-        hasAuction: auction !== null,
-        hasGiveaway: giveaway !== null,
-        streamLive: pump?.isLive === true,
-        viewers: viewerCount(pf.userId),
-        verified: pf.verified,
-        coinName: pump?.name ?? null,
-        streamTitle: pf.streamTitle ?? null,
-        category: pf.streamCategory ?? null,
-        country: pf.originCountry ?? null,
-        title: auction?.listing.title ?? null,
-        // Seller-set cover art wins; otherwise the running item's photo, then
-        // whatever art the coin carries on pump.fun.
-        image: pf.streamImage ?? auction?.listing.photos[0] ?? pump?.image ?? null,
-        currentBid: auction?.currentBid != null ? formatUsdc(auction.currentBid) : null,
-        prize: giveaway?.prize ?? null,
-      };
+  if (profiles.length === 0) return [];
+  const sellerIds = profiles.map((pf) => pf.userId);
+
+  // One query for every seller's running auction, one for every open giveaway,
+  // instead of a pair per seller.
+  const [auctions, giveaways] = await Promise.all([
+    prisma.auction.findMany({
+      where: { status: AuctionStatus.RUNNING, listing: { sellerId: { in: sellerIds } } },
+      include: { listing: { select: { sellerId: true, title: true, photos: true } } },
+      orderBy: { createdAt: 'desc' },
     }),
+    prisma.giveaway.findMany({ where: { sellerId: { in: sellerIds }, status: 'OPEN' } }),
+  ]);
+  // First wins: both lists are newest-first, matching the old findFirst.
+  const auctionBySeller = new Map<string, (typeof auctions)[number]>();
+  for (const a of auctions) if (!auctionBySeller.has(a.listing.sellerId)) auctionBySeller.set(a.listing.sellerId, a);
+  const giveawayBySeller = new Map<string, (typeof giveaways)[number]>();
+  for (const g of giveaways) if (!giveawayBySeller.has(g.sellerId)) giveawayBySeller.set(g.sellerId, g);
+
+  // pump.fun metadata is per-coin and cached inside pumpCoinInfo; this is the
+  // only remaining fan-out, and the response cache keeps it off the hot path.
+  const pumps = await Promise.all(
+    profiles.map((pf) =>
+      pumpCoinInfo(pf.pumpCoinAddress!) as Promise<{ name?: string | null; image?: string | null; isLive?: boolean }>,
+    ),
   );
+
+  const rows = profiles.map((pf, i) => {
+    const auction = auctionBySeller.get(pf.userId) ?? null;
+    const giveaway = giveawayBySeller.get(pf.userId) ?? null;
+    const pump = pumps[i];
+    // Seller-set cover wins, then the running item's photo, then the coin art.
+    // Uploads become media URLs; an https value (pump art) passes through.
+    const cover =
+      mediaUrl('cover', pf.userId, pf.streamImage) ??
+      (auction ? mediaUrl('listing', auction.listingId, auction.listing.photos[0]) : null) ??
+      pump?.image ??
+      null;
+    return {
+      coin: pf.pumpCoinAddress!,
+      sellerHandle: pf.user.handle,
+      sellerAvatar: mediaUrl('avatar', pf.userId, pf.user.avatarUrl),
+      room: pf.userId,
+      hasAuction: auction !== null,
+      hasGiveaway: giveaway !== null,
+      streamLive: pump?.isLive === true,
+      viewers: viewerCount(pf.userId),
+      verified: pf.verified,
+      coinName: pump?.name ?? null,
+      streamTitle: pf.streamTitle ?? null,
+      category: pf.streamCategory ?? null,
+      country: pf.originCountry ?? null,
+      title: auction?.listing.title ?? null,
+      image: cover,
+      currentBid: auction?.currentBid != null ? formatUsdc(auction.currentBid) : null,
+      prize: giveaway?.prize ?? null,
+    };
+  });
   rows.sort((a, b) => Number(b.hasAuction || b.hasGiveaway) - Number(a.hasAuction || a.hasGiveaway));
   return rows;
 }
