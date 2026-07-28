@@ -35,7 +35,7 @@ export default function LiveCoinCard({ c }: { c: LiveCoin }) {
       </div>
       <div className="live-card__meta">
         <div className="live-card__seller">
-          <Avatar handle={c.sellerHandle} size={22} />
+          <Avatar handle={c.sellerHandle} src={c.sellerAvatar} size={22} />
           <span>@{c.sellerHandle}</span>
           {c.verified && <Verified className="live-card__seal" width={15} height={15} />}
           {flag && <span className="live-card__flag" title={`Ships from ${flag.code}`}>{flag.flag}</span>}

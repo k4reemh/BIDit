@@ -181,6 +181,21 @@ export async function loginWithEmail(
 /** Update a user's editable profile fields. */
 const SHIP_MODES = ['WEEKLY_BUNDLE', 'SHIP_LATER', 'PRIVATE'] as const;
 
+/** Avatars are sent inline with every chat line, live card and bid feed entry,
+ *  so an oversized one would bloat every one of those payloads. The client
+ *  downscales to 256px (a few KB); this is the backstop for anything else.
+ *  Over the cap we drop the image rather than store a payload-bloating blob. */
+const MAX_AVATAR_LEN = 120_000;
+function cleanAvatar(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  if (v.length > MAX_AVATAR_LEN) return null;
+  // Inline image or a plain URL only — never a script:/javascript: payload,
+  // since this string is rendered as an <img src> by every client.
+  if (!/^data:image\/(png|jpeg|webp|gif);base64,/.test(v) && !/^https:\/\//.test(v)) return null;
+  return v;
+}
+
 export async function updateProfile(
   userId: string,
   patch: { displayName?: string; avatarUrl?: string; bio?: string; shippingAddress?: unknown; bundleShipping?: boolean; shippingMode?: string },
@@ -193,7 +208,7 @@ export async function updateProfile(
     where: { id: userId },
     data: {
       ...(patch.displayName !== undefined ? { displayName: patch.displayName.trim() || null } : {}),
-      ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl.trim() || null } : {}),
+      ...(patch.avatarUrl !== undefined ? { avatarUrl: cleanAvatar(patch.avatarUrl) } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio.trim() || null } : {}),
       ...(patch.shippingAddress !== undefined
         ? { shippingAddress: encryptPii(patch.shippingAddress ?? null) as Prisma.InputJsonValue }

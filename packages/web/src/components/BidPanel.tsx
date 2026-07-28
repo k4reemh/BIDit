@@ -17,7 +17,7 @@ import {
 import { estimateListingShipping, money2, type Session, type ShippingMode, type ListingShipEstimate } from '../api';
 import { Gift, Bolt, Dice, Chevron, Truck } from '../icons';
 
-interface Feed { who: string; amt: string; key: number }
+interface Feed { who: string; avatar: string | null; amt: string; key: number }
 
 /**
  * The in-site bidding sidebar — a clean, always-on version of the extension
@@ -98,8 +98,8 @@ export default function BidPanel({
       },
       onBid: (m) => {
         offset.current = m.serverNow - Date.now();
-        setAuction((a) => (a ? { ...a, currentBid: m.amount, leaderHandle: m.leaderHandle, endsAt: m.endsAt } : a));
-        setFeed((f) => [{ who: m.leaderHandle, amt: m.amount, key: keyRef.current++ }, ...f].slice(0, 6));
+        setAuction((a) => (a ? { ...a, currentBid: m.amount, leaderHandle: m.leaderHandle, leaderAvatar: m.leaderAvatar, endsAt: m.endsAt } : a));
+        setFeed((f) => [{ who: m.leaderHandle, avatar: m.leaderAvatar ?? null, amt: m.amount, key: keyRef.current++ }, ...f].slice(0, 6));
         if (m.extended) setExtended(Date.now()); // late bid pushed the clock — flash EXTENDED
       },
       onClosed: (m) => {
@@ -112,7 +112,7 @@ export default function BidPanel({
         // instead of remounting — and flickering — the overlay.
         if (!m.wheel && !m.replay && m.winnerHandle && m.amount && celebratedId.current !== m.auctionId) {
           celebratedId.current = m.auctionId;
-          setWin({ winnerHandle: m.winnerHandle, amount: m.amount, title: item.current.title, imageUrl: item.current.image, isMe: m.winnerHandle === myHandle });
+          setWin({ winnerHandle: m.winnerHandle, winnerAvatar: m.winnerAvatar, amount: m.amount, title: item.current.title, imageUrl: item.current.image, isMe: m.winnerHandle === myHandle });
         }
       },
       onBidRejected: (m) => setReject(rejectText(m.reason)),
@@ -268,7 +268,7 @@ export default function BidPanel({
               {showExt && <div className="bp__ext" key={extended}>EXTENDED: clock reset!</div>}
               <div className="bp__leader">
                 {auction!.leaderHandle
-                  ? <><Avatar handle={auction!.leaderHandle} size={18} /> <b>@{auction!.leaderHandle}</b> leading</>
+                  ? <><Avatar handle={auction!.leaderHandle} src={auction!.leaderAvatar} size={18} /> <b>@{auction!.leaderHandle}</b> leading</>
                   : <>No bids yet</>}
               </div>
               <div className="bp__quick">
@@ -293,7 +293,7 @@ export default function BidPanel({
               {feed.length > 0 && (
                 <div className="bp__feed">
                   {feed.map((f) => (
-                    <div className="bp__feedrow" key={f.key}><Avatar handle={f.who} size={18} /><b>@{f.who}</b><span>${f.amt}</span></div>
+                    <div className="bp__feedrow" key={f.key}><Avatar handle={f.who} src={f.avatar} size={18} /><b>@{f.who}</b><span>${f.amt}</span></div>
                   ))}
                 </div>
               )}

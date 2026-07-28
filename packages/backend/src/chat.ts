@@ -62,6 +62,9 @@ export interface PostedChat {
   roomId: string;
   userId: string;
   handle: string;
+  /** Sender's profile photo, resolved live from the User row (NOT snapshotted
+   *  like `handle`) so a changed avatar updates everywhere, including backlog. */
+  avatarUrl: string | null;
   text: string;
   createdAt: Date;
 }
@@ -95,12 +98,16 @@ export async function postChatMessage(
   }
   const now = clock.now();
 
-  const handle = (await prisma.user.findUnique({ where: { id: params.userId }, select: { handle: true } }))?.handle ?? 'someone';
+  const sender = await prisma.user.findUnique({
+    where: { id: params.userId },
+    select: { handle: true, avatarUrl: true },
+  });
+  const handle = sender?.handle ?? 'someone';
   const row = await prisma.chatMessage.create({
     data: { roomId: params.room, userId: params.userId, handle, text, createdAt: now },
     select: { id: true, roomId: true, userId: true, handle: true, text: true, createdAt: true },
   });
-  return row;
+  return { ...row, avatarUrl: sender?.avatarUrl ?? null };
 }
 
 /** Seller deletes a message from their own room (soft delete). Only the room owner
@@ -150,5 +157,13 @@ export async function listRecentChat(
     take: limit,
     select: { id: true, roomId: true, userId: true, handle: true, text: true, createdAt: true },
   });
-  return rows.reverse();
+  // One extra lookup for the distinct senders rather than a per-row join: the
+  // backlog is small and capped, and avatars must reflect the CURRENT user row.
+  const senderIds = [...new Set(rows.map((r) => r.userId))];
+  const avatars = new Map(
+    (await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, avatarUrl: true } })).map(
+      (u) => [u.id, u.avatarUrl] as const,
+    ),
+  );
+  return rows.reverse().map((r) => ({ ...r, avatarUrl: avatars.get(r.userId) ?? null }));
 }

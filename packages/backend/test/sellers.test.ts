@@ -18,7 +18,12 @@ describe('coin <-> seller resolution', () => {
     const linked = await linkCoinToSeller('COIN_abc', 'seller_jane', prisma);
     const resolved = await resolveRoomByCoin('COIN_abc', prisma);
     // linkCoinToSeller is the admin/seed path, which marks the profile verified.
-    expect(resolved).toEqual({ room: linked.room, sellerHandle: 'seller_jane', verified: true });
+    expect(resolved).toEqual({
+      room: linked.room,
+      sellerHandle: 'seller_jane',
+      verified: true, // linkCoinToSeller is the admin/seed path
+      sellerAvatar: null,
+    });
   });
 
   it('relinking moves the coin and keeps a single profile', async () => {

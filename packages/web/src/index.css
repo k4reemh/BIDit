@@ -1028,6 +1028,33 @@ img { display: block; max-width: 100%; }
 .theater__eyebrow { font-size: 14px; font-weight: 700; color: #eaf0fb; letter-spacing: 0.01em; }
 .theater__note { font-size: 13px; color: rgba(234,240,251,0.72); max-width: 340px; line-height: 1.5; }
 
+/* ---- theatre mode (desktop) ----------------------------------------------
+   The stage breaks out of the page container to the full window width while the
+   bid panel stays alongside; a second press narrows the panel further to give
+   the stream even more room. Under 1000px the layout already stacks, so the
+   whole thing is switched off there and the toggle is hidden. */
+.theater__modes { display: flex; align-items: center; gap: 6px; }
+.theater__mode { display: inline-grid; place-items: center; width: 34px; height: 30px; border-radius: 9px;
+  color: #fff; background: rgba(10, 12, 16, 0.55); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.22); font-size: 13px; font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease; }
+.theater__mode:hover { background: rgba(255, 255, 255, 0.22); border-color: rgba(255, 255, 255, 0.4); }
+.watch--theater { width: 100%; max-width: none; padding: 0 0 44px; }
+.watch--theater .watch__grid { gap: 0; align-items: stretch; }
+.watch--theater .theater { border-radius: 0; box-shadow: none; aspect-ratio: auto;
+  /* Fill the viewport below the nav, leaving the meta line visible underneath. */
+  height: calc(100vh - var(--nav-h) - 96px); min-height: 360px; }
+.watch--theater .watch__side { position: sticky; top: 0; padding: 0 16px; }
+.watch--theater .watch__meta { padding: 0 24px; }
+/* Second press: hand more width to the stream. */
+.watch--wide .watch__grid { grid-template-columns: minmax(0, 1fr) 300px; }
+@media (max-width: 1000px) {
+  .theater__modes { display: none; }
+  .watch--theater { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 44px; }
+  .watch--theater .theater { height: auto; aspect-ratio: 16 / 9; border-radius: var(--r-lg); }
+  .watch--theater .watch__side, .watch--theater .watch__meta { padding: 0; }
+}
+
 .live-badge.off { background: rgba(10, 12, 16, 0.55); color: #e6ebf4; backdrop-filter: blur(4px); }
 .live-badge.off .dot { display: none; }
 
@@ -1941,6 +1968,16 @@ img { display: block; max-width: 100%; }
 
 /* onboarding points chip */
 .obx__howic--pts { width: auto; min-width: 40px; padding: 0 9px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ===== export wallet key ================================================= */
+.keyx__warn { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 16px; padding: 12px 14px;
+  border-radius: var(--r); font-size: 13px; line-height: 1.55;
+  color: var(--red); background: rgba(239, 59, 78, 0.08); border: 1px solid rgba(239, 59, 78, 0.24); }
+.keyx__warn svg { flex: none; margin-top: 1px; }
+.keyx__warn b { font-weight: 700; }
+.keyx__secret { display: block; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2);
+  border: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px; line-height: 1.5; word-break: break-all; user-select: all; }
 
 /* ===== withdrawal beta cap notice ======================================== */
 .beta-cap { display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 14px; padding: 11px 13px; border-radius: 12px;

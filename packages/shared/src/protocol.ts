@@ -124,6 +124,8 @@ export interface AuctionStateMessage {
   status: string;
   currentBid: string | null;
   leaderHandle: string | null;
+  /** Leader's profile photo, if they have one. */
+  leaderAvatar?: string | null;
   minNextBid: string;
   /** Nominal auction length (seconds) — lets the client draw a countdown bar. */
   durationSeconds: number;
@@ -140,6 +142,8 @@ export interface BidAcceptedMessage {
   auctionId: string;
   amount: string;
   leaderHandle: string;
+  /** Leader's profile photo, if they have one. */
+  leaderAvatar?: string | null;
   /** True when this bid pushed the deadline forward (anti-snipe) — drives the "EXTENDED!" flash. */
   extended: boolean;
   endsAt: number | null;
@@ -157,6 +161,8 @@ export interface AuctionClosedMessage {
   room: string;
   auctionId: string;
   winnerHandle: string | null;
+  /** Winner's profile photo, for the win celebration. */
+  winnerAvatar?: string | null;
   amount: string | null;
   /** True when a wheel spin will decide the prize — the client should defer the
    *  win celebration and wait for the RANDOMIZER_SPIN that follows. */
@@ -182,8 +188,11 @@ export interface RandomizerSpinMessage {
   winnerHandle: string;
   /** Winning bid amount, for the celebration that follows the spin. */
   amount: string;
-  /** The full scrolling strip the client renders. */
+  /** The full scrolling strip the client renders. Slots hold label + tier only. */
   reel: ReelSlot[];
+  /** The unique prize list, sent once. `reel[i]` is `entries[i % entries.length]`,
+   *  so clients read prize art from here instead of the repeated slots. */
+  entries: WheelEntry[];
   /** Which reel index lands in the centre band — i.e. the prize. */
   targetIndex: number;
   /** How long the spin animation runs. */
@@ -269,6 +278,9 @@ export interface ChatLine {
   id: string;
   senderId: string;
   handle: string;
+  /** Sender's profile photo, if they have one. Clients fall back to the
+   *  generated gradient avatar when absent. */
+  avatarUrl?: string | null;
   text: string;
   createdAt: number;
 }

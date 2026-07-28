@@ -38,3 +38,20 @@ export function deriveDepositKeypair(userId: string): { address: string; secretK
   const kp = nacl.sign.keyPair.fromSeed(seedFor(userId));
   return { address: bs58.encode(Buffer.from(kp.publicKey)), secretKey: kp.secretKey };
 }
+
+/**
+ * The user's own deposit key, base58-encoded — the format Phantom and Solflare
+ * accept on "import private key". Only ever returned to the authenticated owner
+ * of that account, and never logged or persisted.
+ *
+ * Handing this out is safe for the platform's books: a deposit is credited only
+ * after the sweep into treasury actually lands (see SolanaChain.pollDeposits),
+ * so a user who moves funds out of their own deposit address first simply
+ * doesn't get credited. It does mean the address has two spenders — them and
+ * the sweeper — which is why the UI warns that funds sent there may be swept
+ * into their BIDit balance at any moment.
+ */
+export function exportDepositSecretKey(userId: string): { address: string; secretKeyBase58: string } {
+  const { address, secretKey } = deriveDepositKeypair(userId);
+  return { address, secretKeyBase58: bs58.encode(Buffer.from(secretKey)) };
+}

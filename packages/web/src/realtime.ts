@@ -39,6 +39,7 @@ export interface AuctionState {
   status: string;
   currentBid: string | null;
   leaderHandle: string | null;
+  leaderAvatar?: string | null;
   minNextBid: string;
   durationSeconds: number;
   endsAt: number | null;
@@ -49,6 +50,7 @@ export interface AuctionState {
 export interface BidAccepted {
   amount: string;
   leaderHandle: string;
+  leaderAvatar?: string | null;
   extended: boolean;
   endsAt: number | null;
   serverNow: number;
@@ -57,6 +59,7 @@ export interface BidAccepted {
 export interface AuctionClosed {
   auctionId: string;
   winnerHandle: string | null;
+  winnerAvatar?: string | null;
   amount: string | null;
   wheel?: boolean;
   /** Catch-up replay for a client that missed the live close — sync the result
@@ -97,6 +100,8 @@ export interface RandomizerSpin {
   winnerHandle: string;
   amount: string;
   reel: ReelSlot[];
+  /** Unique prize list (with art). reel[i] === entries[i % entries.length]. */
+  entries: WheelPrize[];
   targetIndex: number;
   durationMs: number;
   startsAt: number;
@@ -124,6 +129,8 @@ export interface ChatLine {
   id: string;
   senderId: string;
   handle: string;
+  /** Sender's profile photo; null falls back to the generated avatar. */
+  avatarUrl?: string | null;
   text: string;
   createdAt: number;
 }

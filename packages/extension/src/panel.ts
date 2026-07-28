@@ -42,6 +42,7 @@ const REJECT_TEXT: Record<RealtimeRejectReason, [string, StatusKind]> = {
   AUCTION_ENDED: ['Auction has ended', 'info'],
   AUCTION_NOT_FOUND: ['Auction not found', 'error'],
   RATE_LIMITED: ['Slow down — too many bids', 'error'],
+  EMAIL_UNVERIFIED: ['Confirm your email on BIDit first', 'error'],
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(

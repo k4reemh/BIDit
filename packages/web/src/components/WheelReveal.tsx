@@ -42,7 +42,12 @@ export default function WheelReveal({
     const strip = stripRef.current;
     const startY = CENTER_SLOT * ROW_H;
     const endY = (CENTER_SLOT - spin.targetIndex) * ROW_H;
-    const landedSlot = spin.reel[spin.targetIndex] ?? spin.reel[spin.reel.length - 1]!;
+    // Re-attach the art from the unique entry list — reel slots don't carry it,
+    // and the win celebration that follows shows the prize image.
+    const idx = spin.reel[spin.targetIndex] ? spin.targetIndex : spin.reel.length - 1;
+    const base = spin.reel[idx]!;
+    const entry = spin.entries?.length ? spin.entries[idx % spin.entries.length] : undefined;
+    const landedSlot: ReelSlot = { ...base, imageUrl: base.imageUrl ?? entry?.imageUrl };
     // Only overshoot when there's a row beyond the target to scroll into, so the
     // spring-back never reveals empty space under the window.
     const overshoot = spin.targetIndex < spin.reel.length - 1 ? OVERSHOOT : 0;
@@ -105,14 +110,18 @@ export default function WheelReveal({
           <span className="wr__tick wr__tick--l" aria-hidden />
           <span className="wr__tick wr__tick--r" aria-hidden />
           <div className="wr__strip" ref={stripRef}>
-            {spin.reel.map((slot, i) => (
+            {spin.reel.map((slot, i) => {
+              // Art lives on the unique entry list, not the repeated slots.
+              const art = spin.entries?.length ? spin.entries[i % spin.entries.length]?.imageUrl : slot.imageUrl;
+              return (
               <div className={`wr__row${prize && i === spin.targetIndex ? ' wr__row--win' : ''}`} key={i}>
-                {slot.imageUrl
-                  ? <img className="wr__thumb" src={slot.imageUrl} alt="" />
+                {art
+                  ? <img className="wr__thumb" src={art} alt="" />
                   : <span className="wr__dot" />}
                 <span className="wr__name">{slot.label}</span>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="wr__fade wr__fade--t" />
           <div className="wr__fade wr__fade--b" />

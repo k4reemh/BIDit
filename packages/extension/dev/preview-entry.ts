@@ -35,6 +35,7 @@ const snipe = (): void => {
     type: 'AUCTION_STATE',
     room: 'demo',
     auctionId: 'demo-auction',
+    listingId: 'demo-listing',
     title: 'Charizard — Base Set Holo',
     imageUrl: IMG,
     status: 'RUNNING',

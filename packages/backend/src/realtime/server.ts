@@ -14,8 +14,10 @@ import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
+import { Prisma } from '@prisma/client';
 import {
   AuctionStatus,
+  ListingStatus,
   RealtimeRejectReason,
   roomChannel,
   userChannel,
@@ -425,9 +427,10 @@ export class RealtimeServer {
         select: { id: true, currentBid: true, currentLeaderUserId: true },
       });
       if (recent) {
-        const winnerHandle = recent.currentLeaderUserId
-          ? await this.handleOf(recent.currentLeaderUserId)
-          : null;
+        const replayWinner = recent.currentLeaderUserId
+          ? await this.identityOf(recent.currentLeaderUserId)
+          : { handle: null, avatarUrl: null };
+        const winnerHandle = replayWinner.handle;
         const amount =
           winnerHandle && recent.currentBid !== null ? formatUsdc(recent.currentBid) : null;
         const replay: AuctionClosedMessage = {
@@ -435,6 +438,7 @@ export class RealtimeServer {
           room,
           auctionId: recent.id,
           winnerHandle,
+          winnerAvatar: replayWinner.avatarUrl,
           amount,
           wheel: false,
           replay: true,
@@ -464,8 +468,22 @@ export class RealtimeServer {
     }
   }
 
-  private toChatLine(m: { id: string; userId: string; handle: string; text: string; createdAt: Date }): ChatLine {
-    return { id: m.id, senderId: m.userId, handle: m.handle, text: m.text, createdAt: m.createdAt.getTime() };
+  private toChatLine(m: {
+    id: string;
+    userId: string;
+    handle: string;
+    avatarUrl?: string | null;
+    text: string;
+    createdAt: Date;
+  }): ChatLine {
+    return {
+      id: m.id,
+      senderId: m.userId,
+      handle: m.handle,
+      avatarUrl: m.avatarUrl ?? null,
+      text: m.text,
+      createdAt: m.createdAt.getTime(),
+    };
   }
 
   private async handleChatSend(conn: Conn, msg: ChatSendMessage): Promise<void> {
@@ -581,13 +599,15 @@ export class RealtimeServer {
 
     const state = await this.buildAuctionState(msg.auctionId);
     if (state) {
-      const leaderHandle = (await this.handleOf(conn.userId)) ?? '';
+      const bidder = await this.identityOf(conn.userId);
+      const leaderHandle = bidder.handle ?? '';
       const accepted: BidAcceptedMessage = {
         type: 'BID_ACCEPTED',
         room: state.room,
         auctionId: msg.auctionId,
         amount: formatUsdc(amount),
         leaderHandle,
+        leaderAvatar: bidder.avatarUrl,
         extended: result.extended,
         endsAt: state.message.endsAt,
         serverNow: this.clock.now().getTime(),
@@ -627,7 +647,10 @@ export class RealtimeServer {
       }
 
       const room = auction.listing.sellerId;
-      const winnerHandle = result.winnerUserId ? await this.handleOf(result.winnerUserId) : null;
+      const winner = result.winnerUserId
+        ? await this.identityOf(result.winnerUserId)
+        : { handle: null, avatarUrl: null };
+      const winnerHandle = winner.handle;
       const amount =
         result.winnerUserId && auction.currentBid !== null ? formatUsdc(auction.currentBid) : null;
 
@@ -639,18 +662,30 @@ export class RealtimeServer {
         entries && winnerHandle && amount
           ? this.buildSpin(room, result.auctionId, entries, winnerHandle, amount)
           : null;
+      // Consume the won prize BEFORE anyone can start the next auction on this
+      // wheel, so the same copy can never be won twice. Runs after settlement,
+      // which sets its own quantity/status; this is the authoritative word for
+      // a wheel listing.
+      if (spin) {
+        try {
+          await this.consumeWheelPrize(auction.listingId, entries!, spin.prizeIndex);
+        } catch (err) {
+          console.error('[wheel] failed to consume prize', err);
+        }
+      }
 
       const closed: AuctionClosedMessage = {
         type: 'AUCTION_CLOSED',
         room,
         auctionId: result.auctionId,
         winnerHandle,
+        winnerAvatar: winner.avatarUrl,
         amount,
         wheel: spin !== null,
         serverNow: this.clock.now().getTime(),
       };
       await this.bus.publish(roomChannel(room), JSON.stringify(closed));
-      if (spin) await this.bus.publish(roomChannel(room), JSON.stringify(spin));
+      if (spin) await this.bus.publish(roomChannel(room), JSON.stringify(spin.message));
       const state = await this.buildAuctionState(result.auctionId);
       if (state) await this.bus.publish(roomChannel(room), JSON.stringify(state.message));
     }
@@ -663,25 +698,57 @@ export class RealtimeServer {
     entries: WheelEntry[],
     winnerHandle: string,
     amount: string,
-  ): RandomizerSpinMessage {
+  ): { message: RandomizerSpinMessage; prizeIndex: number } {
     const seed = randomBytes(16).toString('hex');
     const seedHash = createHash('sha256').update(seed).digest('hex');
     const prizeIndex = pickSlot(entries, seed);
     const { reel, targetIndex } = buildReel(entries, prizeIndex);
     const now = this.clock.now().getTime();
-    return {
+    const message: RandomizerSpinMessage = {
       type: 'RANDOMIZER_SPIN',
       room,
       auctionId,
       winnerHandle,
       amount,
       reel,
+      entries,
       targetIndex,
       durationMs: 5200,
       startsAt: now + 400, // small lead so every client arms before it starts
       seedHash,
       serverNow: now,
     };
+    return { message, prizeIndex };
+  }
+
+  /**
+   * Take the won prize out of the wheel's stock.
+   *
+   * A prize's `weight` is its remaining copies — it doubles as the odds weight,
+   * so 3 copies are 3× as likely as 1 and the odds re-normalize by themselves as
+   * stock drains. At zero the entry drops off the wheel entirely.
+   *
+   * The listing's quantity is then set to what's actually left rather than
+   * decremented, so the wheel and the listing can't drift apart: while prizes
+   * remain the listing returns to QUEUED and the seller can run it again; when
+   * the last one goes it's SOLD.
+   */
+  private async consumeWheelPrize(listingId: string, entries: WheelEntry[], prizeIndex: number): Promise<void> {
+    const left: WheelEntry[] = [];
+    entries.forEach((e, i) => {
+      const stock = e.weight && e.weight > 0 ? e.weight : 1;
+      const next = i === prizeIndex ? stock - 1 : stock;
+      if (next > 0) left.push({ ...e, weight: next });
+    });
+    const remaining = left.reduce((n, e) => n + (e.weight ?? 1), 0);
+    await this.prisma.listing.update({
+      where: { id: listingId },
+      data: {
+        wheel: left.length ? (left as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+        quantity: remaining,
+        status: remaining > 0 ? ListingStatus.QUEUED : ListingStatus.SOLD,
+      },
+    });
   }
 
   // ---- builders & senders -------------------------------------------------
@@ -700,9 +767,10 @@ export class RealtimeServer {
       floor: auction.minIncrementFloor,
       bps: BigInt(auction.minIncrementBps),
     };
-    const leaderHandle = auction.currentLeaderUserId
-      ? await this.handleOf(auction.currentLeaderUserId)
-      : null;
+    const leader = auction.currentLeaderUserId
+      ? await this.identityOf(auction.currentLeaderUserId)
+      : { handle: null, avatarUrl: null };
+    const leaderHandle = leader.handle;
     const room = auction.listing.sellerId;
     const message: AuctionStateMessage = {
       type: 'AUCTION_STATE',
@@ -714,6 +782,7 @@ export class RealtimeServer {
       status: auction.status,
       currentBid: auction.currentBid !== null ? formatUsdc(auction.currentBid) : null,
       leaderHandle,
+      leaderAvatar: leader.avatarUrl,
       minNextBid: formatUsdc(minNextBid(auction.currentBid, auction.startingBid, cfg)),
       durationSeconds: auction.durationSeconds,
       endsAt: auction.endsAt ? auction.endsAt.getTime() : null,
@@ -742,11 +811,17 @@ export class RealtimeServer {
   }
 
   private async handleOf(userId: string): Promise<string | null> {
+    return (await this.identityOf(userId)).handle;
+  }
+
+  /** Handle + avatar in one lookup, for the messages that show a face next to a
+   *  name (leader line, win celebration, bid feed). */
+  private async identityOf(userId: string): Promise<{ handle: string | null; avatarUrl: string | null }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { handle: true },
+      select: { handle: true, avatarUrl: true },
     });
-    return user?.handle ?? null;
+    return { handle: user?.handle ?? null, avatarUrl: user?.avatarUrl ?? null };
   }
 
   private sendToConn(conn: Conn, message: ServerMessage): void {

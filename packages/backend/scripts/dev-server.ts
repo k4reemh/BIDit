@@ -28,6 +28,7 @@ import {
   verifyWalletSignature,
   isValidWalletAddress,
   issueWsTicket,
+  verifyPassword,
 } from '../src/auth.js';
 import {
   findOrCreateByWallet,
@@ -46,6 +47,7 @@ import {
   loadSessionRevocations,
   eraseUserData,
 } from '../src/authz.js';
+import { exportDepositSecretKey } from '../src/wallet.js';
 import {
   sendVerificationCode,
   verifyEmailCode,
@@ -155,6 +157,18 @@ function moneyRateLimited(userId: string): boolean {
   recent.push(now);
   moneyHits.set(userId, recent);
   return recent.length > 20; // >20 money actions / minute / user
+}
+
+// Revealing a wallet key is the single most sensitive read in the app, so it
+// gets its own hard limiter on top of the password check: a handful of tries an
+// hour is plenty for a real user and closes the door on grinding at it.
+const keyExportHits = new Map<string, number[]>();
+function keyExportRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const recent = (keyExportHits.get(userId) ?? []).filter((t) => now - t < 3_600_000);
+  recent.push(now);
+  keyExportHits.set(userId, recent);
+  return recent.length > 5; // >5 attempts / hour / user
 }
 
 // Throttle coin-create PREPAREs per-USER: each one costs two external API calls
@@ -599,6 +613,37 @@ async function main() {
       // and is swept; the mock-only simulator lives at /dev/simulate-deposit (gated
       // by devEndpoints + MockChain). A body-driven credit endpoint here would let
       // any signed-in user mint balance, so it must never exist.
+      /**
+       * Reveal the user's OWN deposit-wallet private key.
+       *
+       * Deliberately POST + password re-entry, not a plain authed GET: a stolen
+       * or borrowed session must not be enough to walk off with a key. Verified
+       * email is required too, and the response is marked no-store so it can't
+       * linger in a cache. The key itself is never logged.
+       */
+      if (req.method === 'POST' && p === '/wallet/export-key') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
+        if (keyExportRateLimited(userId)) {
+          return send(res, 429, { error: 'Too many attempts. Try again later.' });
+        }
+        const b = await readJson(req);
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { passwordHash: true },
+        });
+        // Accounts with a password must re-enter it. A wallet-login account has
+        // none — signing in already proved key ownership, so the session stands.
+        if (user?.passwordHash) {
+          const ok = await verifyPassword(String(b.password ?? ''), user.passwordHash);
+          if (!ok) return send(res, 403, { error: 'That password is not right.' });
+        }
+        const exported = exportDepositSecretKey(userId);
+        console.log(`[wallet] deposit key exported for user=${userId}`); // never the key
+        res.setHeader('cache-control', 'no-store');
+        return send(res, 200, exported);
+      }
       if (req.method === 'POST' && p === '/withdraw') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1612,7 +1657,7 @@ async function pumpCoinInfo(mint: string) {
 async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
     where: { pumpCoinAddress: { not: null } },
-    include: { user: { select: { id: true, handle: true } } },
+    include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
   const rows = await Promise.all(
     profiles.map(async (pf) => {
@@ -1628,6 +1673,7 @@ async function liveCoins(viewerCount: (room: string) => number) {
       return {
         coin: pf.pumpCoinAddress!,
         sellerHandle: pf.user.handle,
+        sellerAvatar: pf.user.avatarUrl ?? null,
         room: pf.userId,
         hasAuction: auction !== null,
         hasGiveaway: giveaway !== null,

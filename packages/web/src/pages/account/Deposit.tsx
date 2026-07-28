@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
-import { simulateDeposit, withdraw, refreshMe, money2 } from '../../api';
+import { simulateDeposit, withdraw, refreshMe, money2, exportWalletKey } from '../../api';
 import { Copy, Check, Wallet, Shield } from '../../icons';
 
 export default function Deposit() {
@@ -20,6 +20,36 @@ export default function Deposit() {
   const [wBusy, setWBusy] = useState(false);
   const [wErr, setWErr] = useState('');
   const [wOk, setWOk] = useState('');
+
+  // Private-key export. Held in component state only for as long as the card is
+  // open — never written to storage, and cleared when they hide it again.
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [keyPw, setKeyPw] = useState('');
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyErr, setKeyErr] = useState('');
+  const [secret, setSecret] = useState('');
+  const [keyCopied, setKeyCopied] = useState(false);
+
+  const revealKey = async () => {
+    setKeyBusy(true);
+    setKeyErr('');
+    try {
+      const r = await exportWalletKey(keyPw);
+      setSecret(r.secretKeyBase58);
+      setKeyPw('');
+    } catch (err) {
+      setKeyErr(err instanceof Error ? err.message : 'Could not export the key.');
+    } finally {
+      setKeyBusy(false);
+    }
+  };
+
+  const hideKey = () => {
+    setSecret('');
+    setKeyPw('');
+    setKeyErr('');
+    setKeyOpen(false);
+  };
 
   const refresh = async () => setSession(await refreshMe());
 
@@ -113,6 +143,69 @@ export default function Deposit() {
           <button className="btn btn-primary" onClick={doWithdraw} disabled={wBusy || !wAmt || !wTo.trim()}>{wBusy ? 'Sending…' : 'Withdraw'}</button>
           <span className="muted" style={{ fontSize: 13 }}>Wallet: ${money2(session.settled)}</span>
         </div>
+      </div>
+
+      <div className="card acct-card">
+        <h3 className="acct-sub">Export your wallet key</h3>
+        <p className="muted acct-note">
+          Your deposit address is a real Solana wallet. Export its private key to import the same
+          wallet into Phantom or Solflare.
+        </p>
+        <div className="keyx__warn">
+          <Shield width={16} height={16} />
+          <span>
+            <b>Anyone with this key controls that wallet.</b> Never share it or paste it into a site
+            that asks for it. BIDit will never ask you for it. Note that USDC sent to this address is
+            still swept into your BIDit balance automatically, so don’t use it as a personal wallet.
+          </span>
+        </div>
+        {!keyOpen ? (
+          <div className="acct-actions">
+            <button className="btn btn-ghost" onClick={() => setKeyOpen(true)}>Export private key</button>
+          </div>
+        ) : secret ? (
+          <>
+            <div className="fld">
+              <label>Private key (base58)</label>
+              <code className="keyx__secret">{secret}</code>
+            </div>
+            <div className="acct-actions">
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  navigator.clipboard?.writeText(secret).then(() => {
+                    setKeyCopied(true);
+                    setTimeout(() => setKeyCopied(false), 1800);
+                  })
+                }
+              >
+                {keyCopied ? 'Copied' : 'Copy key'}
+              </button>
+              <button className="btn btn-ghost" onClick={hideKey}>Hide</button>
+            </div>
+          </>
+        ) : (
+          <>
+            {keyErr && <div className="auth__error">{keyErr}</div>}
+            <div className="fld">
+              <label>Confirm your password</label>
+              <input
+                type="password"
+                value={keyPw}
+                onChange={(e) => setKeyPw(e.target.value)}
+                placeholder="Your BIDit password"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter' && keyPw) void revealKey(); }}
+              />
+            </div>
+            <div className="acct-actions">
+              <button className="btn btn-primary" onClick={() => void revealKey()} disabled={keyBusy || !keyPw}>
+                {keyBusy ? 'Checking…' : 'Reveal key'}
+              </button>
+              <button className="btn btn-ghost" onClick={hideKey}>Cancel</button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card acct-card deposit-soon">

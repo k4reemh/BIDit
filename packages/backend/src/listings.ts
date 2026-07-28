@@ -96,10 +96,17 @@ export async function setListingWheel(
     throw new Error(`wheel can only be set while the listing is QUEUED (${listing.status})`);
   }
   const entries = normalizeWheelEntries(rawEntries);
+  // A prize's weight is how many copies are in the pool, so the pool's total is
+  // how many times this wheel can be auctioned. Setting the listing's quantity
+  // to that total is what lets a wheel run again after each spin: settlement
+  // returns a listing to QUEUED while stock remains (see orders.ts), and
+  // consumeWheelPrize keeps the two in step as prizes are won.
+  const stock = entries.reduce((n, e) => n + (e.weight && e.weight > 0 ? e.weight : 1), 0);
   await prisma.listing.update({
     where: { id: listingId },
     data: {
       wheel: entries.length ? (entries as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+      ...(entries.length ? { quantity: Math.min(stock, MAX_QUANTITY) } : {}),
     },
   });
   return entries;

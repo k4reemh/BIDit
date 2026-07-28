@@ -86,7 +86,7 @@ export default function ChatPanel({
         {msgs.length === 0 && <p className="chat__empty">No messages yet. Say hi.</p>}
         {msgs.map((m) => (
           <div key={m.id} className="chat__msg">
-            <Avatar handle={m.handle} size={26} />
+            <Avatar handle={m.handle} src={m.avatarUrl} size={26} />
             <div className="chat__bubble">
               <span className="chat__who">@{m.handle}</span>{' '}
               <span className="chat__text">{m.text}</span>

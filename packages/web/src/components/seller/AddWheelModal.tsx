@@ -9,6 +9,7 @@ const blank = (): Prize => ({ label: '', quantity: '1', image: '' });
 export default function AddWheelModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = useState('');
   const [startingBid, setStartingBid] = useState('1');
+  const [cover, setCover] = useState(''); // the wheel's own photo, like an item's
   const [prizes, setPrizes] = useState<Prize[]>([blank(), blank(), blank()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +39,11 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
     }
     setBusy(true);
     try {
-      const listing = await createListing({ title: title.trim(), startingBid });
+      const listing = await createListing({
+        title: title.trim(),
+        startingBid,
+        ...(cover ? { imageUrl: cover } : {}),
+      });
       await setWheel(listing.id, entries);
       onCreated();
     } catch (err) {
@@ -67,13 +72,25 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
             </label>
           </div>
 
+          <label className="auth__field">
+            <span>Wheel photo <span className="muted">(optional)</span></span>
+            <ImageUpload
+              value={cover}
+              onChange={setCover}
+              label="Drag a photo here, or click to upload"
+              hint="Shown on the wheel's card and while bidding, just like an item."
+            />
+          </label>
+
           <div className="wheel-build">
             <div className="wheel-build__head wheel-build__head--v2">
               <span>Photo</span><span>Prize</span><span>Qty</span><span />
             </div>
             {prizes.map((p, i) => (
               <div className="wheel-build__row wheel-build__row--v2" key={i}>
-                <ImageUpload value={p.image} onChange={(v) => setPrize(i, { image: v })} compact />
+                {/* Thumbnail-sized: prize art ships inside the spin broadcast,
+                    and renders no larger than a reel row. */}
+                <ImageUpload value={p.image} onChange={(v) => setPrize(i, { image: v })} compact max={220} quality={0.75} />
                 <input className="wb-label" value={p.label} onChange={(e) => setPrize(i, { label: e.target.value })} placeholder={i === 0 ? 'Charizard ex Alt Art' : 'Prize name'} />
                 <input className="wb-qty" value={p.quantity} onChange={(e) => setPrize(i, { quantity: e.target.value.replace(/[^0-9]/g, '') })} placeholder="1" inputMode="numeric" title="How many in the pool. More copies, better odds." />
                 <button type="button" className="wb-del" onClick={() => removeRow(i)} disabled={prizes.length <= 2} aria-label="Remove"><Trash width={16} height={16} /></button>

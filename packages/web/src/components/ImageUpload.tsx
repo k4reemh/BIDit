@@ -3,7 +3,7 @@ import { Camera, X } from '../icons';
 
 /** Read an image file, downscale it, and return a compressed data URL — so photos
  *  can be stored inline (no upload infra) without bloating the DB. */
-async function fileToDataUrl(file: File, max = 900, quality = 0.82): Promise<string> {
+async function fileToDataUrl(file: File, max: number = 900, quality: number = 0.82): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const w = Math.max(1, Math.round(bitmap.width * scale));
@@ -25,12 +25,18 @@ export default function ImageUpload({
   label = 'Photo',
   hint,
   compact = false,
+  max,
+  quality,
 }: {
   value: string;
   onChange: (v: string) => void;
   label?: string;
   hint?: string;
   compact?: boolean;
+  /** Longest edge in px. Lower it for images that ride inside API payloads
+   *  (avatars, wheel prizes) rather than being fetched on their own. */
+  max?: number;
+  quality?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -40,7 +46,7 @@ export default function ImageUpload({
     if (!file || !file.type.startsWith('image/')) return;
     setBusy(true);
     try {
-      onChange(await fileToDataUrl(file));
+      onChange(await fileToDataUrl(file, max, quality));
     } catch {
       /* ignore */
     } finally {

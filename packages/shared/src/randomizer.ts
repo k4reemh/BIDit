@@ -90,12 +90,15 @@ export function buildReel(
 ): { reel: ReelSlot[]; targetIndex: number } {
   if (entries.length === 0) throw new Error('wheel has no entries');
   const reps = Math.max(4, repeats);
+  // Slots deliberately carry NO image: the reel repeats the entry list `reps`
+  // times, so duplicating a data URL here would multiply the broadcast by 8.
+  // Clients resolve a slot's art from the message's `entries` via
+  // `entries[i % entries.length]` (the reel is the entry list, in order).
   const reel: ReelSlot[] = [];
   for (let r = 0; r < reps; r++) {
     for (const e of entries) {
       const slot: ReelSlot = { label: e.label };
       if (e.tier) slot.tier = e.tier;
-      if (e.imageUrl) slot.imageUrl = e.imageUrl;
       reel.push(slot);
     }
   }
@@ -113,7 +116,11 @@ export function buildReel(
 export const MAX_WHEEL_ENTRIES = 64;
 const MAX_WHEEL_LABEL_LEN = 120;
 const MAX_WHEEL_TIER_LEN = 40;
-const MAX_WHEEL_IMAGE_LEN = 2000;
+/** Prize art is uploaded as an inline data URL, so this has to fit one. The
+ *  seller UI downscales to a ~200px thumbnail (single-digit KB); this is the
+ *  backstop. It was 2000, which silently truncated every data URL into a broken
+ *  image — the reason wheel prizes rendered blank. */
+const MAX_WHEEL_IMAGE_LEN = 60_000;
 
 export function normalizeWheelEntries(raw: unknown): WheelEntry[] {
   if (!Array.isArray(raw)) return [];

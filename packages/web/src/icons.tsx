@@ -15,6 +15,14 @@ const base = (p: SVGProps<SVGSVGElement>) => ({
 export const Search = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.2-3.2" /></svg>
 );
+/** Theatre mode: a wide frame with arrows pushing outward. */
+export const Theater = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M8 10 5.5 12 8 14M16 10l2.5 2-2.5 2" /></svg>
+);
+/** Leave theatre mode: same frame, arrows pulling inward. */
+export const TheaterExit = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M5.5 10 8 12l-2.5 2M18.5 10 16 12l2.5 2" /></svg>
+);
 /** Filled seal-with-check — the verified-seller mark on live cards. */
 export const Verified = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base({ ...p, strokeWidth: 0, fill: 'currentColor', stroke: 'none' })}>

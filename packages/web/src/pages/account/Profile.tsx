@@ -67,11 +67,16 @@ export default function Profile() {
         </div>
         <div className="fld">
           <label>Profile picture <span className="muted">(optional)</span></label>
+          {/* Small on purpose: the avatar rides inline in chat lines, live
+              cards and bid feeds, so it has to stay a few KB, and it never
+              renders larger than 40px anyway. */}
           <ImageUpload
             value={avatarUrl}
             onChange={setAvatarUrl}
             label="Drag a photo here, or click to upload"
             hint="PNG or JPG"
+            max={256}
+            quality={0.8}
           />
         </div>
         <div className="fld">

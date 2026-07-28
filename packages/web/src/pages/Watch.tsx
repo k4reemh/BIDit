@@ -5,7 +5,7 @@ import ChatPanel from '../components/ChatPanel';
 import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
 import ShopOverlay from '../components/ShopOverlay';
-import { Bag, Verified } from '../icons';
+import { Bag, Verified, Theater, TheaterExit } from '../icons';
 
 // livekit-client is heavy — only load it on the watch page (and only this chunk).
 const PumpStream = lazy(() => import('../components/PumpStream'));
@@ -24,6 +24,19 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   const [resolved, setResolved] = useState<ResolvedRoom | null | undefined>(undefined); // undefined = loading
   const [pump, setPump] = useState<PumpCoin | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
+  // Theatre mode: 'off' is the normal page, 'on' widens the stage to the full
+  // window with the bid panel still alongside, and 'wide' shrinks the panel
+  // further when the stream wants even more room. Desktop only (CSS ignores it
+  // under 1000px, where the panel already stacks below the stream).
+  const [theater, setTheater] = useState<'off' | 'on' | 'wide'>('off');
+
+  // Esc leaves theatre mode, the way every video player behaves.
+  useEffect(() => {
+    if (theater === 'off') return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setTheater('off'); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [theater]);
 
   useEffect(() => {
     let alive = true;
@@ -39,7 +52,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   const sellerHandle = resolved?.sellerHandle;
 
   return (
-    <main className="container watch">
+    <main className={`watch${theater === 'off' ? ' container' : ` watch--theater watch--${theater}`}`}>
       <div className="watch__grid">
         <section className="watch__stage">
           <div className="theater">
@@ -64,7 +77,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
             <div className="theater__top">
               {sellerHandle && (
                 <span className="theater__seller">
-                  <Avatar handle={sellerHandle} size={22} /> @{sellerHandle}
+                  <Avatar handle={sellerHandle} src={resolved?.sellerAvatar} size={22} /> @{sellerHandle}
                   {resolved?.verified && <Verified className="theater__seal" width={15} height={15} aria-label="Verified seller" />}
                 </span>
               )}
@@ -73,6 +86,27 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
                   <Bag width={16} height={16} /> Shop
                 </button>
               )}
+              <div className="theater__modes">
+                {theater !== 'off' && (
+                  <button
+                    className="theater__mode"
+                    onClick={() => setTheater(theater === 'on' ? 'wide' : 'on')}
+                    title={theater === 'on' ? 'Give the stream more room' : 'Give the bid panel more room'}
+                    aria-label={theater === 'on' ? 'Widen the stream' : 'Restore the bid panel'}
+                  >
+                    {theater === 'on' ? '⟨⟩' : '⟩⟨'}
+                  </button>
+                )}
+                <button
+                  className="theater__mode"
+                  onClick={() => setTheater(theater === 'off' ? 'on' : 'off')}
+                  title={theater === 'off' ? 'Theatre mode' : 'Exit theatre mode (Esc)'}
+                  aria-label={theater === 'off' ? 'Theatre mode' : 'Exit theatre mode'}
+                  aria-pressed={theater !== 'off'}
+                >
+                  {theater === 'off' ? <Theater width={17} height={17} /> : <TheaterExit width={17} height={17} />}
+                </button>
+              </div>
             </div>
           </div>
           <div className="watch__meta">

@@ -29,6 +29,8 @@ export interface ResolvedRoom {
   sellerHandle: string;
   /** Trust badge (10 fulfilled orders or an admin). Shown next to the handle. */
   verified: boolean;
+  /** Seller's profile photo, if set. */
+  sellerAvatar?: string | null;
 }
 
 /** Map a Pump.fun coin address -> the seller's room, if a seller has linked it.
@@ -44,10 +46,15 @@ export async function resolveRoomByCoin(
   const profile = await prisma.sellerProfile.findFirst({
     where: { pumpCoinAddress: coin },
     orderBy: { createdAt: 'desc' },
-    include: { user: { select: { id: true, handle: true } } },
+    include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
   if (!profile) return null;
-  return { room: profile.user.id, sellerHandle: profile.user.handle, verified: profile.verified };
+  return {
+    room: profile.user.id,
+    sellerHandle: profile.user.handle,
+    verified: profile.verified,
+    sellerAvatar: profile.user.avatarUrl ?? null,
+  };
 }
 
 /** Force-give `coinAddress` to `sellerId`, releasing it from anyone else who had it.
