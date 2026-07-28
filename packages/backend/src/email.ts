@@ -35,13 +35,35 @@ export function paragraph(text: string): string {
   return `<p style="margin:0 0 8px">${escapeHtml(text)}</p>`;
 }
 
-export async function sendEmail(msg: EmailMessage): Promise<void> {
+/** Is real delivery configured? Used by the startup banner and /health so an
+ *  operator can tell at a glance whether codes are being mailed or only logged. */
+export const emailEnabled = (): boolean => !!process.env.RESEND_API_KEY;
+
+/** The From address in force. Exposed for the startup banner — a wrong or
+ *  unverified From is the single most common reason nothing arrives. */
+export const emailFrom = (): string =>
+  process.env.BIDIT_EMAIL_FROM ?? 'BIDit <onboarding@resend.dev>';
+
+export interface SendResult {
+  ok: boolean;
+  /** Why it failed, safe to show an admin. Never contains the API key. */
+  error?: string;
+}
+
+/**
+ * Send one transactional email. Never throws — a failed verification mail must
+ * not fail the signup that triggered it — but it now REPORTS the outcome so
+ * callers (and the admin test endpoint) can surface it. Silent failure here
+ * used to be indistinguishable from success, which made a misconfigured domain
+ * impossible to diagnose from outside the server logs.
+ */
+export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.BIDIT_EMAIL_FROM ?? 'BIDit <onboarding@resend.dev>';
+  const from = emailFrom();
   const subject = cleanSubject(msg.subject);
   if (!key) {
     console.log(`[email:noop] to=${msg.to} subject=${JSON.stringify(subject)} (set RESEND_API_KEY to send)`);
-    return;
+    return { ok: false, error: 'RESEND_API_KEY is not set, so nothing was sent.' };
   }
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -49,8 +71,18 @@ export async function sendEmail(msg: EmailMessage): Promise<void> {
       headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
       body: JSON.stringify({ from, to: msg.to, subject, html: msg.html }),
     });
-    if (!res.ok) console.error('[email] send failed', res.status, await res.text().catch(() => ''));
+    const body = await res.text().catch(() => '');
+    if (!res.ok) {
+      // Resend's body says exactly what's wrong (unverified domain, bad From,
+      // sandbox-recipient restriction). Log it verbatim — it's the whole answer.
+      console.error(`[email] send FAILED ${res.status} from=${from} to=${msg.to} :: ${body}`);
+      return { ok: false, error: `Resend responded ${res.status}: ${body || '(empty body)'}` };
+    }
+    console.log(`[email] sent to=${msg.to} from=${from} subject=${JSON.stringify(subject)}`);
+    return { ok: true };
   } catch (err) {
-    console.error('[email] error', (err as Error)?.message ?? err);
+    const error = (err as Error)?.message ?? String(err);
+    console.error('[email] network error', error);
+    return { ok: false, error };
   }
 }

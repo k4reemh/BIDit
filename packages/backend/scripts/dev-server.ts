@@ -50,6 +50,7 @@ import {
 } from '../src/authz.js';
 import { exportDepositSecretKey } from '../src/wallet.js';
 import { requestPasswordReset, resetPassword } from '../src/password-reset.js';
+import { sendEmail, emailShell, paragraph, emailEnabled, emailFrom } from '../src/email.js';
 import {
   sendVerificationCode,
   verifyEmailCode,
@@ -377,6 +378,14 @@ async function main() {
   const devEndpoints = !isProd && (chain.cluster === 'mock' || process.env.BIDIT_ENABLE_DEV_ENDPOINTS === 'yes');
 
   console.log(`[chain] cluster=${chain.cluster} · payout=${directPayout ? 'DIRECT (no escrow, no fee)' : 'escrow (95/5)'} · dev-endpoints=${devEndpoints ? 'on' : 'off'}`);
+  // Email is the delivery path for verification + password-reset codes. Say
+  // plainly whether it is live, since a missing key silently degrades to
+  // "codes are only printed in these logs".
+  if (emailEnabled()) {
+    console.log(`[email] delivery ON · from=${emailFrom()}`);
+  } else {
+    console.warn('[email] ⚠️  RESEND_API_KEY not set — verification and reset codes are LOGGED, not delivered.');
+  }
   if (chain.cluster === 'mainnet-beta') {
     console.log('[chain] ⚠️  MAINNET — REAL USDC WILL MOVE. treasury:', chain.walletAddress('treasury'));
   }
@@ -456,6 +465,9 @@ async function main() {
         mainnet: chain.cluster === 'mainnet-beta',
         payout: directPayout ? 'direct' : 'escrow',
         devEndpoints,
+        // Whether transactional email can actually be delivered. Boolean only —
+        // never the key or the From address.
+        email: emailEnabled(),
         production: isProd,
         time: new Date().toISOString(),
       });
@@ -1520,6 +1532,30 @@ async function main() {
         const released = await releaseOrdersForShipment(String(b.shipmentId ?? ''), escrow, systemClock, prisma);
         if (released.length === 0) return send(res, 400, { error: 'Nothing to release: no order is in the dispute window.' });
         return send(res, 200, { ok: true, released: released.length });
+      }
+      /**
+       * Send a test email and report exactly what happened. Admin-only.
+       * Resend's failure reasons (unverified domain, bad From, sandbox
+       * recipient limits) are the actual answer when mail goes missing, and
+       * they're invisible from the app otherwise.
+       */
+      if (req.method === 'POST' && p === '/admin/test-email') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        const to = String(b.to ?? '').trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return send(res, 400, { error: 'Give a valid "to" address.' });
+        const result = await sendEmail({
+          to,
+          subject: 'BIDit test email',
+          html: emailShell('Test email', paragraph('If you are reading this, BIDit can deliver mail.')),
+        });
+        return send(res, result.ok ? 200 : 502, {
+          ...result,
+          from: emailFrom(),
+          configured: emailEnabled(),
+        });
       }
       if (req.method === 'GET' && p === '/admin/orders') {
         const userId = authUser(req);
