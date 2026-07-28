@@ -141,6 +141,32 @@ export async function registerWithEmail(
 }
 
 /** Finish onboarding: set the chosen username, display name and interests. */
+/**
+ * Claim a username on its own, without finishing onboarding.
+ *
+ * Onboarding used to only validate the handle on its final submit, so someone
+ * who picked a taken name learned about it several screens later. The username
+ * step calls this on Continue instead: it either takes the name now or fails
+ * right there. Re-affirming a name you already hold is a no-op.
+ */
+export async function setHandle(
+  userId: string,
+  rawHandle: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<User> {
+  const handle = rawHandle.trim().toLowerCase();
+  if (!HANDLE_RE.test(handle)) throw new AuthError('Username must be 3–20 chars: letters, numbers or underscores.');
+  const taken = await prisma.user.findUnique({ where: { handle }, select: { id: true } });
+  if (taken && taken.id !== userId) throw new AuthError('That username is taken.');
+  try {
+    return await prisma.user.update({ where: { id: userId }, data: { handle } });
+  } catch (err) {
+    // Someone claimed it between the check and the write.
+    if (isUniqueViolation(err, 'handle')) throw new AuthError('That username is taken.');
+    throw err;
+  }
+}
+
 export async function completeOnboarding(
   userId: string,
   input: { handle?: string; displayName?: string; interests?: string[] },
@@ -308,7 +334,7 @@ export async function submitSellerOnboarding(
     website?: string;
     socials?: Record<string, string> | null;
     pitch?: string;
-    origin?: { country?: string; region?: string; city?: string; postal?: string };
+    origin?: { name?: string; line1?: string; line2?: string; country?: string; region?: string; city?: string; postal?: string };
   },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
@@ -322,7 +348,15 @@ export async function submitSellerOnboarding(
       ...(input.socials !== undefined ? { socials: (input.socials ?? null) as Prisma.InputJsonValue } : {}),
       ...(input.pitch !== undefined ? { pitch: str(input.pitch) } : {}),
       ...(input.origin !== undefined
-        ? { originCountry: str(o.country), originRegion: str(o.region), originCity: str(o.city), originPostal: str(o.postal) }
+        ? {
+            originName: str(o.name),
+            originLine1: str(o.line1),
+            originLine2: str(o.line2),
+            originCountry: str(o.country),
+            originRegion: str(o.region),
+            originCity: str(o.city),
+            originPostal: str(o.postal),
+          }
         : {}),
     },
   });

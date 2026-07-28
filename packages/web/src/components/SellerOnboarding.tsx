@@ -25,6 +25,9 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
   const [pitch, setPitch] = useState(session.pitch ?? '');
   const [coin, setCoin] = useState(session.pumpCoinAddress ?? '');
   const [usedPaste, setUsedPaste] = useState(false); // only a pasted coin is ever sent on finish
+  const [name, setName] = useState(session.shipping?.originName ?? session.displayName ?? '');
+  const [line1, setLine1] = useState(session.shipping?.originLine1 ?? '');
+  const [line2, setLine2] = useState(session.shipping?.originLine2 ?? '');
   const [country, setCountry] = useState(session.shipping?.originCountry ?? '');
   const [region, setRegion] = useState(session.shipping?.originRegion ?? '');
   const [city, setCity] = useState(session.shipping?.originCity ?? '');
@@ -45,7 +48,15 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
         // to null the link — which would wipe a coin the create flow just made.
         ...(usedPaste && coin.trim() ? { coinAddress: coin.trim() } : {}),
         socials,
-        origin: { country: country.trim(), region: region.trim(), city: city.trim(), postal: postal.trim() },
+        origin: {
+          name: name.trim(),
+          line1: line1.trim(),
+          line2: line2.trim(),
+          country: country.trim(),
+          region: region.trim(),
+          city: city.trim(),
+          postal: postal.trim(),
+        },
       });
       setSession(s);
     } catch (err) {
@@ -54,7 +65,26 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
     }
   };
 
-  const next = () => (step < LAST ? setStep(step + 1) : finish());
+  // Ship-from is the one step that can't be skipped: without a name and a real
+  // street address we can't buy a carrier label, so a seller who skipped it
+  // would only discover the problem when their first order needed shipping.
+  const SHIP_STEP = 3;
+  const missingShip = [
+    !name.trim() && 'your name',
+    !line1.trim() && 'street address',
+    !city.trim() && 'city',
+    !country.trim() && 'country',
+    !postal.trim() && 'postal code',
+  ].filter(Boolean) as string[];
+
+  const next = () => {
+    setError('');
+    if (step === SHIP_STEP && missingShip.length > 0) {
+      setError(`We need ${missingShip.join(', ')} to create your shipping labels.`);
+      return;
+    }
+    return step < LAST ? setStep(step + 1) : finish();
+  };
 
   return (
     <main className="container sob">
@@ -89,7 +119,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
 
         {step === 1 && (
           <>
-            <h1 className="display sob__title">Your shop</h1>
+            <h1 className="display sob__title">Your shop <span className="sob__opt">Optional</span></h1>
             <p className="muted sob__sub">Link your socials so buyers know it’s really you. All optional. You can add these later in Settings.</p>
             <div className="fld"><label>X / Twitter</label><input value={x} onChange={(e) => setX(e.target.value)} placeholder="@yourhandle" /></div>
             <div className="fld-row">
@@ -103,7 +133,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
 
         {step === 2 && (
           <>
-            <h1 className="display sob__title">Your stream</h1>
+            <h1 className="display sob__title">Your stream <span className="sob__opt">Optional</span></h1>
             {session.pumpCoinAddress ? (
               <>
                 <p className="muted sob__sub">Your livestream coin is linked. Buyers who open its pump.fun page see your live BIDit auctions.</p>
@@ -134,7 +164,13 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
         {step === 3 && (
           <>
             <h1 className="display sob__title">Where do you ship from?</h1>
-            <p className="muted sob__sub">We use this to calculate accurate shipping costs for buyers, based on distance and item weight.</p>
+            <p className="muted sob__sub">
+              This is the return address printed on your shipping labels, and it sets the shipping
+              cost buyers see. It stays private to buyers. <b>Required</b> before you can sell.
+            </p>
+            <div className="fld"><label>Full name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name on the label" autoFocus /></div>
+            <div className="fld"><label>Street address</label><input value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="123 Main St" /></div>
+            <div className="fld"><label>Apt, suite, unit <span className="muted">(optional)</span></label><input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Unit 4" /></div>
             <div className="fld-row">
               <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>
               <div className="fld"><label>State / Region</label><input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CA, AB…" /></div>
@@ -165,9 +201,17 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
 
         <div className="sob__actions">
           {step > 0 ? <button className="btn btn-ghost" onClick={() => setStep(step - 1)} disabled={busy}>Back</button> : <span />}
-          <button className="btn btn-primary btn-lg" onClick={next} disabled={busy}>
-            {busy ? 'Saving…' : step === LAST ? 'Go to dashboard' : 'Continue'} {!busy && <ArrowRight width={18} height={18} />}
-          </button>
+          <div className="sob__right">
+            {/* Shop and stream can wait; ship-from can't (labels need it). */}
+            {(step === 1 || step === 2) && (
+              <button className="sob__later" onClick={() => setStep(step + 1)} disabled={busy}>
+                Add later
+              </button>
+            )}
+            <button className="btn btn-primary btn-lg" onClick={next} disabled={busy}>
+              {busy ? 'Saving…' : step === LAST ? 'Go to dashboard' : 'Continue'} {!busy && <ArrowRight width={18} height={18} />}
+            </button>
+          </div>
         </div>
       </div>
     </main>

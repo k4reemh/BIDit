@@ -32,11 +32,15 @@ export default function ChatPanel({
   const feedRef = useRef<HTMLDivElement | null>(null);
   const [, setTick] = useState(0);
   const isOwner = !!session && session.userId === room;
+  // The server decides who may moderate (owner or one of their moderators) and
+  // says so on CHAT_HISTORY; the owner check is just an optimistic default.
+  const [canMod, setCanMod] = useState(false);
+  const canModerate = isOwner || canMod;
 
   useEffect(() => {
     if (!session) return; // socket is token-gated — signed-out shows the CTA below
     const c = openRoom(room, {
-      onChatHistory: (list, cd) => { setMsgs(list); setCooldownMs(cd); },
+      onChatHistory: (list, cd, mod) => { setMsgs(list); setCooldownMs(cd); setCanMod(mod); },
       onChat: (m) => setMsgs((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m].slice(-200))),
       onChatDeleted: (id) => setMsgs((prev) => prev.filter((m) => m.id !== id)),
       onChatRejected: (r) => {
@@ -91,7 +95,7 @@ export default function ChatPanel({
               <span className="chat__who">@{m.handle}</span>{' '}
               <span className="chat__text">{m.text}</span>
             </div>
-            {isOwner && m.senderId !== room && (
+            {canModerate && m.senderId !== room && (
               <div className="chat__mod">
                 <button title="Delete message" onClick={() => ctl.current?.deleteChat(m.id)}><Trash width={13} height={13} /></button>
                 <button title="Block user" onClick={() => ctl.current?.blockUser(m.senderId)}><Shield width={13} height={13} /></button>

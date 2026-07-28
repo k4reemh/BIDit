@@ -12,6 +12,9 @@ export default function ShippingSettingsCard({
   setSession: (s: Session) => void;
 }) {
   const s = session.shipping;
+  const [name, setName] = useState(s?.originName ?? '');
+  const [line1, setLine1] = useState(s?.originLine1 ?? '');
+  const [line2, setLine2] = useState(s?.originLine2 ?? '');
   const [country, setCountry] = useState(s?.originCountry ?? '');
   const [region, setRegion] = useState(s?.originRegion ?? '');
   const [city, setCity] = useState(s?.originCity ?? '');
@@ -26,6 +29,9 @@ export default function ShippingSettingsCard({
     setBusy(true);
     try {
       await saveShippingSettings({
+        originName: name.trim() || null,
+        originLine1: line1.trim() || null,
+        originLine2: line2.trim() || null,
         originCountry: country.trim() || null,
         originRegion: region.trim() || null,
         originCity: city.trim() || null,
@@ -45,7 +51,11 @@ export default function ShippingSettingsCard({
   return (
     <div className="card acct-card">
       <h3 className="acct-sub">Shipping</h3>
-      <p className="muted acct-note">Where you ship from (used to estimate buyers’ shipping) and which options you offer.</p>
+      <p className="muted acct-note">Your return address. It prints on your shipping labels and sets the shipping cost buyers see. Buyers never see it.</p>
+
+      <div className="fld"><label>Full name</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name on the label" /></div>
+      <div className="fld"><label>Street address</label><input value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="123 Main St" /></div>
+      <div className="fld"><label>Apt, suite, unit <span className="muted">(optional)</span></label><input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Unit 4" /></div>
 
       <div className="fld-row">
         <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>

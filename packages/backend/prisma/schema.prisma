@@ -176,7 +176,13 @@ model SellerProfile {
   chatCooldownMs      Int?
   payoutWalletAddress String?
   // Ship-from origin (drives weight/zone rate quotes) + which shipping modes the
-  // seller offers on their page.
+  // seller offers on their page. Name + street are required to buy a real
+  // carrier label, which is why seller onboarding makes this step mandatory;
+  // rates alone only need city/postal, so the earlier fields sufficed before
+  // labels existed.
+  originName          String?
+  originLine1         String?
+  originLine2         String?
   originCountry       String?
   originRegion        String?
   originCity          String?
@@ -633,6 +639,22 @@ model DepositReceipt {
 /// A live-chat message in a seller's room (roomId = seller's userId). handle is a
 /// snapshot so the feed renders without a User join; deletedAt soft-deletes for
 /// seller moderation. Lightweight, no relations (matches GiveawayEntry style).
+/**
+ * A user the seller has trusted to moderate their room's live chat: same powers
+ * as the seller over messages (delete, block) and the chat cooldown, and
+ * nothing else — moderators never touch listings, orders or money.
+ */
+model ChatModerator {
+  id        String   @id @default(cuid())
+  roomId    String // the seller's userId, i.e. the room
+  userId    String // the moderator
+  handle    String // snapshot for the seller's management list
+  addedAt   DateTime @default(now())
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+}
+
 model ChatMessage {
   id        String    @id @default(cuid())
   roomId    String // seller's userId (the room)

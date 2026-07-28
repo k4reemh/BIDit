@@ -300,6 +300,9 @@ export interface ChatHistoryMessage {
   room: string;
   messages: ChatLine[];
   cooldownMs: number;
+  /** True when this viewer may delete/block in this room — the seller or one of
+   *  their moderators. Drives whether the client shows moderation controls. */
+  canModerate?: boolean;
   serverNow: number;
 }
 /** A message was removed (seller moderation) — clients drop it from the feed. */

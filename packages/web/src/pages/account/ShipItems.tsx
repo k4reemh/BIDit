@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAccount } from '../../components/AccountLayout';
 import EmptyState from '../../components/EmptyState';
 import {
@@ -22,6 +23,10 @@ const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(undefined, { mon
 
 export default function ShipItems() {
   const { session, setSession } = useAccount();
+  // Same rule the server enforces in createAndPayShipment: a label needs a
+  // street line and a country.
+  const addr = session.shippingAddress;
+  const hasAddress = !!addr?.line1?.trim() && !!addr?.country?.trim();
   const [data, setData] = useState<Fulfillment | null>(null);
   const [error, setError] = useState('');
 
@@ -52,6 +57,22 @@ export default function ShipItems() {
         <h1 className="display acct-title">Ready to ship</h1>
         <p className="muted">Cards you’ve won, held for you. Ship them whenever you like. Bundle a seller’s items to pay shipping once.</p>
       </div>
+
+      {/* Shipping is blocked server-side without a delivery address, so say it
+          here rather than letting them pick items and hit an error. */}
+      {!hasAddress && (
+        <div className="card acct-card ship-needaddr">
+          <span className="ship-needaddr__ic"><Truck width={20} height={20} /></span>
+          <div>
+            <b>Add your delivery address first</b>
+            <p className="muted">
+              We print it on the label, so nothing can ship until it&rsquo;s on file. Your wins stay
+              held for you in the meantime.
+            </p>
+          </div>
+          <Link className="btn btn-primary" to="/shipping">Add address</Link>
+        </div>
+      )}
 
       <label className="ship-priv card acct-card" style={{ alignItems: 'center', padding: '12px 14px' }}>
         <input type="checkbox" checked={session.bundleShipping ?? false} onChange={toggleBundle} />

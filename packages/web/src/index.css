@@ -1580,6 +1580,12 @@ img { display: block; max-width: 100%; }
 .obx__seg.on { background: var(--accent); }
 .obx__skip { font-size: 13.5px; font-weight: 600; color: var(--muted); background: none; border: 0; cursor: pointer; }
 .obx__skip:hover { color: var(--ink); }
+/* Balances the logo so the progress segments stay centred in the header. */
+.obx__headpad { width: 74px; }
+/* Per-step "Add later" — sits left of the primary action in the footer. */
+.obx__later { margin-left: auto; margin-right: 4px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.obx__later:hover { color: var(--ink); }
+.obx__later:disabled { opacity: 0.5; cursor: default; }
 .obx__body { display: flex; flex-direction: column; width: 100%; padding: 20px 0 8px; animation: obxin 0.38s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @keyframes obxin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .obx__eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
@@ -1990,3 +1996,34 @@ img { display: block; max-width: 100%; }
 .danger-zone .acct-sub { color: var(--red, #ff5a6a); }
 .btn-danger { background: transparent; color: var(--red, #ff5a6a); border: 1px solid rgba(255, 90, 106, 0.5); }
 .btn-danger:hover:not(:disabled) { background: rgba(255, 90, 106, 0.1); }
+
+/* ===== chat moderators (seller settings) ================================= */
+.mod__add { align-items: flex-end; }
+.mod__add .btn { flex: none; margin-bottom: 2px; }
+.mod__empty { display: flex; align-items: center; gap: 9px; padding: 14px 16px; border-radius: var(--r);
+  background: var(--surface-2); border: 1px dashed var(--line); color: var(--muted); font-size: 13.5px; }
+.mod__empty svg { flex: none; color: var(--faint); }
+.mod__list { display: flex; flex-direction: column; gap: 8px; }
+.mod__row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--r);
+  background: var(--surface-2); border: 1px solid var(--line-2); }
+.mod__handle { flex: 1; font-size: 14px; font-weight: 600; }
+.mod__remove { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px;
+  color: var(--muted); transition: background 0.14s ease, color 0.14s ease; }
+.mod__remove:hover { background: rgba(239, 59, 78, 0.12); color: var(--red); }
+
+/* Seller onboarding: optional-step affordances. */
+.sob__right { display: flex; align-items: center; gap: 14px; }
+.sob__later { font-size: 14px; font-weight: 600; color: var(--muted); }
+.sob__later:hover { color: var(--ink); }
+.sob__later:disabled { opacity: 0.5; cursor: default; }
+.sob__opt { margin-left: 10px; padding: 3px 10px; border-radius: 999px; vertical-align: middle;
+  font-family: var(--font); font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+  color: var(--muted); background: var(--surface-3); }
+
+/* Buyer can't ship without a delivery address — say so before they try. */
+.ship-needaddr { display: flex; align-items: center; gap: 14px; }
+.ship-needaddr > div { flex: 1; }
+.ship-needaddr p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; }
+.ship-needaddr__ic { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 12px;
+  background: var(--accent-soft); color: var(--accent-strong); }
+@media (max-width: 640px) { .ship-needaddr { flex-direction: column; align-items: flex-start; } }

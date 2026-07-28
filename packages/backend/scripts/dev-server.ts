@@ -46,6 +46,7 @@ import {
   revokeUserSessions,
   loadSessionRevocations,
   eraseUserData,
+  setHandle,
 } from '../src/authz.js';
 import { exportDepositSecretKey } from '../src/wallet.js';
 import {
@@ -67,7 +68,13 @@ import {
 import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
-import { CHAT_COOLDOWN_MS } from '../src/chat.js';
+import {
+  CHAT_COOLDOWN_MS,
+  canModerateRoom,
+  listRoomModerators,
+  addRoomModerator,
+  removeRoomModerator,
+} from '../src/chat.js';
 import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
 import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
 import { reconcileWallets } from '../src/audit.js';
@@ -412,6 +419,9 @@ async function main() {
       socials: (profile?.socials as Record<string, string> | null) ?? null,
       pitch: profile?.pitch ?? null,
       shipping: {
+        originName: profile?.originName ?? null,
+        originLine1: profile?.originLine1 ?? null,
+        originLine2: profile?.originLine2 ?? null,
         originCountry: profile?.originCountry ?? null,
         originRegion: profile?.originRegion ?? null,
         originCity: profile?.originCity ?? null,
@@ -500,6 +510,20 @@ async function main() {
       }
       // Confirm the emailed code. Authed: the account already exists and is
       // signed in, it just can't do anything that matters until this passes.
+      // Claim a username mid-onboarding so "that username is taken" lands on the
+      // username step rather than after the whole flow.
+      if (req.method === 'POST' && p === '/me/handle') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await setHandle(userId, String(b.handle ?? ''), prisma);
+          return send(res, 200, await sessionPayload(userId));
+        } catch (err) {
+          if (err instanceof AuthError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
       if (req.method === 'POST' && p === '/auth/verify-email') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1016,6 +1040,50 @@ async function main() {
         });
         return send(res, 200, await sessionPayload(userId));
       }
+      // ---- chat moderators (owner manages; moderators just use the powers) ----
+      if (req.method === 'GET' && p === '/seller/moderators') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        const mods = await listRoomModerators(userId, prisma);
+        return send(res, 200, mods.map((m) => ({ ...m, addedAt: m.addedAt.getTime() })));
+      }
+      if (req.method === 'POST' && p === '/seller/moderators') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        const b = await readJson(req);
+        const added = await addRoomModerator(userId, String(b.handle ?? ''), prisma);
+        return send(res, 200, added);
+      }
+      if (req.method === 'POST' && p === '/seller/moderators/remove') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        const b = await readJson(req);
+        await removeRoomModerator(userId, String(b.userId ?? ''), prisma);
+        return send(res, 200, { ok: true });
+      }
+      /** Set a room's chat cooldown. Open to the seller AND their moderators —
+       *  slowing a spammy chat is a moderation action, not a shop setting. */
+      if (req.method === 'POST' && p === '/room/chat-cooldown') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const room = String(b.room ?? '');
+        if (!(await canModerateRoom(room, userId, prisma))) {
+          return send(res, 403, { error: 'You can’t moderate this room.' });
+        }
+        const ALLOWED = [0, 3000, 5000, 10000, 30000];
+        const cd = Number(b.chatCooldownMs);
+        if (!ALLOWED.includes(cd)) return send(res, 400, { error: 'Pick one of the offered cooldowns.' });
+        await prisma.sellerProfile.upsert({
+          where: { userId: room },
+          update: { chatCooldownMs: cd },
+          create: { userId: room, chatCooldownMs: cd },
+        });
+        return send(res, 200, { ok: true, chatCooldownMs: cd });
+      }
       if (req.method === 'POST' && p === '/seller/shipping-settings') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1023,6 +1091,9 @@ async function main() {
         const b = await readJson(req);
         const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
         const data = {
+          originName: str(b.originName),
+          originLine1: str(b.originLine1),
+          originLine2: str(b.originLine2),
           originCountry: str(b.originCountry),
           originRegion: str(b.originRegion),
           originCity: str(b.originCity),

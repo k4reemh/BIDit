@@ -15,6 +15,11 @@ export interface ShippingAddress {
 export type ShippingMode = 'WEEKLY_BUNDLE' | 'SHIP_LATER' | 'PRIVATE';
 
 export interface ShippingSettings {
+  /** Name + street are required to buy a carrier label, so seller onboarding
+   *  makes the ship-from step mandatory. */
+  originName: string | null;
+  originLine1: string | null;
+  originLine2: string | null;
   originCountry: string | null;
   originRegion: string | null;
   originCity: string | null;
@@ -144,6 +149,13 @@ export async function updateMe(patch: {
   return req<Session>('/me', { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
+/** Take a username during onboarding, so a clash is reported on that step. */
+export async function setHandle(handle: string): Promise<Session> {
+  const s = await req<Session>('/me/handle', { method: 'POST', body: JSON.stringify({ handle }) });
+  setToken(s.token);
+  return s;
+}
+
 export async function completeOnboarding(payload: {
   handle?: string;
   displayName?: string;
@@ -191,7 +203,7 @@ export const submitSellerOnboarding = (payload: {
   socials?: Record<string, string>;
   pitch?: string;
   coinAddress?: string;
-  origin?: { country?: string; region?: string; city?: string; postal?: string };
+  origin?: { name?: string; line1?: string; line2?: string; country?: string; region?: string; city?: string; postal?: string };
 }) => req<Session>('/seller/onboarding', { method: 'POST', body: JSON.stringify(payload) });
 
 export interface SellerApplication {
@@ -425,6 +437,14 @@ export const submitCoinCreate = (p: {
   signedTxB64?: string;
 }) => req<CoinCreateStatus>('/seller/coin-create/submit', { method: 'POST', body: JSON.stringify(p) });
 export const getCoinCreateStatus = () => req<CoinCreateStatus>('/seller/coin-create/status');
+// ---- chat moderators -------------------------------------------------------
+export interface Moderator { userId: string; handle: string; addedAt: number }
+export const getModerators = () => req<Moderator[]>('/seller/moderators');
+export const addModerator = (handle: string) =>
+  req<{ userId: string; handle: string }>('/seller/moderators', { method: 'POST', body: JSON.stringify({ handle }) });
+export const removeModerator = (userId: string) =>
+  req<{ ok: boolean }>('/seller/moderators/remove', { method: 'POST', body: JSON.stringify({ userId }) });
+
 export const saveStreamSettings = (s: {
   streamTitle: string | null;
   streamCategory: string | null;

@@ -110,14 +110,84 @@ export async function postChatMessage(
   return { ...row, avatarUrl: sender?.avatarUrl ?? null };
 }
 
-/** Seller deletes a message from their own room (soft delete). Only the room owner
- *  (byUserId === room) may delete. Returns true if a row was hidden. */
+/**
+ * Who may moderate a room: the seller who owns it, plus anyone they've added as
+ * a moderator. Moderators get exactly the chat powers (delete, block, cooldown)
+ * and nothing else — listings, orders and money stay owner-only.
+ */
+export async function canModerateRoom(
+  room: string,
+  userId: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<boolean> {
+  if (userId === room) return true;
+  const mod = await prisma.chatModerator.findUnique({
+    where: { roomId_userId: { roomId: room, userId } },
+    select: { id: true },
+  });
+  return !!mod;
+}
+
+/** A moderator-management failure (bad handle, etc). Distinct from ChatError,
+ *  whose reasons are a closed union on the realtime protocol. */
+export class ModeratorError extends Error {
+  readonly status = 400;
+  constructor(message: string) {
+    super(message);
+    this.name = 'ModeratorError';
+  }
+}
+
+/** The seller's moderator list, for managing it in Settings. */
+export async function listRoomModerators(
+  room: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{ userId: string; handle: string; addedAt: Date }[]> {
+  return prisma.chatModerator.findMany({
+    where: { roomId: room },
+    orderBy: { addedAt: 'asc' },
+    select: { userId: true, handle: true, addedAt: true },
+  });
+}
+
+/** Owner-only: trust a user (by handle) to moderate this room. Idempotent. */
+export async function addRoomModerator(
+  room: string,
+  handle: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{ userId: string; handle: string }> {
+  const clean = handle.trim().replace(/^@/, '').toLowerCase();
+  if (!clean) throw new ModeratorError('Enter the username to add.');
+  const user = await prisma.user.findUnique({ where: { handle: clean }, select: { id: true, handle: true } });
+  if (!user) throw new ModeratorError('No user with that username.');
+  if (user.id === room) throw new ModeratorError('You already have every moderator power in your own room.');
+  await prisma.chatModerator.upsert({
+    where: { roomId_userId: { roomId: room, userId: user.id } },
+    create: { roomId: room, userId: user.id, handle: user.handle },
+    update: { handle: user.handle },
+  });
+  return { userId: user.id, handle: user.handle };
+}
+
+/** Owner-only: take moderator rights back. Idempotent. */
+export async function removeRoomModerator(
+  room: string,
+  userId: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  await prisma.chatModerator.deleteMany({ where: { roomId: room, userId } });
+}
+
+/** Delete a message from a room (soft delete). The room owner or one of their
+ *  moderators may delete. Returns true if a row was hidden. */
 export async function deleteChatMessage(
   params: { room: string; messageId: string; byUserId: string },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<boolean> {
-  if (params.byUserId !== params.room) throw new ChatError('BLOCKED'); // not the room owner
+  if (!(await canModerateRoom(params.room, params.byUserId, prisma))) {
+    throw new ChatError('BLOCKED'); // neither the room owner nor a moderator
+  }
   const res = await prisma.chatMessage.updateMany({
     where: { id: params.messageId, roomId: params.room, deletedAt: null },
     data: { deletedAt: clock.now() },
@@ -125,15 +195,21 @@ export async function deleteChatMessage(
   return res.count === 1;
 }
 
-/** Seller blocks a user from their own room. Only the room owner may block; a
- *  block also hides that user's existing messages. Idempotent. */
+/** Block a user from a room. The owner or a moderator may block; a block also
+ *  hides that user's existing messages. Idempotent. */
 export async function blockChatUser(
   params: { room: string; userId: string; byUserId: string },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
-  if (params.byUserId !== params.room) throw new ChatError('BLOCKED'); // not the room owner
-  if (params.userId === params.room) return; // a seller can't block themselves
+  if (!(await canModerateRoom(params.room, params.byUserId, prisma))) {
+    throw new ChatError('BLOCKED'); // neither the room owner nor a moderator
+  }
+  if (params.userId === params.room) return; // nobody can block the seller from their own room
+  // Moderators can't turn on each other, and can't remove the owner's trust.
+  if (params.userId !== params.byUserId && (await canModerateRoom(params.room, params.userId, prisma))) {
+    if (params.byUserId !== params.room) return; // only the owner may block a fellow moderator
+  }
   await prisma.chatBlock.upsert({
     where: { roomId_userId: { roomId: params.room, userId: params.userId } },
     create: { roomId: params.room, userId: params.userId },

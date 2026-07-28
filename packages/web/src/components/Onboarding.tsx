@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Logo from './Logo';
 import { INTERESTS } from '../data';
-import { completeOnboarding, type Session } from '../api';
+import { completeOnboarding, setHandle, type Session } from '../api';
 import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
@@ -11,6 +11,8 @@ const HOW = [
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const LAST = 4;
+/** The one step nobody can skip — everything downstream keys off the username. */
+const HANDLE_STEP = 1;
 const TITLES = ['Welcome to BIDit', 'Claim your username', 'What do you collect?', 'Fund your first bid', 'Earn points, catch airdrops'];
 const POINTS_PERKS = [
   { pts: '100×', t: 'on every $1 you spend' },
@@ -38,7 +40,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
     });
   };
 
-  const finish = async (skip = false) => {
+  const finish = async () => {
     setBusy(true);
     setError('');
     try {
@@ -46,18 +48,29 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setBusy(false);
-      if (!skip) setStep(1);
+      setStep(1); // the only thing that can still fail here is the username
     }
   };
 
-  const next = () => {
+  const next = async () => {
     setError('');
-    if (step === 1) {
+    // Claim the username on THIS step rather than at the end of the flow, so a
+    // taken name is reported here instead of four screens later.
+    if (step === HANDLE_STEP) {
       const h = handle.trim().toLowerCase();
       if (!HANDLE_RE.test(h)) { setError('3–20 characters: letters, numbers or underscores.'); return; }
+      setBusy(true);
+      try {
+        await setHandle(h);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not take that username.');
+        return;
+      } finally {
+        setBusy(false);
+      }
     }
     if (step < LAST) setStep(step + 1);
-    else finish();
+    else void finish();
   };
 
   return (
@@ -69,7 +82,9 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
           <div className="obx__steps">
             {[0, 1, 2, 3, 4].map((i) => <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />)}
           </div>
-          <button className="obx__skip" onClick={() => finish(true)} disabled={busy}>Skip for now</button>
+          {/* No skip-the-whole-thing button: the username is required, and the
+              optional steps carry their own "Add later" in the footer. */}
+          <span className="obx__headpad" aria-hidden />
         </div>
 
         <div className="obx__body" key={step}>
@@ -158,7 +173,16 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
           {step > 0
             ? <button className="btn btn-ghost" onClick={() => { setError(''); setStep(step - 1); }} disabled={busy}>Back</button>
             : <span />}
-          <button className="btn btn-primary btn-lg obx__next" onClick={next} disabled={busy}>
+          {step !== HANDLE_STEP && step !== 0 && (
+            <button
+              className="obx__later"
+              onClick={() => { setError(''); step < LAST ? setStep(step + 1) : void finish(); }}
+              disabled={busy}
+            >
+              Add later
+            </button>
+          )}
+          <button className="btn btn-primary btn-lg obx__next" onClick={() => void next()} disabled={busy}>
             {busy ? 'Setting up…' : step === 0 ? 'Get started' : step === LAST ? 'Start bidding' : 'Continue'}
             {!busy && <ArrowRight width={18} height={18} />}
           </button>

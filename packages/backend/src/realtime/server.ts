@@ -64,7 +64,16 @@ import { verifySession, consumeWsTicket, onSessionRevoked } from '../auth.js';
 import { settleAuction, settleAuctionDirect } from '../orders.js';
 import type { EscrowProvider } from '../escrow.js';
 import { enterGiveaway, drawGiveaway, listEntrants, type DrawResult } from '../giveaways.js';
-import { postChatMessage, deleteChatMessage, blockChatUser, listRecentChat, roomChatCooldownMs, ChatError, CHAT_BACKLOG } from '../chat.js';
+import {
+  postChatMessage,
+  deleteChatMessage,
+  blockChatUser,
+  listRecentChat,
+  roomChatCooldownMs,
+  canModerateRoom,
+  ChatError,
+  CHAT_BACKLOG,
+} from '../chat.js';
 
 interface Conn {
   id: string;
@@ -453,15 +462,17 @@ export class RealtimeServer {
     // empty (so the cooldown always arrives); gated to the first subscribe so the
     // 12s heartbeat re-subscribes don't re-send it.
     if (firstSubscribe) {
-      const [history, cooldownMs] = await Promise.all([
+      const [history, cooldownMs, canModerate] = await Promise.all([
         listRecentChat(room, CHAT_BACKLOG, this.prisma),
         roomChatCooldownMs(room, this.prisma),
+        canModerateRoom(room, conn.userId, this.prisma),
       ]);
       const out: ChatHistoryMessage = {
         type: 'CHAT_HISTORY',
         room,
         messages: history.map((m) => this.toChatLine(m)),
         cooldownMs,
+        canModerate,
         serverNow: this.clock.now().getTime(),
       };
       this.sendToConn(conn, out);

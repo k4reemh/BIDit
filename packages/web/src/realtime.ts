@@ -148,7 +148,7 @@ interface Handlers {
   onBidRejected?: (m: { auctionId: string; reason: string }) => void;
   onSpin?: (m: RandomizerSpin) => void;
   onChat?: (m: ChatLine) => void;
-  onChatHistory?: (messages: ChatLine[], cooldownMs: number) => void;
+  onChatHistory?: (messages: ChatLine[], cooldownMs: number, canModerate: boolean) => void;
   onChatDeleted?: (messageId: string) => void;
   onChatRejected?: (m: { reason: string; retryMs?: number }) => void;
 }
@@ -245,8 +245,8 @@ function dispatch(h: Handlers, raw: string): void {
       h.onChat?.((m as unknown as { line: ChatLine }).line);
       break;
     case 'CHAT_HISTORY': {
-      const h2 = m as unknown as { messages: ChatLine[]; cooldownMs: number };
-      h.onChatHistory?.(h2.messages, h2.cooldownMs);
+      const h2 = m as unknown as { messages: ChatLine[]; cooldownMs: number; canModerate?: boolean };
+      h.onChatHistory?.(h2.messages, h2.cooldownMs, h2.canModerate === true);
       break;
     }
     case 'CHAT_DELETED':
