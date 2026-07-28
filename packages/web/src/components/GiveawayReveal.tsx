@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Avatar from './Avatar';
+import ShareOnX from './ShareOnX';
 import { runConfetti } from '../lib/confetti';
 import type { GiveawayWinner } from '../realtime';
 
@@ -57,6 +58,9 @@ export default function GiveawayReveal({
       }
       setLanded(true);
       runConfetti(canvasRef.current);
+      // Same as the auction win: the winner keeps the card (it holds their share
+      // button) and closes it themselves; everyone else gets the timed reveal.
+      if (isMe) return;
       window.setTimeout(() => setLeaving(true), 5600);
       window.setTimeout(onDone, 6050);
     };
@@ -113,6 +117,17 @@ export default function GiveawayReveal({
             <div className="gvr__wprize">wins <b>{win.prize}</b></div>
             <div className="gvr__meta">{win.entrantCount} {win.entrantCount === 1 ? 'entry' : 'entries'}</div>
             <div className="gvr__fair"><i /> Provably fair · seed <code>{win.seedHash.slice(0, 10)}…</code></div>
+            {isMe && (
+              <div className="wc__actions">
+                <ShareOnX item={win.prize} kind="giveaway" />
+                <button
+                  className="wc__close"
+                  onClick={() => { setLeaving(true); window.setTimeout(onDone, 450); }}
+                >
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

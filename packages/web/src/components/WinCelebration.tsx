@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Avatar from './Avatar';
 import { runConfetti, CONFETTI } from '../lib/confetti';
+import ShareOnX from './ShareOnX';
 
 export interface WinInfo {
   winnerHandle: string;
@@ -26,6 +27,10 @@ export default function WinCelebration({ win, onDone }: { win: WinInfo; onDone: 
       win.isMe ? 190 : 110,
       4200,
     );
+    // The winner's card WAITS for them: it carries a share button, and a card
+    // that dismisses itself in four seconds gives nobody time to press it.
+    // Everyone else still gets the quick celebratory flash.
+    if (win.isMe) return;
     const t1 = window.setTimeout(() => setLeaving(true), 3900);
     const t2 = window.setTimeout(onDone, 4350);
     return () => { clearTimeout(t1); clearTimeout(t2); };
@@ -47,6 +52,17 @@ export default function WinCelebration({ win, onDone }: { win: WinInfo; onDone: 
         </div>
         <div className="wc__price">${win.amount}</div>
         <div className="wc__buyback">+${pumped} → <b>$BID</b> buyback</div>
+        {win.isMe && (
+          <div className="wc__actions">
+            <ShareOnX item={win.title} kind="auction" />
+            <button
+              className="wc__close"
+              onClick={() => { setLeaving(true); window.setTimeout(onDone, 450); }}
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     document.body,
