@@ -2078,3 +2078,6 @@ img { display: block; max-width: 100%; }
   border: 1px solid rgba(255, 255, 255, 0.18); transition: background 0.15s ease, transform 0.1s ease; }
 .sharex:hover { background: #23292f; }
 .sharex:active { transform: translateY(0.5px); }
+/* Compact variant for list rows (Purchases), where the button sits beside a
+   status pill rather than under a celebration. */
+.sharex--sm { height: 32px; padding: 0 12px; font-size: 12.5px; }

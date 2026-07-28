@@ -609,6 +609,8 @@ export interface Purchase {
   image: string | null;
   amount: string;
   stage: 'to_ship' | 'in_transit' | 'delivered';
+  /** Won at auction (as opposed to bought outright) — gates "I just won" sharing. */
+  won?: boolean;
   tracking: string | null;
   carrier: string | null;
   deliveredAt: number | null;

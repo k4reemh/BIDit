@@ -238,6 +238,8 @@ export interface BuyerPurchase {
   amount: bigint;
   /** FulfillmentItem status: READY_TO_SHIP | IN_SHIPMENT | SHIPPED | DELIVERED. */
   status: string;
+  /** True when this came from winning an auction rather than a buy-now purchase. */
+  won: boolean;
   shipment: { status: string; trackingNumber: string | null; carrier: string | null; deliveredAt: Date | null } | null;
 }
 
@@ -259,6 +261,22 @@ export async function getBuyerPurchases(buyerId: string, prisma: PrismaClient = 
       })
     : [];
   const byId = new Map(shipments.map((s) => [s.id, s]));
+
+  // Was this WON at auction, or bought outright from the shop? Only an auction
+  // order carries an auctionId. The distinction drives whether the buyer is
+  // offered "I just won this" sharing, which would be false for a buy-now.
+  const orderIds = [...new Set(items.map((i) => i.orderId).filter((x): x is string => !!x))];
+  const wonOrderIds = new Set(
+    orderIds.length
+      ? (
+          await prisma.order.findMany({
+            where: { id: { in: orderIds }, auctionId: { not: null } },
+            select: { id: true },
+          })
+        ).map((o) => o.id)
+      : [],
+  );
+
   return items.map((it) => ({
     id: it.id,
     orderId: it.orderId,
@@ -266,6 +284,7 @@ export async function getBuyerPurchases(buyerId: string, prisma: PrismaClient = 
     photo: it.photo,
     amount: it.amount,
     status: it.status,
+    won: it.orderId ? wonOrderIds.has(it.orderId) : false,
     shipment: it.shipmentId ? byId.get(it.shipmentId) ?? null : null,
   }));
 }

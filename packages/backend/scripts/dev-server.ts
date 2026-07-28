@@ -2021,6 +2021,7 @@ async function buyerPurchasesDto(buyerId: string) {
       image: r.photo,
       amount: formatUsdc(r.amount),
       stage,
+      won: r.won,
       tracking: r.shipment?.trackingNumber ?? null,
       carrier: r.shipment?.carrier ?? null,
       deliveredAt: r.shipment?.deliveredAt ? r.shipment.deliveredAt.getTime() : null,

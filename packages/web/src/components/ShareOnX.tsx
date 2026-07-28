@@ -11,11 +11,15 @@ import { XLogo } from '../icons';
 export default function ShareOnX({
   item,
   kind,
+  url,
   className = '',
 }: {
   /** What they won, e.g. the item title or giveaway prize. */
   item: string;
   kind: 'auction' | 'giveaway';
+  /** Link to attach. Defaults to the current page, which is right on a watch
+   *  page but wrong on a private account page — pass the site root there. */
+  url?: string;
   className?: string;
 }) {
   const what = item.trim() || (kind === 'giveaway' ? 'a prize' : 'a card');
@@ -24,9 +28,8 @@ export default function ShareOnX({
       ? `I just won ${what} in a free giveaway with @biditsol!`
       : `I just won ${what} on auction with @biditsol!`;
 
-  const href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(
-    typeof window === 'undefined' ? '' : window.location.href,
-  )}`;
+  const link = url ?? (typeof window === 'undefined' ? '' : window.location.href);
+  const href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
 
   return (
     <a

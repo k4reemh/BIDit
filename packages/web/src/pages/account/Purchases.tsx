@@ -4,6 +4,7 @@ import { useAccount } from '../../components/AccountLayout';
 import EmptyState from '../../components/EmptyState';
 import { getPurchases, type Purchase } from '../../api';
 import { Bag, Check } from '../../icons';
+import ShareOnX from '../../components/ShareOnX';
 
 function Thumb({ src }: { src: string | null }) {
   return src
@@ -26,6 +27,16 @@ function Row({ p }: { p: Purchase }) {
         </span>
       )}
       {p.stage === 'delivered' && <span className="acct-saved"><Check width={14} height={14} /> Delivered</span>}
+      {/* Only for auction wins: "I just won this" would be false for a buy-now.
+          Links to the site rather than this page, which is private to them. */}
+      {p.won && (
+        <ShareOnX
+          item={p.title}
+          kind="auction"
+          url={typeof window === 'undefined' ? '' : window.location.origin}
+          className="sharex--sm"
+        />
+      )}
     </div>
   );
 }
