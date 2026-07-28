@@ -100,6 +100,17 @@ model User {
   handle        String   @unique
   email         String?  @unique
   passwordHash  String?
+  // Email ownership. New email signups start false and must enter the code we
+  // mail them; wallet logins are true (they proved key ownership) and accounts
+  // that predate this feature are backfilled true on boot (see bootstrap.ts).
+  // The code itself is never stored — only an HMAC of it.
+  emailVerified Boolean  @default(false)
+  verifyCodeHash String?
+  verifyCodeExpiresAt DateTime?
+  verifyCodeSentAt    DateTime?
+  // Wrong guesses against the current code. Reset when a new code is issued;
+  // once it hits the cap the code is dead and they must request another.
+  verifyAttempts Int     @default(0)
   displayName   String?
   avatarUrl     String?
   bio           String?
@@ -156,6 +167,10 @@ model SellerProfile {
   // `streamCategory` drives the small category tag on the card.
   streamTitle         String?
   streamCategory      String?
+  // Cover art for the seller's card on the live grid. Seller-uploaded (a
+  // downscaled JPEG data URL, size-capped at the endpoint). When null the card
+  // falls back to the running auction's photo, then the coin's pump.fun image.
+  streamImage         String?
   // Per-room live-chat cooldown (ms between messages from one viewer). null = the
   // default (CHAT_COOLDOWN_MS); 0 = off. Seller-set in Settings.
   chatCooldownMs      Int?

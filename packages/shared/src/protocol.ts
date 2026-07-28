@@ -105,6 +105,8 @@ export type ServerMessageType = (typeof ServerMessageType)[keyof typeof ServerMe
 export const RealtimeRejectReason = {
   ...BidRejectReason,
   RATE_LIMITED: 'RATE_LIMITED',
+  /** The account has an email address it hasn't confirmed yet. */
+  EMAIL_UNVERIFIED: 'EMAIL_UNVERIFIED',
 } as const;
 export type RealtimeRejectReason =
   (typeof RealtimeRejectReason)[keyof typeof RealtimeRejectReason];

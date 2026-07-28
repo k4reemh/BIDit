@@ -339,6 +339,14 @@ img { display: block; max-width: 100%; }
 .cta-band__title { font-size: 28px; margin-bottom: 7px; }
 .cta-band p { color: rgba(255, 255, 255, 0.66); font-size: 15px; max-width: 520px; }
 
+/* Bands that are navy in BOTH themes. Their contents must not follow the theme
+   tokens: in light mode --surface is white, so a plain .btn-ghost inside one
+   rendered white-on-white and the button disappeared. Pin the on-navy values. */
+.on-navy .btn-ghost {
+  color: #fff; background: rgba(255, 255, 255, 0.10); border-color: rgba(255, 255, 255, 0.26);
+}
+.on-navy .btn-ghost:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.4); }
+
 /* ===== footer ============================================================= */
 .footer { margin-top: 70px; border-top: 1px solid var(--line); padding: 52px 0 28px; }
 .footer__top { display: grid; grid-template-columns: 1.3fr 2fr; gap: 40px; }
@@ -454,6 +462,27 @@ img { display: block; max-width: 100%; }
 .ob__chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
 .ob__chipg { font-size: 15px; }
 .ob__foot { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line-2); }
+
+/* ---- confirm-your-email step (blocking, right after signup) ---- */
+.vfy { text-align: center; }
+.vfy__sub { margin: 8px auto 22px; max-width: 380px; font-size: 14.5px; line-height: 1.55; }
+.vfy__sub b { color: var(--ink); font-weight: 600; word-break: break-all; }
+.vfy__code {
+  width: 100%; height: 62px; text-align: center; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+  font-size: 30px; font-weight: 700; letter-spacing: 0.34em; text-indent: 0.34em; /* centers despite the tracking */
+  font-variant-numeric: tabular-nums; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.vfy__code::placeholder { color: var(--faint); letter-spacing: 0.34em; }
+.vfy__code:focus { border-color: rgba(255, 106, 0, 0.5); box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.1); }
+.vfy__code:disabled { opacity: 0.6; }
+.vfy__ok { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 13.5px; font-weight: 600; color: var(--green); }
+.vfy__actions { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 20px; }
+.vfy__actions .btn { width: 100%; }
+.vfy__resend { font-size: 13.5px; font-weight: 600; color: var(--accent-strong); }
+.vfy__resend:disabled { color: var(--faint); cursor: default; }
+.vfy__foot { margin-top: 20px; font-size: 12.5px; line-height: 1.6; }
+.vfy__link { font-size: inherit; font-weight: 600; color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ===== account / dashboard ================================================ */
 .acct { display: grid; grid-template-columns: 246px 1fr; gap: 34px; padding: 34px 24px 84px; align-items: start; }
@@ -1407,6 +1436,10 @@ img { display: block; max-width: 100%; }
 .bidtip__list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
 .bidtip__list li svg { color: var(--accent); flex: none; margin-top: 2px; }
 
+/* The seal sits inline after a handle, wherever a seller is named. */
+.theater__seal { color: #2fd7a0; flex: none; margin-left: 1px; }
+.shop__seal { color: #1eb980; vertical-align: -2px; margin-left: 6px; }
+
 /* ---- verified badge ---- */
 .vbadge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #1eb980;
   background: rgba(34, 197, 138, 0.14); border: 1px solid rgba(34, 197, 138, 0.32); padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
@@ -1794,8 +1827,10 @@ img { display: block; max-width: 100%; }
 .pts-band__glow { position: absolute; right: -140px; top: -140px; width: 420px; height: 420px; border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 106, 0, 0.34), transparent 65%); pointer-events: none; }
 .pts-band__body { position: relative; }
+/* Pinned, not var(--accent-strong): the band is navy in both themes, and light
+   mode's darker orange goes muddy against it. */
 .pts-band__eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--accent-strong); margin-bottom: 12px; }
+  text-transform: uppercase; color: #ff8a33; margin-bottom: 12px; }
 .pts-band__title { font-size: 30px; line-height: 1.12; margin-bottom: 10px; }
 .pts-band__sub { color: rgba(255, 255, 255, 0.72); font-size: 15px; line-height: 1.6; max-width: 560px; }
 .pts-band__sub b { color: #fff; }
@@ -1804,7 +1839,7 @@ img { display: block; max-width: 100%; }
 .pts-band__chips { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pts-band__chip { padding: 16px 15px; border-radius: 14px; background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12); display: flex; flex-direction: column; gap: 3px; }
-.pts-band__chip b { font-size: 18px; font-weight: 800; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+.pts-band__chip b { font-size: 18px; font-weight: 800; color: #ff8a33; font-variant-numeric: tabular-nums; }
 .pts-band__chip span { font-size: 12.5px; color: rgba(255, 255, 255, 0.62); }
 .pts-band__chip--hot { background: rgba(255, 106, 0, 0.14); border-color: rgba(255, 106, 0, 0.35); }
 @media (max-width: 900px) {
@@ -1820,15 +1855,15 @@ img { display: block; max-width: 100%; }
   background: radial-gradient(circle, rgba(255, 106, 0, 0.3), transparent 65%); pointer-events: none; }
 .pts__hero-main { position: relative; }
 .pts__eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--accent-strong); margin-bottom: 12px; }
+  text-transform: uppercase; color: #ff8a33; margin-bottom: 12px; }
 .pts__title { font-size: 33px; line-height: 1.1; margin-bottom: 12px; color: #fff; }
 .pts__sub { font-size: 14.5px; line-height: 1.65; color: rgba(255, 255, 255, 0.72); max-width: 620px; }
 .pts__sub b { color: #fff; }
-.pts__sub b.accent { color: var(--accent-strong); }
+.pts__sub b.accent { color: #ff8a33; }
 .pts__rates { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
 .pts__rate { display: flex; align-items: center; gap: 11px; padding: 12px 16px 12px 12px; border-radius: 13px;
   background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
-.pts__rate-x { font-family: var(--font-display, inherit); font-size: 21px; font-weight: 800; color: var(--accent-strong);
+.pts__rate-x { font-family: var(--font-display, inherit); font-size: 21px; font-weight: 800; color: #ff8a33;
   font-variant-numeric: tabular-nums; }
 .pts__rate b { display: block; font-size: 13.5px; color: #fff; }
 .pts__rate span { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
@@ -1836,7 +1871,7 @@ img { display: block; max-width: 100%; }
   padding: 30px 24px; border-radius: 18px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); text-align: center; }
 .pts__balance-label { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
 .pts__balance-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; line-height: 1; }
-.pts__balance-link { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--accent-strong); }
+.pts__balance-link { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: #ff8a33; }
 @media (max-width: 900px) {
   .pts__hero { grid-template-columns: 1fr; padding: 30px 22px; }
   .pts__title { font-size: 26px; }

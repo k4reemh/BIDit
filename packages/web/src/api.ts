@@ -47,8 +47,12 @@ export interface Session {
   fulfilledCount?: number;
   verifyThreshold?: number;
   pumpCoinAddress: string | null;
+  /** False only when the account has an email it hasn't confirmed yet. */
+  emailVerified?: boolean;
   streamTitle?: string | null;
   streamCategory?: string | null;
+  /** Seller-uploaded cover art for their card on the live grid (data URL). */
+  streamImage?: string | null;
   chatCooldownMs?: number;
   website?: string | null;
   socials?: Record<string, string> | null;
@@ -113,6 +117,13 @@ export async function login(email: string, password: string): Promise<Session> {
   setToken(s.token);
   return s;
 }
+
+/** Confirm the emailed code. Returns the refreshed session (emailVerified true). */
+export const verifyEmail = (code: string) =>
+  req<Session>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });
+
+/** Mail a fresh code. Rejects if one was sent within the last minute. */
+export const resendVerifyCode = () => req<{ ok: boolean }>('/auth/resend-code', { method: 'POST' });
 
 export async function updateMe(patch: {
   displayName?: string;
@@ -406,8 +417,12 @@ export const submitCoinCreate = (p: {
   signedTxB64?: string;
 }) => req<CoinCreateStatus>('/seller/coin-create/submit', { method: 'POST', body: JSON.stringify(p) });
 export const getCoinCreateStatus = () => req<CoinCreateStatus>('/seller/coin-create/status');
-export const saveStreamSettings = (s: { streamTitle: string | null; streamCategory: string | null; chatCooldownMs?: number }) =>
-  req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
+export const saveStreamSettings = (s: {
+  streamTitle: string | null;
+  streamCategory: string | null;
+  streamImage?: string | null;
+  chatCooldownMs?: number;
+}) => req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
 
 // ---- giveaways -------------------------------------------------------------
 export type GiveawayKind = 'PUBLIC' | 'BUYER_ONLY';
@@ -461,6 +476,7 @@ export interface PumpCoin {
 export interface ResolvedRoom {
   room: string;
   sellerHandle: string;
+  verified: boolean;
 }
 export const getLive = () => req<LiveCoin[]>('/live');
 export const getPumpCoin = (mint: string) => req<PumpCoin>(`/pump/coin?mint=${encodeURIComponent(mint)}`);

@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSeller } from '../../components/SellerLayout';
 import { setSellerCoin, saveStreamSettings, type Session } from '../../api';
-import { Check, ArrowRight } from '../../icons';
+import { Check, ArrowRight, Verified } from '../../icons';
 import ShippingSettingsCard from '../../components/seller/ShippingSettingsCard';
 import CreateCoinCard from '../../components/seller/CreateCoinCard';
+import ImageUpload from '../../components/ImageUpload';
 import { CATEGORIES } from '../../data';
 
 export default function Settings() {
@@ -12,6 +13,7 @@ export default function Settings() {
   const [coin, setCoin] = useState(session.pumpCoinAddress ?? '');
   const [title, setTitle] = useState(session.streamTitle ?? '');
   const [category, setCategory] = useState(session.streamCategory ?? '');
+  const [image, setImage] = useState(session.streamImage ?? '');
   const [cooldown, setCooldown] = useState(session.chatCooldownMs ?? 5000);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -26,6 +28,7 @@ export default function Settings() {
       const next: Session = await saveStreamSettings({
         streamTitle: title.trim() || null,
         streamCategory: category || null,
+        streamImage: image || null,
         chatCooldownMs: cooldown,
       });
       setSession(next); // fresh session reflects coin + title + category
@@ -75,6 +78,14 @@ export default function Settings() {
         </div>
         <p className="muted acct-note" style={{ marginTop: 0 }}>Leave the title blank to show your coin name instead.</p>
         <div className="fld">
+          <ImageUpload
+            value={image}
+            onChange={setImage}
+            label="Cover image"
+            hint="Shown on your card in the live grid. Landscape works best. Without one we use the item you’re auctioning, then your coin art."
+          />
+        </div>
+        <div className="fld">
           <label>Live chat cooldown</label>
           <select value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))}>
             <option value={0}>Off (no limit)</option>
@@ -95,9 +106,23 @@ export default function Settings() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Verification</h3>
+        {/* Real status, not a decoration: the badge is earned at
+            `verifyThreshold` fulfilled orders (or granted by an admin). */}
         <div className="verify-row">
-          <span className="verify-badge"><Check width={15} height={15} /> Verified seller</span>
-          <span className="muted">Beta auto-approval · KYC arrives with mainnet.</span>
+          {session.verified ? (
+            <>
+              <span className="verify-badge"><Verified width={15} height={15} /> Verified seller</span>
+              <span className="muted">Buyers see this badge on your stream and your cards.</span>
+            </>
+          ) : (
+            <>
+              <span className="verify-badge vbadge--pending"><Check width={15} height={15} /> Not verified yet</span>
+              <span className="muted">
+                Fulfill {session.verifyThreshold ?? 10} orders to earn the badge. You&rsquo;re at{' '}
+                <b>{session.fulfilledCount ?? 0}</b>.
+              </span>
+            </>
+          )}
         </div>
       </div>
 

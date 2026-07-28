@@ -46,6 +46,12 @@ import {
   loadSessionRevocations,
   eraseUserData,
 } from '../src/authz.js';
+import {
+  sendVerificationCode,
+  verifyEmailCode,
+  backfillLegacyVerified,
+  requireVerifiedEmail,
+} from '../src/email-verify.js';
 import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
 import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '../src/promo.js';
 import {
@@ -262,6 +268,11 @@ async function main() {
   }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
+  // Accounts that predate email verification are trusted (see the function's
+  // note) — without this, everyone who already signed up would be locked out.
+  await backfillLegacyVerified(prisma)
+    .then((n) => n > 0 && console.log(`[verify] backfilled ${n} pre-existing account(s) as verified`))
+    .catch((e) => console.error('[verify] backfill', e));
   const httpServer = http.createServer((req, res) => void route(req, res));
   const realtime = new RealtimeServer({
     prisma,
@@ -358,6 +369,8 @@ async function main() {
       userId,
       handle: user.handle,
       email: user.email,
+      // Only meaningful when there IS an email; wallet/dev accounts are never gated.
+      emailVerified: !user.email || user.emailVerified,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       bio: user.bio,
@@ -379,6 +392,7 @@ async function main() {
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
       streamTitle: profile?.streamTitle ?? null,
       streamCategory: profile?.streamCategory ?? null,
+      streamImage: profile?.streamImage ?? null,
       chatCooldownMs: profile?.chatCooldownMs ?? CHAT_COOLDOWN_MS,
       website: profile?.website ?? null,
       socials: (profile?.socials as Record<string, string> | null) ?? null,
@@ -458,7 +472,40 @@ async function main() {
             { email: String(b.email ?? ''), password: String(b.password ?? ''), handle: String(b.handle ?? '') },
             prisma,
           );
+          // Mail the code now; the account exists but stays unverified until it
+          // comes back. A mail failure must not strand a created account, so a
+          // throw here only means "no code yet" — they can resend.
+          await sendVerificationCode(user.id, { force: true }, prisma).catch((e) =>
+            console.error('[verify] send on register failed', (e as Error)?.message ?? e),
+          );
           return send(res, 200, await sessionPayload(user.id));
+        } catch (err) {
+          if (err instanceof AuthError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      // Confirm the emailed code. Authed: the account already exists and is
+      // signed in, it just can't do anything that matters until this passes.
+      if (req.method === 'POST' && p === '/auth/verify-email') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
+        const b = await readJson(req);
+        try {
+          await verifyEmailCode(userId, String(b.code ?? ''), prisma);
+          return send(res, 200, await sessionPayload(userId));
+        } catch (err) {
+          if (err instanceof AuthError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/auth/resend-code') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
+        try {
+          await sendVerificationCode(userId, {}, prisma);
+          return send(res, 200, { ok: true });
         } catch (err) {
           if (err instanceof AuthError) return send(res, 400, { error: err.message });
           throw err;
@@ -555,6 +602,7 @@ async function main() {
       if (req.method === 'POST' && p === '/withdraw') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
         if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         const b = await readJson(req);
         const toAddress = String(b.toAddress ?? '').trim();
@@ -765,6 +813,7 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/apply') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
         await applyAsSeller(userId, prisma);
         return send(res, 200, await sessionPayload(userId));
       }
@@ -899,9 +948,20 @@ async function main() {
         const ALLOWED_COOLDOWNS = [0, 3000, 5000, 10000, 30000];
         const cd = Number(b.chatCooldownMs);
         const chatCooldownMs = ALLOWED_COOLDOWNS.includes(cd) ? cd : undefined;
+        // Cover art rides in the JSON as a downscaled data URL. Accept only an
+        // inline image (never a remote URL we'd re-serve) and cap it: every /live
+        // row carries this string, so an oversized one would bloat the grid for
+        // everyone. The client downscales to ~720px, well inside this.
+        const streamImage = ((): string | null => {
+          const v = b.streamImage;
+          if (typeof v !== 'string' || !v.trim()) return null;
+          if (!/^data:image\/(png|jpeg|webp);base64,/.test(v)) return null;
+          return v.length > 600_000 ? null : v;
+        })();
         const data = {
           streamTitle: clip(b.streamTitle, 80),
           streamCategory: clip(b.streamCategory, 40),
+          streamImage,
           ...(chatCooldownMs !== undefined ? { chatCooldownMs } : {}),
         };
         await prisma.sellerProfile.upsert({
@@ -1384,6 +1444,7 @@ async function main() {
       if (req.method === 'POST' && p === '/shop/buy') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
         if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         const b = await readJson(req);
         try {
@@ -1578,7 +1639,9 @@ async function liveCoins(viewerCount: (room: string) => number) {
         category: pf.streamCategory ?? null,
         country: pf.originCountry ?? null,
         title: auction?.listing.title ?? null,
-        image: auction?.listing.photos[0] ?? pump?.image ?? null,
+        // Seller-set cover art wins; otherwise the running item's photo, then
+        // whatever art the coin carries on pump.fun.
+        image: pf.streamImage ?? auction?.listing.photos[0] ?? pump?.image ?? null,
         currentBid: auction?.currentBid != null ? formatUsdc(auction.currentBid) : null,
         prize: giveaway?.prize ?? null,
       };

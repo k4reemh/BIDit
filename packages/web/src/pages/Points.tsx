@@ -47,7 +47,7 @@ export default function Points({ session, onAuth }: { session: Session | null; o
   return (
     <main className="container pts">
       {/* hero */}
-      <section className="pts__hero card">
+      <section className="pts__hero card on-navy">
         <div className="pts__hero-glow" aria-hidden />
         <div className="pts__hero-main">
           <span className="pts__eyebrow"><Gift width={15} height={15} /> BIDit Points</span>

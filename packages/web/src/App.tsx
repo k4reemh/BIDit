@@ -5,6 +5,7 @@ import MobileTabBar from './components/MobileTabBar';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import Onboarding from './components/Onboarding';
+import VerifyEmail from './components/VerifyEmail';
 import Tutorial, { hasSeenTutorial } from './components/Tutorial';
 import AccountLayout from './components/AccountLayout';
 import SellerLayout from './components/SellerLayout';
@@ -150,7 +151,18 @@ export default function App() {
       <MobileTabBar user={user} onAuth={setAuth} />
 
       {auth && <AuthModal mode={auth} onClose={() => setAuth(null)} onSuccess={onAuthed} />}
-      {onboarding && (
+      {/* Ahead of onboarding: an unverified account can't do anything the rest
+          of the app offers, so asking for the code first keeps the order honest. */}
+      {session && session.emailVerified === false && (
+        <VerifyEmail
+          session={session}
+          onVerified={(s) => {
+            setSession(s);
+            if (!s.onboarded) setOnboarding(s);
+          }}
+        />
+      )}
+      {onboarding && session?.emailVerified !== false && (
         <Onboarding
           session={onboarding}
           onDone={(s) => {

@@ -27,6 +27,8 @@ export class SellerError extends Error {
 export interface ResolvedRoom {
   room: string;
   sellerHandle: string;
+  /** Trust badge (10 fulfilled orders or an admin). Shown next to the handle. */
+  verified: boolean;
 }
 
 /** Map a Pump.fun coin address -> the seller's room, if a seller has linked it.
@@ -45,7 +47,7 @@ export async function resolveRoomByCoin(
     include: { user: { select: { id: true, handle: true } } },
   });
   if (!profile) return null;
-  return { room: profile.user.id, sellerHandle: profile.user.handle };
+  return { room: profile.user.id, sellerHandle: profile.user.handle, verified: profile.verified };
 }
 
 /** Force-give `coinAddress` to `sellerId`, releasing it from anyone else who had it.
@@ -77,7 +79,8 @@ export async function linkCoinToSeller(
     update: { pumpCoinAddress: coin, verified: true },
     create: { userId: user.id, pumpCoinAddress: coin, verified: true },
   });
-  return { room: user.id, sellerHandle: user.handle };
+  // This admin/seed path always writes verified: true just above.
+  return { room: user.id, sellerHandle: user.handle, verified: true };
 }
 
 /** Ensure a running auction exists for a seller; returns its id (reuses if live). */

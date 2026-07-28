@@ -356,6 +356,7 @@ function rejectText(reason: string): string {
     case 'INSUFFICIENT_FUNDS': return 'Not enough balance. Add funds to bid.';
     case 'AUCTION_CLOSED': return 'That auction just closed.';
     case 'RATE_LIMITED': return 'Slow down a touch, then try again.';
+    case 'EMAIL_UNVERIFIED': return 'Confirm your email address before bidding.';
     default: return 'Bid not accepted. Try again.';
   }
 }

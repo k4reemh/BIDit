@@ -139,7 +139,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
 
       {/* ---- BIDit Points ---- */}
       <section className="section container">
-        <div className="pts-band">
+        <div className="pts-band on-navy">
           <div className="pts-band__glow" aria-hidden />
           <div className="pts-band__body">
             <span className="pts-band__eyebrow"><Gift width={14} height={14} /> BIDit Points · Community airdrops</span>
@@ -165,7 +165,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
 
       {/* ---- seller CTA ---- */}
       <section className="section container">
-        <div className="cta-band">
+        <div className="cta-band on-navy">
           <div>
             <h2 className="display cta-band__title">Turn your stream into an auction house.</h2>
             <p>List your cards, run live auctions and wheel spins, and get paid in USDC. Setup takes about five minutes.</p>

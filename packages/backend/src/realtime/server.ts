@@ -539,6 +539,22 @@ export class RealtimeServer {
       return;
     }
 
+    // Winning spends real money, so the same email gate the HTTP money paths
+    // use applies here. Accounts without an email (wallet logins) are exempt.
+    const account = await this.prisma.user.findUnique({
+      where: { id: conn.userId },
+      select: { email: true, emailVerified: true },
+    });
+    if (account?.email && !account.emailVerified) {
+      this.sendToConn(conn, {
+        type: 'BID_REJECTED',
+        auctionId: msg.auctionId,
+        clientNonce: msg.clientNonce,
+        reason: RealtimeRejectReason.EMAIL_UNVERIFIED,
+      });
+      return;
+    }
+
     let amount: bigint;
     try {
       amount = usdc(msg.amount);

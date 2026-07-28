@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getShop, buyShopItem, refreshMe, type ShopItem, type Session } from '../api';
-import { Bag, Check, X } from '../icons';
+import { Bag, Check, X, Verified } from '../icons';
 
 /**
  * The seller's shop, opened from the watch page: fixed-price items viewers can
@@ -11,6 +11,7 @@ import { Bag, Check, X } from '../icons';
 export default function ShopOverlay({
   coin,
   sellerHandle,
+  sellerVerified,
   session,
   onAuth,
   onClose,
@@ -18,6 +19,7 @@ export default function ShopOverlay({
 }: {
   coin: string;
   sellerHandle: string;
+  sellerVerified?: boolean;
   session: Session | null;
   onAuth: () => void;
   onClose: () => void;
@@ -57,7 +59,10 @@ export default function ShopOverlay({
         <div className="shop__head">
           <span className="shop__ic"><Bag width={18} height={18} /></span>
           <div>
-            <h2 className="shop__title">@{sellerHandle}’s shop</h2>
+            <h2 className="shop__title">
+              @{sellerHandle}’s shop
+              {sellerVerified && <Verified className="shop__seal" width={16} height={16} aria-label="Verified seller" />}
+            </h2>
             <p className="muted shop__sub">Buy it now, no bidding. Paid from your balance, ships like a win.</p>
           </div>
         </div>
