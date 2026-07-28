@@ -2078,6 +2078,3 @@ img { display: block; max-width: 100%; }
   border: 1px solid rgba(255, 255, 255, 0.18); transition: background 0.15s ease, transform 0.1s ease; }
 .sharex:hover { background: #23292f; }
 .sharex:active { transform: translateY(0.5px); }
-.wc__close { height: 38px; padding: 0 15px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
-  color: rgba(255, 255, 255, 0.72); border: 1px solid rgba(255, 255, 255, 0.18); transition: color 0.15s, background 0.15s; }
-.wc__close:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }

@@ -30,13 +30,12 @@ Seller badge.
 
 ## Architecture
 
-A TypeScript monorepo with three layers over a shared domain package:
+A TypeScript monorepo with two layers over a shared domain package:
 
 | Package | What it is |
 | --- | --- |
 | `@bidit/backend` | The engine — auctions, timers, the ledger, escrow, the real-time WebSocket server, and the Solana USDC rails. Node + Prisma (PostgreSQL). |
 | `@bidit/web` | The consumer web app — homepage, live watch/bid page, buyer and seller dashboards, admin. React + Vite. |
-| `@bidit/extension` | A Manifest V3 browser overlay that renders the auction panel on a Pump.fun coin page. |
 | `@bidit/shared` | Domain enums, the money type, and the wire protocol — one source of truth so the layers can't drift. |
 
 **The server is authoritative.** Clients render state and send intents; they
@@ -69,7 +68,6 @@ packages/
   shared/      domain enums · money helpers · realtime protocol
   backend/     Prisma schema · ledger · auction engine · WS server · Solana rails · tests
   web/         React + Vite consumer app (homepage, live page, dashboards, admin)
-  extension/   Manifest V3 overlay for Pump.fun pages
 ```
 
 ## Run it locally
@@ -82,9 +80,6 @@ npm install        # installs deps and generates the Prisma client
 npm test           # boots embedded PG, pushes the schema, runs the full suite
 npm run dev        # dev server at http://localhost:8787  ( / · /seller · /admin )
 ```
-
-Build the extension with `npm -w @bidit/extension run build`, then load
-`packages/extension/dist/` unpacked at `chrome://extensions`.
 
 ## Testing
 
@@ -106,7 +101,7 @@ managed Postgres; the web app deploys to Vercel.
 ## Status
 
 BIDit is in early access. The auction engine, real-time layer, web app,
-extension, seller flow, and USDC settlement rails are built and tested. The
+seller flow, and USDC settlement rails are built and tested. The
 current release pays sellers directly on a sale; the delivery-gated escrow flow
 and the non-custodial on-chain program are the next milestones.
 

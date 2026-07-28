@@ -58,9 +58,6 @@ export default function GiveawayReveal({
       }
       setLanded(true);
       runConfetti(canvasRef.current);
-      // Same as the auction win: the winner keeps the card (it holds their share
-      // button) and closes it themselves; everyone else gets the timed reveal.
-      if (isMe) return;
       window.setTimeout(() => setLeaving(true), 5600);
       window.setTimeout(onDone, 6050);
     };
@@ -120,12 +117,6 @@ export default function GiveawayReveal({
             {isMe && (
               <div className="wc__actions">
                 <ShareOnX item={win.prize} kind="giveaway" />
-                <button
-                  className="wc__close"
-                  onClick={() => { setLeaving(true); window.setTimeout(onDone, 450); }}
-                >
-                  Close
-                </button>
               </div>
             )}
           </div>
