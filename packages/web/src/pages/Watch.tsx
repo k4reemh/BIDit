@@ -78,7 +78,11 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
               {sellerHandle && (
                 <span className="theater__seller">
                   <Avatar handle={sellerHandle} src={resolved?.sellerAvatar} size={22} /> @{sellerHandle}
-                  {resolved?.verified && <Verified className="theater__seal" width={15} height={15} aria-label="Verified seller" />}
+                  {resolved?.verified && (
+                    <span className="vpill" title="Verified seller">
+                      <Verified width={11} height={11} /> Verified
+                    </span>
+                  )}
                 </span>
               )}
               {sellerHandle && (

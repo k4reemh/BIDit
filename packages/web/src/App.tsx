@@ -170,6 +170,9 @@ export default function App() {
             setOnboarding(null);
             if (!hasSeenTutorial()) setTutorial(true); // first-run interactive tour
           }}
+          // Closing keeps the account and the session; the flow reappears next
+          // visit, and every step is reachable from Settings meanwhile.
+          onDismiss={() => setOnboarding(null)}
         />
       )}
       {tutorial && <Tutorial onDone={() => setTutorial(false)} />}

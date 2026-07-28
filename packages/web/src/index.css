@@ -33,6 +33,15 @@
   --shadow: 0 4px 16px rgba(20, 22, 28, 0.07), 0 1px 3px rgba(20, 22, 28, 0.05);
   --shadow-lg: 0 20px 48px rgba(20, 22, 28, 0.13);
 
+  /* Full-width feature bands (Points, seller CTA). Light in light mode, navy in
+     dark — they used to be navy in both, which read as a bug on a light page. */
+  --band: #ffffff;
+  --band-ink: #0b2447;
+  --band-sub: #5c6e88;
+  --band-line: rgba(11, 36, 71, 0.10);
+  --band-chip: #f1f5fb;
+  --band-accent: #e85d00;
+
   --maxw: 1200px;
   --nav-h: 64px;
 
@@ -68,6 +77,13 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+
+  --band: #0b2447;
+  --band-ink: #ffffff;
+  --band-sub: rgba(255, 255, 255, 0.72);
+  --band-line: rgba(255, 255, 255, 0.12);
+  --band-chip: rgba(255, 255, 255, 0.06);
+  --band-accent: #ff8a33;
 }
 /* Soft-tinted alert/status boxes that were baked light — dark equivalents. */
 :root[data-theme="dark"] .auth__error,
@@ -335,17 +351,18 @@ img { display: block; max-width: 100%; }
 
 /* seller cta */
 .cta-band { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 40px 44px;
-  border-radius: var(--r-xl); background: var(--navy); color: #fff; }
+  border-radius: var(--r-xl); background: var(--band); color: var(--band-ink); border: 1px solid var(--band-line); }
 .cta-band__title { font-size: 28px; margin-bottom: 7px; }
-.cta-band p { color: rgba(255, 255, 255, 0.66); font-size: 15px; max-width: 520px; }
+.cta-band p { color: var(--band-sub); font-size: 15px; max-width: 520px; }
 
-/* Bands that are navy in BOTH themes. Their contents must not follow the theme
-   tokens: in light mode --surface is white, so a plain .btn-ghost inside one
-   rendered white-on-white and the button disappeared. Pin the on-navy values. */
-.on-navy .btn-ghost {
+/* Inside a band the ghost button has to sit on whatever the band's surface is.
+   In dark mode that's navy, so it needs light-on-translucent-white; in light
+   mode the normal ghost styling is already correct. (It previously forced white
+   text in both, which vanished against the white light-mode surface.) */
+:root[data-theme="dark"] .on-navy .btn-ghost {
   color: #fff; background: rgba(255, 255, 255, 0.10); border-color: rgba(255, 255, 255, 0.26);
 }
-.on-navy .btn-ghost:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.4); }
+:root[data-theme="dark"] .on-navy .btn-ghost:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.4); }
 
 /* ===== footer ============================================================= */
 .footer { margin-top: 70px; border-top: 1px solid var(--line); padding: 52px 0 28px; }
@@ -1570,7 +1587,7 @@ img { display: block; max-width: 100%; }
    full-screen two-column split, which read as broken at wide viewports). */
 .obx { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px;
   background: rgba(5, 9, 18, 0.62); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
-.obx__panel { display: flex; flex-direction: column; width: 100%; max-width: 620px;
+.obx__panel { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 620px;
   max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg); padding: 26px 32px 28px; animation: risein 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -1856,24 +1873,27 @@ img { display: block; max-width: 100%; }
 /* ===== BIDit Points ======================================================= */
 /* home band */
 .pts-band { position: relative; overflow: hidden; display: grid; grid-template-columns: 1.35fr 1fr; gap: 30px; align-items: center;
-  padding: 44px 46px; border-radius: var(--r-xl); background: var(--navy); color: #fff; }
+  padding: 44px 46px; border-radius: var(--r-xl); background: var(--band); color: var(--band-ink);
+  border: 1px solid var(--band-line); }
+/* Subtle on white, richer on navy — the same 34% wash reads muddy in light mode. */
 .pts-band__glow { position: absolute; right: -140px; top: -140px; width: 420px; height: 420px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 106, 0, 0.34), transparent 65%); pointer-events: none; }
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.12), transparent 65%); pointer-events: none; }
+:root[data-theme="dark"] .pts-band__glow { background: radial-gradient(circle, rgba(255, 106, 0, 0.34), transparent 65%); }
 .pts-band__body { position: relative; }
 /* Pinned, not var(--accent-strong): the band is navy in both themes, and light
    mode's darker orange goes muddy against it. */
 .pts-band__eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #ff8a33; margin-bottom: 12px; }
+  text-transform: uppercase; color: var(--band-accent); margin-bottom: 12px; }
 .pts-band__title { font-size: 30px; line-height: 1.12; margin-bottom: 10px; }
-.pts-band__sub { color: rgba(255, 255, 255, 0.72); font-size: 15px; line-height: 1.6; max-width: 560px; }
-.pts-band__sub b { color: #fff; }
+.pts-band__sub { color: var(--band-sub); font-size: 15px; line-height: 1.6; max-width: 560px; }
+.pts-band__sub b { color: var(--band-ink); }
 .pts-band__cta { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
-.pts-band__cta .btn-ghost { color: #fff; border-color: rgba(255, 255, 255, 0.22); }
+
 .pts-band__chips { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.pts-band__chip { padding: 16px 15px; border-radius: 14px; background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12); display: flex; flex-direction: column; gap: 3px; }
-.pts-band__chip b { font-size: 18px; font-weight: 800; color: #ff8a33; font-variant-numeric: tabular-nums; }
-.pts-band__chip span { font-size: 12.5px; color: rgba(255, 255, 255, 0.62); }
+.pts-band__chip { padding: 16px 15px; border-radius: 14px; background: var(--band-chip);
+  border: 1px solid var(--band-line); display: flex; flex-direction: column; gap: 3px; }
+.pts-band__chip b { font-size: 18px; font-weight: 800; color: var(--band-accent); font-variant-numeric: tabular-nums; }
+.pts-band__chip span { font-size: 12.5px; color: var(--band-sub); }
 .pts-band__chip--hot { background: rgba(255, 106, 0, 0.14); border-color: rgba(255, 106, 0, 0.35); }
 @media (max-width: 900px) {
   .pts-band { grid-template-columns: 1fr; padding: 32px 24px; }
@@ -1883,28 +1903,29 @@ img { display: block; max-width: 100%; }
 /* points page */
 .pts { padding: 34px 0 70px; }
 .pts__hero { position: relative; overflow: hidden; display: grid; grid-template-columns: 1.5fr 0.9fr; gap: 28px;
-  padding: 40px 42px; background: var(--navy); border: none; color: #fff; }
+  padding: 40px 42px; background: var(--band); border: 1px solid var(--band-line); color: var(--band-ink); }
 .pts__hero-glow { position: absolute; right: -120px; bottom: -160px; width: 440px; height: 440px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 106, 0, 0.3), transparent 65%); pointer-events: none; }
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.11), transparent 65%); pointer-events: none; }
+:root[data-theme="dark"] .pts__hero-glow { background: radial-gradient(circle, rgba(255, 106, 0, 0.3), transparent 65%); }
 .pts__hero-main { position: relative; }
 .pts__eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #ff8a33; margin-bottom: 12px; }
-.pts__title { font-size: 33px; line-height: 1.1; margin-bottom: 12px; color: #fff; }
-.pts__sub { font-size: 14.5px; line-height: 1.65; color: rgba(255, 255, 255, 0.72); max-width: 620px; }
-.pts__sub b { color: #fff; }
-.pts__sub b.accent { color: #ff8a33; }
+  text-transform: uppercase; color: var(--band-accent); margin-bottom: 12px; }
+.pts__title { font-size: 33px; line-height: 1.1; margin-bottom: 12px; color: var(--band-ink); }
+.pts__sub { font-size: 14.5px; line-height: 1.65; color: var(--band-sub); max-width: 620px; }
+.pts__sub b { color: var(--band-ink); }
+.pts__sub b.accent { color: var(--band-accent); }
 .pts__rates { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; }
 .pts__rate { display: flex; align-items: center; gap: 11px; padding: 12px 16px 12px 12px; border-radius: 13px;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); }
-.pts__rate-x { font-family: var(--font-display, inherit); font-size: 21px; font-weight: 800; color: #ff8a33;
+  background: var(--band-chip); border: 1px solid var(--band-line); }
+.pts__rate-x { font-family: var(--font-display, inherit); font-size: 21px; font-weight: 800; color: var(--band-accent);
   font-variant-numeric: tabular-nums; }
-.pts__rate b { display: block; font-size: 13.5px; color: #fff; }
-.pts__rate span { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.pts__rate b { display: block; font-size: 13.5px; color: var(--band-ink); }
+.pts__rate span { font-size: 12px; color: var(--band-sub); }
 .pts__balance { position: relative; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 30px 24px; border-radius: 18px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); text-align: center; }
-.pts__balance-label { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
-.pts__balance-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; line-height: 1; }
-.pts__balance-link { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: #ff8a33; }
+  padding: 30px 24px; border-radius: 18px; background: var(--band-chip); border: 1px solid var(--band-line); text-align: center; }
+.pts__balance-label { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--band-sub); }
+.pts__balance-num { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; color: var(--band-ink); font-variant-numeric: tabular-nums; line-height: 1; }
+.pts__balance-link { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--band-accent); }
 @media (max-width: 900px) {
   .pts__hero { grid-template-columns: 1fr; padding: 30px 22px; }
   .pts__title { font-size: 26px; }
@@ -2031,3 +2052,21 @@ img { display: block; max-width: 100%; }
 /* "Forgot your password?" sits under the password field, right-aligned. */
 .auth__forgot { align-self: flex-end; margin-top: -4px; font-size: 13px; font-weight: 600; color: var(--accent-strong); }
 .auth__forgot:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Verified-seller pill. Reads like the LIVE/OFFLINE bubble but smaller, and
+   sits inline next to the seller's name rather than over the artwork. */
+.vpill { display: inline-flex; align-items: center; gap: 4px; flex: none;
+  padding: 2px 7px 2px 6px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.5;
+  color: #0d8a5f; background: rgba(30, 185, 128, 0.14); border: 1px solid rgba(30, 185, 128, 0.3); }
+.vpill svg { flex: none; }
+:root[data-theme="dark"] .vpill { color: #2fd7a0; background: rgba(47, 215, 160, 0.16); border-color: rgba(47, 215, 160, 0.34); }
+/* On the watch page the pill sits on the dark stream, so it needs its own contrast. */
+.theater__seller .vpill { color: #7ef0c4; background: rgba(47, 215, 160, 0.2); border-color: rgba(47, 215, 160, 0.4); }
+
+/* Onboarding is dismissible: the account already exists by this point, so
+   trapping someone in setup is wrong. Backdrop click and Esc also close it. */
+.obx__close { position: absolute; top: 14px; right: 16px; width: 32px; height: 32px; border-radius: 9px;
+  display: grid; place-items: center; font-size: 22px; line-height: 1; color: var(--muted);
+  transition: background 0.14s ease, color 0.14s ease; }
+.obx__close:hover { background: var(--surface-3); color: var(--ink); }

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Logo from './Logo';
 import { INTERESTS } from '../data';
-import { completeOnboarding, setHandle as claimHandle, updateMe, type Session } from '../api';
+import { completeOnboarding, setHandle as claimHandle, updateMe, ApiError, type Session } from '../api';
 import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
@@ -30,7 +30,18 @@ const POINTS_PERKS = [
   { pts: '+3,000', t: 'win your first auction' },
 ];
 
-export default function Onboarding({ session, onDone }: { session: Session; onDone: (s: Session) => void }) {
+export default function Onboarding({
+  session,
+  onDone,
+  onDismiss,
+}: {
+  session: Session;
+  onDone: (s: Session) => void;
+  /** Close without finishing. The account already exists — they just haven't
+   *  set it up — so this leaves them signed in and shows the flow again next
+   *  visit. Everything here is reachable later from Settings. */
+  onDismiss: () => void;
+}) {
   const [step, setStep] = useState(0);
   const [handle, setHandle] = useState(session.handle.startsWith('collector_') ? '' : session.handle);
   const [interests, setInterests] = useState<Set<string>>(new Set());
@@ -80,8 +91,13 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
       try {
         await claimHandle(h);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not take that username.');
-        return;
+        // A backend that predates /me/handle answers 404. That's a deploy-skew
+        // problem, not the user's — don't strand them on this step; the final
+        // submit still validates the name.
+        if (!(err instanceof ApiError && err.status === 404)) {
+          setError(err instanceof Error ? err.message : 'Could not take that username.');
+          return;
+        }
       } finally {
         setBusy(false);
       }
@@ -112,10 +128,18 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
     else void finish();
   };
 
+  // Esc closes it, like any dismissible overlay.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onDismiss]);
+
   return (
     // A centered popup over the site — one focused card, no split-screen.
-    <div className="obx">
-      <main className="obx__panel">
+    <div className="obx" onClick={onDismiss}>
+      <main className="obx__panel" onClick={(e) => e.stopPropagation()}>
+        <button className="obx__close" onClick={onDismiss} aria-label="Close setup">×</button>
         <div className="obx__head">
           <Logo size={22} />
           <div className="obx__steps">
