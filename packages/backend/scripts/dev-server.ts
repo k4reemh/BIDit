@@ -49,6 +49,7 @@ import {
   setHandle,
 } from '../src/authz.js';
 import { exportDepositSecretKey } from '../src/wallet.js';
+import { requestPasswordReset, resetPassword } from '../src/password-reset.js';
 import {
   sendVerificationCode,
   verifyEmailCode,
@@ -510,6 +511,33 @@ async function main() {
       }
       // Confirm the emailed code. Authed: the account already exists and is
       // signed in, it just can't do anything that matters until this passes.
+      /**
+       * Start a password reset. Always answers 200 with the same body, whether
+       * or not the address is registered — a differing response here would let
+       * anyone test which emails have BIDit accounts.
+       */
+      if (req.method === 'POST' && p === '/auth/forgot-password') {
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
+        const b = await readJson(req);
+        await requestPasswordReset(String(b.email ?? ''), prisma).catch((e) =>
+          console.error('[reset] request failed', (e as Error)?.message ?? e),
+        );
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && p === '/auth/reset-password') {
+        if (authRateLimited(req)) return send(res, 429, { error: 'Too many attempts. Please wait a minute.' });
+        const b = await readJson(req);
+        try {
+          await resetPassword(
+            { email: String(b.email ?? ''), code: String(b.code ?? ''), password: String(b.password ?? '') },
+            prisma,
+          );
+          return send(res, 200, { ok: true });
+        } catch (err) {
+          if (err instanceof AuthError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
       // Claim a username mid-onboarding so "that username is taken" lands on the
       // username step rather than after the whole flow.
       if (req.method === 'POST' && p === '/me/handle') {

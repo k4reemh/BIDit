@@ -149,6 +149,17 @@ export async function updateMe(patch: {
   return req<Session>('/me', { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
+/** Ask for a reset code. Always resolves, whether or not the email is known. */
+export const forgotPassword = (email: string) =>
+  req<{ ok: boolean }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+
+/** Set a new password with the emailed code. Signs every old session out. */
+export const resetPassword = (email: string, code: string, password: string) =>
+  req<{ ok: boolean }>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, password }),
+  });
+
 /** Take a username during onboarding, so a clash is reported on that step. */
 export async function setHandle(handle: string): Promise<Session> {
   const s = await req<Session>('/me/handle', { method: 'POST', body: JSON.stringify({ handle }) });

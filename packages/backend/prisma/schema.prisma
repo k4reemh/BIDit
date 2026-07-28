@@ -111,6 +111,12 @@ model User {
   // Wrong guesses against the current code. Reset when a new code is issued;
   // once it hits the cap the code is dead and they must request another.
   verifyAttempts Int     @default(0)
+  // Password reset. Same shape as the verification code above: only an HMAC of
+  // the code is stored, it expires, and wrong guesses are capped.
+  resetCodeHash String?
+  resetCodeExpiresAt DateTime?
+  resetCodeSentAt    DateTime?
+  resetAttempts Int      @default(0)
   displayName   String?
   avatarUrl     String?
   bio           String?

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Logo from './Logo';
 import { INTERESTS } from '../data';
-import { completeOnboarding, setHandle, type Session } from '../api';
+import { completeOnboarding, setHandle as claimHandle, updateMe, type Session } from '../api';
 import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
@@ -10,10 +10,19 @@ const HOW = [
   { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
-const LAST = 4;
+const LAST = 5;
 /** The one step nobody can skip — everything downstream keys off the username. */
 const HANDLE_STEP = 1;
-const TITLES = ['Welcome to BIDit', 'Claim your username', 'What do you collect?', 'Fund your first bid', 'Earn points, catch airdrops'];
+const TITLES = [
+  'Welcome to BIDit',
+  'Claim your username',
+  'What do you collect?',
+  'Where should your wins ship?',
+  'Fund your first bid',
+  'Earn points, catch airdrops',
+];
+/** Delivery address. Skippable, but everything you win waits until it's set. */
+const ADDRESS_STEP = 3;
 const POINTS_PERKS = [
   { pts: '100×', t: 'on every $1 you spend' },
   { pts: '20×', t: 'on every $1 you sell' },
@@ -25,6 +34,14 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
   const [step, setStep] = useState(0);
   const [handle, setHandle] = useState(session.handle.startsWith('collector_') ? '' : session.handle);
   const [interests, setInterests] = useState<Set<string>>(new Set());
+  const a = session.shippingAddress;
+  const [shipName, setShipName] = useState(a?.name ?? session.displayName ?? '');
+  const [line1, setLine1] = useState(a?.line1 ?? '');
+  const [line2, setLine2] = useState(a?.line2 ?? '');
+  const [city, setCity] = useState(a?.city ?? '');
+  const [region, setRegion] = useState(a?.region ?? '');
+  const [postal, setPostal] = useState(a?.postal ?? '');
+  const [country, setCountry] = useState(a?.country ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -61,9 +78,31 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
       if (!HANDLE_RE.test(h)) { setError('3–20 characters: letters, numbers or underscores.'); return; }
       setBusy(true);
       try {
-        await setHandle(h);
+        await claimHandle(h);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not take that username.');
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    if (step === ADDRESS_STEP && (shipName.trim() || line1.trim())) {
+      // Partly filled is still worth keeping — they can finish it in Settings.
+      setBusy(true);
+      try {
+        await updateMe({
+          shippingAddress: {
+            name: shipName.trim(),
+            line1: line1.trim(),
+            line2: line2.trim(),
+            city: city.trim(),
+            region: region.trim(),
+            postal: postal.trim(),
+            country: country.trim(),
+          },
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not save that address.');
         return;
       } finally {
         setBusy(false);
@@ -80,7 +119,9 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
         <div className="obx__head">
           <Logo size={22} />
           <div className="obx__steps">
-            {[0, 1, 2, 3, 4].map((i) => <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />)}
+            {Array.from({ length: LAST + 1 }, (_, i) => (
+              <span key={i} className={`obx__seg${i <= step ? ' on' : ''}`} />
+            ))}
           </div>
           {/* No skip-the-whole-thing button: the username is required, and the
               optional steps carry their own "Add later" in the footer. */}
@@ -131,7 +172,27 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
             </>
           )}
 
-          {step === 3 && (
+          {step === ADDRESS_STEP && (
+            <>
+              <p className="obx__sub">
+                This is where your wins get shipped, and it&rsquo;s what we print on the label. You
+                can add it later, but nothing ships until it&rsquo;s on file. Sellers never see it.
+              </p>
+              <div className="fld"><label>Full name</label><input value={shipName} onChange={(e) => setShipName(e.target.value)} placeholder="Name on the package" autoFocus /></div>
+              <div className="fld"><label>Street address</label><input value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="123 Main St" /></div>
+              <div className="fld"><label>Apt, suite, unit <span className="muted">(optional)</span></label><input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Unit 4" /></div>
+              <div className="fld-row">
+                <div className="fld"><label>City</label><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" /></div>
+                <div className="fld"><label>State / Region</label><input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CA, AB…" /></div>
+              </div>
+              <div className="fld-row">
+                <div className="fld"><label>Postal / ZIP</label><input value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="ZIP / postal" /></div>
+                <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>
+              </div>
+            </>
+          )}
+
+          {step === 4 && (
             <>
               <p className="obx__sub">We generated a Solana wallet just for you. Send it <b>USDC or SOL</b> to fund your bids. Every auction settles from this balance.</p>
               <div className="obx__wallet">
@@ -145,7 +206,7 @@ export default function Onboarding({ session, onDone }: { session: Session; onDo
             </>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <>
               <p className="obx__sub">
                 Everything you do on BIDit earns <b>BIDit Points</b>. Points decide your share of the
