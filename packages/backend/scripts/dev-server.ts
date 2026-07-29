@@ -66,6 +66,7 @@ import {
   seedRunningAuction,
   setSellerCoin,
   reassignCoin,
+  backfillRenamedCategories,
   startAuctionFromListing,
 } from '../src/sellers.js';
 import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
@@ -297,6 +298,11 @@ async function main() {
   await backfillLegacyVerified(prisma)
     .then((n) => n > 0 && console.log(`[verify] backfilled ${n} pre-existing account(s) as verified`))
     .catch((e) => console.error('[verify] backfill', e));
+  // The web's category list renamed "Clothes" — move saved profiles with it so
+  // their streams keep matching the browse filter.
+  await backfillRenamedCategories(prisma)
+    .then((n) => n > 0 && console.log(`[sellers] renamed stream category on ${n} profile(s)`))
+    .catch((e) => console.error('[sellers] category backfill', e));
   const httpServer = http.createServer((req, res) => void route(req, res));
   const realtime = new RealtimeServer({
     prisma,

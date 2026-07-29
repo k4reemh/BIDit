@@ -7,7 +7,7 @@ import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import { Search, GitHub, Gift, XLogo, Chevron, Wallet, ArrowRight } from '../icons';
 import { money2 } from '../api';
-import { CATEGORIES } from '../data';
+import { FEATURED_CATEGORIES } from '../data';
 import type { User } from '../App';
 
 export default function TopNav({
@@ -87,7 +87,7 @@ export default function TopNav({
               </button>
               {cats && (
                 <div className="nav__catmenu" role="menu">
-                  {CATEGORIES.map((c) => (
+                  {FEATURED_CATEGORIES.map((c) => (
                     <Link
                       key={c.name}
                       role="menuitem"

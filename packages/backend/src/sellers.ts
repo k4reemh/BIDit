@@ -174,6 +174,22 @@ export async function reassignCoin(
   });
 }
 
+/** Stream categories are stored on the profile as the display name, so renaming
+ *  one in the web's category list orphans every seller who already saved it.
+ *  Run once at boot: rewrites old names to their replacements. */
+export async function backfillRenamedCategories(prisma: PrismaClient = defaultPrisma): Promise<number> {
+  const RENAMES: Record<string, string> = { Clothes: 'Mens Fashion' };
+  let total = 0;
+  for (const [from, to] of Object.entries(RENAMES)) {
+    const r = await prisma.sellerProfile.updateMany({
+      where: { streamCategory: from },
+      data: { streamCategory: to },
+    });
+    total += r.count;
+  }
+  return total;
+}
+
 /** The seller's live "Start Auction" control: spin up an auction on a queued item. */
 export async function startAuctionFromListing(
   listingId: string,

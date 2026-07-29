@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import LiveCoinCard from '../components/LiveCoinCard';
-import { CATEGORIES } from '../data';
+import { FEATURED_CATEGORIES } from '../data';
 import { getLive, getPromo, type LiveCoin, type PromoState } from '../api';
 import { ArrowRight, Bolt, Gift, Radio } from '../icons';
 
@@ -109,13 +109,18 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       <section className="section container">
         <div className="section__head"><h2 className="section-title">Shop by category</h2></div>
         <div className="cat-grid">
-          {CATEGORIES.map((c) => (
+          {FEATURED_CATEGORIES.map((c) => (
             <Link className="cat" to={`/browse?cat=${encodeURIComponent(c.name)}`} key={c.name}>
               <img className="cat__img" src={c.image} alt="" loading="lazy" />
               <span className="cat__grad" />
               <span className="cat__name">{c.name}</span>
             </Link>
           ))}
+          <Link className="cat cat--more" to="/browse">
+            <span className="cat__more-icon"><ArrowRight width={18} height={18} /></span>
+            <span className="cat__more-title">Browse more</span>
+            <span className="cat__more-sub">All categories</span>
+          </Link>
         </div>
       </section>
 
