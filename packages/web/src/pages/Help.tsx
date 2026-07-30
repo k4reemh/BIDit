@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import {
-  Wallet, Radio, Bolt, Truck, UserCheck, Tag, Book, Shield, Gift, ArrowRight, XLogo,
+  Wallet, Radio, Truck, UserCheck, Tag, Book, Shield, Gift, ArrowRight, XLogo,
 } from '../icons';
 
 const BUYER = [
   { icon: Wallet, title: 'Add funds', body: 'Deposit USDC to your BIDit wallet. Takes a minute, and you only do it once.', to: '/deposit', cta: 'Go to Deposit' },
   { icon: Radio, title: 'Find a live auction', body: 'Browse “Live right now” on the homepage, or open a seller’s coin to watch and bid.', to: '/', cta: 'Browse live' },
-  { icon: Bolt, title: 'Bid in real time', body: 'Tap to bid. Your funds are reserved, not charged. You only pay if you actually win.', to: '/docs#how', cta: 'How bidding works' },
+  { icon: Tag, title: 'Bid in real time', body: 'Tap to bid. Your funds are reserved, not charged. You only pay if you actually win.', to: '/docs#how', cta: 'How bidding works' },
   { icon: Truck, title: 'Win → ship it', body: 'Won cards land in “Ready to ship.” Bundle a seller’s wins to pay shipping just once.', to: '/ship', cta: 'Ready to ship' },
 ];
 
@@ -18,7 +18,7 @@ const SELLER = [
 ];
 
 const GUIDES = [
-  { icon: Bolt, label: 'How bidding works', to: '/docs#how' },
+  { icon: Book, label: 'How bidding works', to: '/docs#how' },
   { icon: Wallet, label: 'Deposits & withdrawals', to: '/docs#balance' },
   { icon: Truck, label: 'Shipping & delivery', to: '/docs#shipping' },
   { icon: Tag, label: 'Fees & $BID', to: '/docs#fees' },

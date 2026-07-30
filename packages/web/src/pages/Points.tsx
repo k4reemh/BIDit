@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPoints, claimMission, type PointsSummary, type Mission, type Session } from '../api';
 import {
-  Gift, Bolt, Wallet, Tag, UserCheck, Users, Dice, Check, ArrowRight, Bag,
+  Gift, Radio, Wallet, Tag, UserCheck, Users, Dice, Check, ArrowRight, Bag,
 } from '../icons';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 const MISSION_ICONS: Record<string, typeof Gift> = {
   deposit: Wallet,
-  first_bid: Bolt,
+  first_bid: Radio,
   first_win: Tag,
   giveaway_win: Dice,
   refer_friend: Users,

@@ -3,17 +3,18 @@ import { createPortal } from 'react-dom';
 import Avatar from './Avatar';
 import BidSparks from './BidSparks';
 import { runConfetti, CONFETTI } from '../lib/confetti';
-import { Bolt, Wallet, Check, Bag, Truck, ArrowRight } from '../icons';
+import { Radio, Wallet, Check, Bag, Truck, Lock, Shield, ArrowRight } from '../icons';
 
 /**
- * First-run interactive tutorial — a guided, "learn by doing" tour of the whole
+ * First-run interactive tutorial. A guided, "learn by doing" tour of the whole
  * buyer loop shown once after signup. Every scene is a self-contained, fully
  * simulated mini-demo (no API calls, no real money): the user funds a wallet,
- * places a bid and feels anti-snipe extend the clock, wins, buys now, and sees
- * it ship. Reuses the real bid bar, sparks, and confetti so it looks like the
+ * places a bid, feels anti-snipe extend the clock, rides the countdown to zero
+ * and wins on the spot, ships it, buys now, and sees why escrow makes it all
+ * risk free. Reuses the real bid bar, sparks, and confetti so it looks like the
  * product, not a cartoon.
  */
-const SCENES = 7;
+const SCENES = 6;
 const TUTORIAL_SEEN_KEY = 'bidit_tutorial_seen';
 
 const CARD_IMG = 'https://images.pokemontcg.io/base1/4_hires.png';
@@ -48,10 +49,9 @@ export default function Tutorial({ onDone }: { onDone: () => void }) {
           {step === 0 && <SceneWelcome onNext={next} />}
           {step === 1 && <SceneFund onNext={next} />}
           {step === 2 && <SceneBid onNext={next} />}
-          {step === 3 && <SceneWin onNext={next} />}
-          {step === 4 && <SceneReadyShip onNext={next} />}
-          {step === 5 && <SceneBuy onNext={next} />}
-          {step === 6 && <SceneShip onFinish={finish} />}
+          {step === 3 && <SceneReadyShip onNext={next} />}
+          {step === 4 && <SceneBuy onNext={next} />}
+          {step === 5 && <SceneEscrow onFinish={finish} />}
         </div>
 
         <div className="tut__foot">
@@ -83,7 +83,6 @@ function Scene({ icon, kicker, title, sub, children }: { icon: React.ReactNode; 
 function SceneWelcome({ onNext }: { onNext: () => void }) {
   return (
     <div className="tut-scene tut-scene--welcome">
-      <div className="tut-welcome__logo"><Bolt width={38} height={38} /></div>
       <h2 className="tut-scene__title">Welcome to BIDit</h2>
       <p className="tut-scene__sub">Here's the whole thing in about a minute: bid live, win the card, the seller ships it to you. Let's try it.</p>
       <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Show me how <ArrowRight width={17} height={17} /></button>
@@ -134,29 +133,41 @@ function SceneFund({ onNext }: { onNext: () => void }) {
   );
 }
 
-/* ---- 3 · bid (the hero: anti-snipe) --------------------------------------- */
+/* ---- 3 · bid, ride the clock to zero, win --------------------------------- */
 const BID_MAX = 8;
+// After the demo bid the clock ticks a little faster than real time, so the
+// win lands in ~3.5s instead of a full 8s wait.
+const COUNTDOWN_SPEED = 2.2;
 function SceneBid({ onNext }: { onNext: () => void }) {
   const [remaining, setRemaining] = useState(3.4);
   const [bidded, setBidded] = useState(false);
+  const [won, setWon] = useState(false);
   const [spark, setSpark] = useState(false);
   const [extend, setExtend] = useState(false);
   const biddedRef = useRef(false);
+  const wonRef = useRef(false);
   const last = useRef(0);
 
   useEffect(() => {
     let raf = 0;
     const loop = (t: number) => {
       if (!last.current) last.current = t;
-      const dt = (t - last.current) / 1000;
+      const dt = Math.min(0.05, (t - last.current) / 1000);
       last.current = t;
       setRemaining((r) => {
-        // After the bid, freeze on the extended time so the "clock extended"
-        // state stays clean instead of ticking down to zero.
-        if (biddedRef.current) return r;
-        let nr = r - dt;
-        // Before the user bids, hold near zero and keep nudging — never actually
+        if (biddedRef.current) {
+          // Post-bid: run the extended clock all the way down to zero...
+          const nr = Math.max(0, r - dt * COUNTDOWN_SPEED);
+          if (nr === 0 && !wonRef.current) {
+            // ...and the moment it hits zero, they win.
+            wonRef.current = true;
+            setWon(true);
+          }
+          return nr;
+        }
+        // Before the user bids, hold near zero and keep nudging. Never actually
         // expire, so they always get to feel the tap → extend moment.
+        let nr = r - dt;
         if (nr < 0.6) nr = 0.6;
         return Math.max(0, nr);
       });
@@ -181,55 +192,58 @@ function SceneBid({ onNext }: { onNext: () => void }) {
   const low = fill < 0.4;
 
   return (
-    <Scene
-      icon={<Bolt width={26} height={26} />}
-      kicker="Step 2 · bid live"
-      title="Place a bid"
-      sub={bidded
-        ? 'See that? Your late bid pushed the clock back to 8s. That’s anti-snipe. No one steals it at the buzzer.'
-        : 'Tap Bid before the timer hits zero. A late bid extends the clock, so bidding stays fair.'}
-    >
-      <div className="tut-bid">
-        <div className="tut-bid__head">
-          <img className="tut-bid__thumb" src={CARD_IMG} alt="" />
-          <div className="tut-bid__id">
-            <span className="live-badge"><span className="dot" /> LIVE</span>
-            <div className="tut-bid__title">Charizard · Base Set Holo</div>
+    <>
+      <Scene
+        icon={<Radio width={26} height={26} />}
+        kicker="Step 2 · bid live"
+        title="Place a bid"
+        sub={bidded
+          ? 'See that? Your late bid pushed the clock back to 8s. That’s anti-snipe. Now hold it to zero and it’s yours.'
+          : 'Tap Bid before the timer hits zero. A late bid extends the clock, so bidding stays fair.'}
+      >
+        <div className="tut-bid">
+          <div className="tut-bid__head">
+            <img className="tut-bid__thumb" src={CARD_IMG} alt="" />
+            <div className="tut-bid__id">
+              <span className="live-badge"><span className="dot" /> LIVE</span>
+              <div className="tut-bid__title">Charizard · Base Set Holo</div>
+            </div>
           </div>
+          <div className="tut-bid__stats">
+            <div><span>Current bid</span><b>${bidded ? '12' : '8'}</b></div>
+            <div className="tut-bid__timer"><span>Ends in</span><b className={low ? 'low' : ''}>{remaining.toFixed(1)}s</b></div>
+          </div>
+          <div className="bp__barwrap">
+            <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${fill * 100}%` }} /></div>
+            <BidSparks fill={fill} active={spark || low} />
+          </div>
+          <div className="tut-bid__leader">
+            {bidded
+              ? <><Avatar handle="you" size={20} /> <b>You're the top bid</b> · $12</>
+              : <><Avatar handle="degen_max" size={20} /> @degen_max leading · min next $12</>}
+          </div>
+          {extend && <div className="tut-bid__extend">+5s · clock extended</div>}
         </div>
-        <div className="tut-bid__stats">
-          <div><span>Current bid</span><b>${bidded ? '12' : '8'}</b></div>
-          <div className="tut-bid__timer"><span>Ends in</span><b className={low ? 'low' : ''}>{remaining.toFixed(1)}s</b></div>
-        </div>
-        <div className="bp__barwrap">
-          <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${fill * 100}%` }} /></div>
-          <BidSparks fill={fill} active={spark || low} />
-        </div>
-        <div className="tut-bid__leader">
-          {bidded
-            ? <><Avatar handle="you" size={20} /> <b>You're the top bid</b> · $12</>
-            : <><Avatar handle="degen_max" size={20} /> @degen_max leading · min next $12</>}
-        </div>
-        {extend && <div className="tut-bid__extend">+5s · clock extended</div>}
-      </div>
 
-      {!bidded ? (
-        <button className="btn btn-accent btn-lg tut-cta tut-cta--pulse" onClick={placeBid}>Bid $12</button>
-      ) : (
-        <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Next <ArrowRight width={17} height={17} /></button>
-      )}
-    </Scene>
+        {!bidded ? (
+          <button className="btn btn-accent btn-lg tut-cta tut-cta--pulse" onClick={placeBid}>Bid $12</button>
+        ) : (
+          <p className="tut-note tut-note--muted">Nobody outbids you before zero and it's yours...</p>
+        )}
+      </Scene>
+      {won && <WinPop onNext={onNext} />}
+    </>
   );
 }
 
-/* ---- 4 · win -------------------------------------------------------------- */
-function SceneWin({ onNext }: { onNext: () => void }) {
+/** The "You won" moment, popped over the bid scene the instant the clock dies. */
+function WinPop({ onNext }: { onNext: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     runConfetti(canvas.current, CONFETTI, 170, 4200);
   }, []);
   return (
-    <div className="tut-scene tut-scene--win">
+    <div className="tut-winpop">
       <canvas ref={canvas} className="tut-win__confetti" />
       <div className="tut-win__av"><Avatar handle="you" size={70} /></div>
       <div className="tut-scene__kick">You won</div>
@@ -245,9 +259,15 @@ function SceneWin({ onNext }: { onNext: () => void }) {
   );
 }
 
-/* ---- 5 · ready to ship (win fulfillment + buy-now-pay-later) --------------- */
+/* ---- 4 · ready to ship (win fulfillment + buy-now-pay-later) --------------- */
 function SceneReadyShip({ onNext }: { onNext: () => void }) {
   const [shipped, setShipped] = useState(false);
+  // Paying shipping IS completing this step; move on without an extra Next tap.
+  useEffect(() => {
+    if (!shipped) return;
+    const t = setTimeout(onNext, 1400);
+    return () => clearTimeout(t);
+  }, [shipped, onNext]);
   return (
     <Scene
       icon={<Truck width={26} height={26} />}
@@ -269,18 +289,22 @@ function SceneReadyShip({ onNext }: { onNext: () => void }) {
         <span className="tut-tip__ic"><Bag width={16} height={16} /></span>
         <span><b>Skip shipping costs with Buy Now, Pay Later.</b> Sellers store your items until you're ready to ship.</span>
       </div>
-      {!shipped ? (
-        <p className="tut-note tut-note--muted">Tap <b>Ship now</b> to send your win.</p>
-      ) : (
-        <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Next <ArrowRight width={17} height={17} /></button>
-      )}
+      {!shipped
+        ? <p className="tut-note tut-note--muted">Tap <b>Ship now</b> to send your win.</p>
+        : <p className="tut-note"><Check width={15} height={15} /> Paid. The seller gets your label and packs it up.</p>}
     </Scene>
   );
 }
 
-/* ---- 6 · buy now ---------------------------------------------------------- */
+/* ---- 5 · buy now ---------------------------------------------------------- */
 function SceneBuy({ onNext }: { onNext: () => void }) {
   const [bought, setBought] = useState(false);
+  // Buying completes the step; no extra Next tap.
+  useEffect(() => {
+    if (!bought) return;
+    const t = setTimeout(onNext, 1400);
+    return () => clearTimeout(t);
+  }, [bought, onNext]);
   return (
     <Scene
       icon={<Bag width={26} height={26} />}
@@ -298,34 +322,35 @@ function SceneBuy({ onNext }: { onNext: () => void }) {
           ? <span className="tut-buy__done"><Check width={16} height={16} /> Bought</span>
           : <button className="btn btn-primary btn-sm tut-buy__btn" onClick={() => setBought(true)}>Buy now</button>}
       </div>
-      {!bought ? (
-        <p className="tut-note tut-note--muted">Tap <b>Buy now</b> to grab it.</p>
-      ) : (
-        <>
-          <p className="tut-note"><Check width={15} height={15} /> Done. It goes straight to shipping, just like a win.</p>
-          <button className="btn btn-primary btn-lg tut-cta" onClick={onNext}>Next <ArrowRight width={17} height={17} /></button>
-        </>
-      )}
+      {!bought
+        ? <p className="tut-note tut-note--muted">Tap <b>Buy now</b> to grab it.</p>
+        : <p className="tut-note"><Check width={15} height={15} /> Done. It goes straight to shipping, just like a win.</p>}
     </Scene>
   );
 }
 
-/* ---- 7 · delivery (finale) ------------------------------------------------ */
-function SceneShip({ onFinish }: { onFinish: () => void }) {
+/* ---- 6 · escrow (finale) --------------------------------------------------- */
+function SceneEscrow({ onFinish }: { onFinish: () => void }) {
   return (
     <Scene
-      icon={<Truck width={26} height={26} />}
-      kicker="Step 5 · delivery"
-      title="The seller ships it to you"
-      sub="It lands at your door, buyer-protected the whole way. That's the loop."
+      icon={<Shield width={26} height={26} />}
+      kicker="Step 5 · buyer protection"
+      title="Your money is protected"
+      sub="Funds stay locked in escrow until you confirm delivery, so you can enjoy risk free bidding. If it never arrives, you get your money back."
     >
-      <div className="tut-ship">
-        <div className="tut-ship__track">
-          <span className="tut-ship__pt"><Bag width={18} height={18} /></span>
-          <span className="tut-ship__line"><span className="tut-ship__truck"><Truck width={20} height={20} /></span></span>
-          <span className="tut-ship__pt tut-ship__pt--you"><Avatar handle="you" size={30} /></span>
+      <div className="tut-esc" aria-hidden>
+        <div className="tut-esc__track">
+          <span className="tut-esc__line" />
+          <span className="tut-esc__node tut-esc__node--a"><Avatar handle="you" size={30} /></span>
+          <span className="tut-esc__node tut-esc__node--b">
+            <Lock className="tut-esc__lock" width={19} height={19} />
+            <Check className="tut-esc__check" width={19} height={19} />
+          </span>
+          <span className="tut-esc__node tut-esc__node--c"><Avatar handle="seller" size={30} /></span>
+          <span className="tut-esc__coin">$12</span>
+          <span className="tut-esc__pill"><Check width={12} height={12} /> Delivered</span>
         </div>
-        <div className="tut-ship__labels"><span>Seller ships</span><span>Your door</span></div>
+        <div className="tut-esc__labels"><span>You pay</span><span>Locked in escrow</span><span>Seller paid</span></div>
       </div>
       <button className="btn btn-primary btn-lg tut-cta" onClick={onFinish}>Start exploring <ArrowRight width={17} height={17} /></button>
       <p className="tut-note tut-note--muted">You can replay this anytime from your profile menu.</p>

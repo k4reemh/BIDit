@@ -15,7 +15,7 @@ import {
   type RandomizerSpin,
 } from '../realtime';
 import { estimateListingShipping, money2, type Session, type ShippingMode, type ListingShipEstimate } from '../api';
-import { Gift, Bolt, Dice, Chevron, Truck } from '../icons';
+import { Gift, Dice, Chevron, Truck } from '../icons';
 
 interface Feed { who: string; avatar: string | null; amt: string; key: number }
 
@@ -208,7 +208,7 @@ export default function BidPanel({
   return (
     <aside className={`bp${running && final ? ' bp--final' : ''}`}>
       <div className="bp__head">
-        <span className="bp__brand"><Bolt width={15} height={15} /> Live bidding</span>
+        <span className="bp__brand">Live bidding</span>
         <div className="bp__headright">
           {session && (
             <button className="bp__ship" onClick={() => setShipOpen(true)} title="Shipping options" aria-label="Shipping options">
@@ -231,7 +231,7 @@ export default function BidPanel({
           {running ? (
             <>
               <div className="bp__item">
-                <div className="bp__thumb">{auction!.imageUrl ? <img src={auction!.imageUrl} alt="" /> : <Bolt width={20} height={20} />}</div>
+                <div className="bp__thumb">{auction!.imageUrl ? <img src={auction!.imageUrl} alt="" /> : null}</div>
                 <div className="bp__itemid">
                   <span className="live-badge"><span className="dot" /> LIVE</span>
                   <div className="bp__title">{auction!.title}</div>
@@ -257,7 +257,7 @@ export default function BidPanel({
                 </div>
               )}
               <div className="bp__bidrow">
-                <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : '—'}</b></div>
+                <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : 'No bids'}</b></div>
                 <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining! > 0 ? `${remaining!.toFixed(1)}s` : 'Settling…'}</div>
               </div>
               {shipNote && <button type="button" className={`bp__shipnote${shipNote.warn ? ' warn' : ''}`} onClick={() => setShipOpen(true)} title="Change shipping option">{shipNote.text}</button>}
@@ -301,7 +301,6 @@ export default function BidPanel({
           ) : (
             !giveaway && (
               <div className="bp__empty">
-                <span className="bp__emptyic"><Bolt width={22} height={22} /></span>
                 <b>Waiting for the next item…</b>
                 <p>When the seller starts an auction it appears here instantly.</p>
               </div>

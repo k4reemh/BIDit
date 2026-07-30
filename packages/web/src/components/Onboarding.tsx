@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import Logo from './Logo';
 import { INTERESTS } from '../data';
 import { completeOnboarding, setHandle as claimHandle, updateMe, ApiError, type Session } from '../api';
-import { Bolt, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
+import { Radio, Truck, Wallet, Copy, Check, ArrowRight, Gift } from '../icons';
 
 const HOW = [
-  { ic: Bolt, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
+  { ic: Radio, t: 'Bid live on stream', d: 'Jump into a seller’s live pump.fun stream and place real bids in real time.' },
   { ic: Truck, t: 'Win it, seller ships it', d: 'Your funds stay put until you win. Then the seller ships it straight to your door.' },
   { ic: Wallet, t: 'Settle in USDC', d: 'Fast, on-chain settlement. No chargebacks, no haggling, no middlemen.' },
 ];

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import type { User } from '../App';
 import {
-  Gift, UserCheck, Truck, Bookmark, Bolt, Bag, Shield,
+  Gift, UserCheck, Truck, Bookmark, Book, Bag, Shield,
   Wallet, Users, Settings, Info, Logout, Chevron,
 } from '../icons';
 
@@ -63,7 +63,7 @@ export default function ProfileMenu({
           )}
           <Link to="/friends" className="pm__row" onClick={onClose}><Users width={20} height={20} /> Friends <Chevron className="pm__chev" width={16} height={16} /></Link>
           {onReplayTutorial && (
-            <button className="pm__row" onClick={() => { onReplayTutorial(); onClose(); }}><Bolt width={20} height={20} /> How it works <Chevron className="pm__chev" width={16} height={16} /></button>
+            <button className="pm__row" onClick={() => { onReplayTutorial(); onClose(); }}><Book width={20} height={20} /> How it works <Chevron className="pm__chev" width={16} height={16} /></button>
           )}
           <Link to="/settings" className="pm__row" onClick={onClose}><Settings width={20} height={20} /> Account Settings <Chevron className="pm__chev" width={16} height={16} /></Link>
           <Link to="/help" className="pm__row" onClick={onClose}><Info width={20} height={20} /> Help &amp; Legal <Chevron className="pm__chev" width={16} height={16} /></Link>

@@ -9,7 +9,7 @@ import {
   type Session,
 } from '../../api';
 import { hasPhantom, connectPhantom, signCreateTx, signLoginMessage, PhantomError } from '../../lib/phantom';
-import { Bolt, Check } from '../../icons';
+import { Check } from '../../icons';
 
 type Stage = 'idle' | 'working' | 'done';
 
@@ -220,7 +220,7 @@ export default function CreateCoinCard({
         {imgOk ? (
           <img className="ccc__img" src="/pump-coin.png" alt="" onError={() => setImgOk(false)} />
         ) : (
-          <span className="ccc__img ccc__img--ph"><Bolt width={22} height={22} /></span>
+          <span className="ccc__img ccc__img--ph" />
         )}
         <div>
           <b className="ccc__name">{session.handle}&rsquo;s BIDit Livestream</b>

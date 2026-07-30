@@ -6,7 +6,7 @@
  * fresh from the network. We only touch same-origin GETs (the app shell +
  * static assets), and navigations are network-first so users can never get
  * stuck on a stale build while online. */
-const CACHE = 'bidit-shell-v1';
+const CACHE = 'bidit-shell-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

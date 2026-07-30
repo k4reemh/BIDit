@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bolt, Radio, Eye, Wallet, Shield, Tag, Gift, Dice, UserCheck, Info, Book, ArrowRight, Truck,
+  Grid, Radio, Eye, Wallet, Shield, Tag, Gift, Dice, UserCheck, Info, Book, ArrowRight, Truck,
 } from '../icons';
 
 const SECTIONS = [
-  { id: 'overview', label: 'What is BIDit', icon: Bolt },
+  { id: 'overview', label: 'What is BIDit', icon: Grid },
   { id: 'how', label: 'How an auction works', icon: Radio },
   { id: 'overlay', label: 'Getting the overlay', icon: Eye },
   { id: 'balance', label: 'Balance & deposits', icon: Wallet },
@@ -67,7 +67,7 @@ export default function Docs() {
 
         {/* OVERVIEW */}
         <section id="overview" className="docs__sec">
-          <h2 className="docs__h2"><Bolt width={22} height={22} /> What is BIDit</h2>
+          <h2 className="docs__h2"><Grid width={22} height={22} /> What is BIDit</h2>
           <p>
             BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything: cards, clothes,
             tech, bounties. The BIDit browser overlay drops a live auction panel right onto the stream. Viewers place

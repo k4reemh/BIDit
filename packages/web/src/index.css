@@ -1789,7 +1789,7 @@ img { display: block; max-width: 100%; }
    First-run interactive tutorial
    ========================================================================== */
 .tut { position: fixed; inset: 0; z-index: 120; display: flex; animation: risein 0.25s ease; }
-.tut__inner { flex: 1; display: flex; flex-direction: column; background: var(--bg);
+.tut__inner { position: relative; overflow: hidden; flex: 1; display: flex; flex-direction: column; background: var(--bg);
   padding: max(env(safe-area-inset-top, 0px), 16px) 20px calc(18px + env(safe-area-inset-bottom, 0px)); }
 .tut__top { display: flex; align-items: center; gap: 14px; flex: none; }
 .tut__dots { display: flex; gap: 6px; flex: 1; }
@@ -1827,9 +1827,6 @@ img { display: block; max-width: 100%; }
 .tut-note--muted { color: var(--muted); }
 .tut-note--muted b { color: var(--ink); font-weight: 600; }
 
-.tut-welcome__logo { width: 76px; height: 76px; border-radius: 22px; display: grid; place-items: center; margin-bottom: 18px; color: #fff; background: var(--navy); animation: tut-bolt 2s ease-in-out infinite; }
-.tut-welcome__logo svg { color: var(--accent); }
-@keyframes tut-bolt { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 .tut-scene--welcome { text-align: center; }
 
 .tut-wallet { width: 100%; max-width: 320px; border-radius: 16px; padding: 22px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; transition: border-color 0.3s, box-shadow 0.3s; }
@@ -1851,9 +1848,12 @@ img { display: block; max-width: 100%; }
 .tut-bid__extend { display: inline-block; margin-top: 11px; font-size: 12px; font-weight: 700; color: #fff; background: #0e9f6e; padding: 4px 11px; border-radius: 999px; animation: tut-pop 0.3s ease; }
 @keyframes tut-pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-.tut-scene--win { position: relative; }
-.tut-scene--win > * { position: relative; z-index: 1; }
-.tut-win__confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+/* The win moment: pops over the whole tutorial card when the clock hits zero. */
+.tut-winpop { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 28px 24px; background: var(--bg); border-radius: inherit; animation: tut-winpop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.tut-winpop > * { position: relative; z-index: 1; }
+@keyframes tut-winpop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+.tut-win__confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0 !important; }
 .tut-win__av { margin-bottom: 8px; }
 .tut-win__head { margin-top: 2px; }
 .tut-win__item { display: inline-flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 15px 6px 6px; margin: 12px 0 2px; font-size: 13.5px; font-weight: 600; }
@@ -1873,14 +1873,49 @@ img { display: block; max-width: 100%; }
 .tut-tip__ic { color: var(--accent-strong); flex: none; margin-top: 1px; }
 .tut-tip b { color: var(--ink); font-weight: 700; }
 
-.tut-ship { width: 100%; max-width: 320px; margin-bottom: 20px; }
-.tut-ship__track { display: flex; align-items: center; gap: 8px; }
-.tut-ship__pt { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-strong); flex: none; }
-.tut-ship__pt--you { background: none; }
-.tut-ship__line { flex: 1; height: 3px; border-radius: 2px; position: relative; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
-.tut-ship__truck { position: absolute; top: 50%; color: var(--accent-strong); background: var(--surface); padding: 0 4px; transform: translate(-50%, -50%); animation: tut-drive 2.6s cubic-bezier(0.45, 0, 0.25, 1) infinite; }
-@keyframes tut-drive { 0% { left: 6%; } 72% { left: 94%; } 100% { left: 94%; } }
-.tut-ship__labels { display: flex; justify-content: space-between; margin-top: 9px; font-size: 12px; color: var(--muted); }
+/* Escrow finale: $12 leaves the buyer, sits locked at the middle until the
+   "Delivered" beat, then releases to the seller. One shared 6s timeline. */
+.tut-esc { width: 100%; max-width: 340px; margin-bottom: 22px; }
+.tut-esc__track { position: relative; height: 46px; }
+.tut-esc__line { position: absolute; left: 20px; right: 20px; top: 50%; height: 3px; border-radius: 2px; transform: translateY(-50%);
+  background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
+.tut-esc__node { position: absolute; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; z-index: 1; }
+.tut-esc__node--a { left: 6%; }
+.tut-esc__node--b { left: 50%; width: 44px; height: 44px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-strong);
+  border: 1px solid rgba(255, 106, 0, 0.3); animation: tut-esc-node 6s ease-in-out infinite; }
+.tut-esc__node--c { left: 94%; }
+.tut-esc__node--b svg { grid-area: 1 / 1; }
+.tut-esc__lock { animation: tut-esc-lock 6s ease-in-out infinite; }
+.tut-esc__check { color: #0e9f6e; opacity: 0; animation: tut-esc-check 6s ease-in-out infinite; }
+.tut-esc__coin { position: absolute; top: 50%; left: 6%; transform: translate(-50%, -50%); z-index: 2; padding: 3px 9px; border-radius: 999px;
+  background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: var(--shadow);
+  animation: tut-esc-coin 6s cubic-bezier(0.45, 0, 0.25, 1) infinite; }
+.tut-esc__pill { position: absolute; left: 50%; top: -16px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; background: rgba(14, 159, 110, 0.14); color: #0e9f6e; font-size: 11px; font-weight: 700;
+  opacity: 0; animation: tut-esc-pill 6s ease infinite; }
+.tut-esc__labels { display: flex; justify-content: space-between; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.tut-esc__labels span:nth-child(2) { color: var(--accent-strong); font-weight: 600; }
+@keyframes tut-esc-coin {
+  0% { left: 6%; transform: translate(-50%, -50%) scale(1); opacity: 0; }
+  6% { opacity: 1; }
+  22% { left: 44%; transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  27%, 57% { left: 50%; transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  62% { left: 56%; transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  78% { left: 94%; opacity: 1; }
+  86%, 100% { left: 94%; transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+@keyframes tut-esc-node {
+  0%, 22% { box-shadow: 0 0 0 0 rgba(255, 106, 0, 0); }
+  30% { box-shadow: 0 0 0 7px rgba(255, 106, 0, 0.16); }
+  38%, 100% { box-shadow: 0 0 0 0 rgba(255, 106, 0, 0); }
+}
+@keyframes tut-esc-lock { 0%, 54% { opacity: 1; } 60%, 92% { opacity: 0; } 98%, 100% { opacity: 1; } }
+@keyframes tut-esc-check { 0%, 54% { opacity: 0; } 60%, 92% { opacity: 1; } 98%, 100% { opacity: 0; } }
+@keyframes tut-esc-pill {
+  0%, 50% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  58%, 86% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  94%, 100% { opacity: 0; transform: translateX(-50%) translateY(4px); }
+}
 
 /* ===== BIDit Points ======================================================= */
 /* home band */

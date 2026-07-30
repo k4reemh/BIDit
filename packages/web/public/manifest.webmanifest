@@ -1,7 +1,7 @@
 {
-  "name": "BIDit — Live auctions on pump.fun",
+  "name": "BIDit: Live auctions on pump.fun",
   "short_name": "BIDit",
-  "description": "Bid live and buy now on Pokémon, One Piece, sports cards, sealed, tech and more — settled in USDC on Solana.",
+  "description": "Bid live and buy now on Pokémon, One Piece, sports cards, sealed, tech and more. Settled in USDC on Solana.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",

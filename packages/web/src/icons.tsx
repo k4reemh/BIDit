@@ -84,8 +84,8 @@ export const Info = (p: SVGProps<SVGSVGElement>) => (
 export const Users = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.5a3.2 3.2 0 0 1 0 6.3M21 20a6 6 0 0 0-4-5.7" /></svg>
 );
-export const Bolt = (p: SVGProps<SVGSVGElement>) => (
-  <svg {...base({ ...p, fill: 'currentColor', stroke: 'none' })}><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" /></svg>
+export const Lock = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="5" y="11" width="14" height="9" rx="2.2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>
 );
 export const Eye = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>

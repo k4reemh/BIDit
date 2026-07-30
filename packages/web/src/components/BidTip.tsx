@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Bolt, Check } from '../icons';
+import { X, Check } from '../icons';
 
 const KEY = 'bidit_tip_bid';
 
@@ -14,7 +14,7 @@ export default function BidTip() {
       <button className="bidtip__x" onClick={dismiss} aria-label="Dismiss">
         <X width={14} height={14} />
       </button>
-      <div className="bidtip__h"><Bolt width={16} height={16} /> New here? How bidding works</div>
+      <div className="bidtip__h">New here? How bidding works</div>
       <ul className="bidtip__list">
         <li><Check width={14} height={14} /><span>Tap to bid. You’re only charged if you <b>win</b>. Bids just reserve funds.</span></li>
         <li><Check width={14} height={14} /><span>A late bid <b>extends the clock</b>. No last-second snipes.</span></li>

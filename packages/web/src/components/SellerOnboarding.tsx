@@ -2,13 +2,13 @@ import { useState } from 'react';
 import Logo from './Logo';
 import CreateCoinCard from './seller/CreateCoinCard';
 import { submitSellerOnboarding, type Session } from '../api';
-import { Bolt, Radio, Truck, Shield, Check, ArrowRight, Tag, UserCheck, Wallet } from '../icons';
+import { Users, Radio, Truck, Shield, Check, ArrowRight, Tag, UserCheck, Wallet } from '../icons';
 
 const LAST = 4;
 
 const HOW = [
   { ic: Radio, t: 'Go live on your stream', d: 'Run auctions and wheel spins right on your pump.fun stream with the BIDit overlay.' },
-  { ic: Bolt, t: 'Buyers bid in real time', d: 'Highest bid at the buzzer wins. Anti-snipe keeps it fair: no last-second steals.' },
+  { ic: Users, t: 'Buyers bid in real time', d: 'Highest bid at the buzzer wins. Anti-snipe keeps it fair: no last-second steals.' },
   { ic: Truck, t: 'You ship, you get paid', d: 'Buyers pay shipping. You keep 95% of each sale in USDC, withdrawable anytime.' },
 ];
 
