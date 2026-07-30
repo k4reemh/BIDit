@@ -1,5 +1,5 @@
 /**
- * Fulfillment — the physical side of a sale, separate from the money (which is
+ * Fulfillment: the physical side of a sale, separate from the money (which is
  * instant in direct-payout mode). Each won card becomes a FulfillmentItem
  * (READY_TO_SHIP); items from one seller to one buyer are grouped into a
  * Shipment carrying a single shipping fee. The four shipping modes (standard /
@@ -24,7 +24,7 @@ export const NO_SHIP_BUSINESS_DAYS = 7;
 /** Fallback weight for a sleeved card + mailer when the seller didn't estimate. */
 const DEFAULT_WEIGHT_G = 60;
 
-/** Add N business days (skipping Sat/Sun) to a date. Holidays are ignored — fine
+/** Add N business days (skipping Sat/Sun) to a date. Holidays are ignored: fine
  *  for the beta's no-ship deadline. */
 export function addBusinessDays(from: Date, n: number): Date {
   const d = new Date(from.getTime());
@@ -38,7 +38,7 @@ export function addBusinessDays(from: Date, n: number): Date {
 }
 
 /** Start the seller's ship-by clock on any LOCKED (escrow) order behind these
- *  items — the buyer just paid shipping, so the seller has NO_SHIP_BUSINESS_DAYS
+ *  items: the buyer just paid shipping, so the seller has NO_SHIP_BUSINESS_DAYS
  *  to ship before the escrow is refunded. No-op for direct-mode orders (RELEASED). */
 async function startSellerShipClock(itemIds: string[], clock: Clock, prisma: PrismaClient): Promise<void> {
   const items = await prisma.fulfillmentItem.findMany({ where: { id: { in: itemIds } }, select: { orderId: true } });
@@ -123,7 +123,7 @@ export async function createFulfillmentItem(
  *  - First win of the week: open a WEEKLY_BUNDLE shipment, charge shipping ONCE
  *    (decision), attach the item, open a pass (7-day week).
  *  - Later wins that week: attach free to the open pass's shipment.
- * Best-effort — any precondition miss (no address, insufficient funds) silently
+ * Best-effort, any precondition miss (no address, insufficient funds) silently
  * falls back to Standard (the item just stays Ready-to-Ship). Runs after the item
  * is created, inside the sale settlement.
  */
@@ -160,7 +160,7 @@ export async function applyWeeklyBundling(
     }
   }
 
-  // Auto-ship this win — needs an address to ship to and funds for shipping.
+  // Auto-ship this win: needs an address to ship to and funds for shipping.
   const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
   if (!dest || !dest.line1 || !dest.country) return; // no address → fall back to Ready-to-ship
   const origin: ShipLocation = {
@@ -185,7 +185,7 @@ export async function applyWeeklyBundling(
   try {
     await settleShipping({ buyerAccountId, amount: fee, shipmentId: shipment.id }, prisma);
   } catch {
-    // Can't afford shipping right now — undo and fall back to Ready-to-ship (buy
+    // Can't afford shipping right now: undo and fall back to Ready-to-ship (buy
     // now, ship later): the buyer keeps the win, the item just waits to be shipped.
     await prisma.shipment.delete({ where: { id: shipment.id } }).catch(() => {});
     return;
@@ -244,7 +244,7 @@ export interface BuyerPurchase {
 }
 
 /** Everything the buyer has won/bought that still exists (not discarded), across the
- *  whole lifecycle — for the Purchases overview. Each item carries its shipment (if
+ *  whole lifecycle, for the Purchases overview. Each item carries its shipment (if
  *  any) so the UI can show tracking + the delivered state. `shipmentId` is a loose
  *  FK (no relation), so shipments are fetched + joined in memory. */
 export async function getBuyerPurchases(buyerId: string, prisma: PrismaClient = defaultPrisma): Promise<BuyerPurchase[]> {
@@ -312,7 +312,7 @@ export function getSellerHeldItems(sellerId: string, prisma: PrismaClient = defa
 }
 
 /** Operator test view: shipments moving through the pipeline (post-label) that an
- *  admin can drive by hand — normally Shippo advances these automatically. */
+ *  admin can drive by hand: normally Shippo advances these automatically. */
 export function listInflightShipments(prisma: PrismaClient = defaultPrisma) {
   return prisma.shipment.findMany({
     where: { status: { in: ['LABEL_CREATED', 'SHIPPED', 'DELIVERED'] } },
@@ -400,7 +400,7 @@ export async function createAndPayShipment(
   const buyerAccountId = await getOrCreateUserAccount(params.buyerId, prisma);
 
   // Charge the buyer: the whole fee (base shipping + any privacy premium) goes to
-  // the FEE pool — the platform buys the label. Throws InsufficientFundsError
+  // the FEE pool: the platform buys the label. Throws InsufficientFundsError
   // (mapped to a friendly 400 by the caller) if short.
   await settleShipping(
     { buyerAccountId, amount: shippingFee + privacyFee, shipmentId: shipment.id },
@@ -419,7 +419,7 @@ export async function createAndPayShipment(
 }
 
 /**
- * Read-only shipping estimate for a set of ready-to-ship items — same origin,
+ * Read-only shipping estimate for a set of ready-to-ship items, same origin,
  * destination and weight the real charge would use, so the buyer sees the fee
  * before committing. Charges nothing and creates nothing.
  */
@@ -477,7 +477,7 @@ export async function estimateShipment(
 }
 
 /**
- * Read-only shipping estimate for a single listing (not yet won) — for the bid
+ * Read-only shipping estimate for a single listing (not yet won), for the bid
  * panel, so a buyer sees what shipping will cost before bidding. Uses the seller's
  * ship-from, the listing weight and the buyer's saved address.
  */
@@ -552,10 +552,10 @@ export async function confirmShipmentForLabel(
 }
 
 /**
- * Advance a package to SHIPPED — LABEL_CREATED -> SHIPPED. This is driven by the
+ * Advance a package to SHIPPED: LABEL_CREATED -> SHIPPED. This is driven by the
  * CARRIER: the ShipmentTracker flips a package here the moment tracking shows the
  * label moving (with an admin override for the rare manual case). Sellers never
- * self-attest shipping — they just print the BIDit label and drop the package off;
+ * self-attest shipping: they just print the BIDit label and drop the package off;
  * the carrier's first scan is what marks it shipped. The tracking number is already
  * on the label, so there's nothing to enter.
  */
@@ -570,7 +570,7 @@ export async function markShipmentShipped(
   }
   const now = clock.now();
   await prisma.fulfillmentItem.updateMany({ where: { shipmentId: s.id }, data: { status: 'SHIPPED' } });
-  // Shipping a weekly bundle closes the week — the buyer's next win starts a fresh
+  // Shipping a weekly bundle closes the week: the buyer's next win starts a fresh
   // pass (and a fresh shipping charge).
   if (s.mode === 'WEEKLY_BUNDLE') {
     await prisma.weeklyShippingPass.updateMany({
@@ -641,12 +641,12 @@ export async function markShipmentDelivered(
 }
 
 // NOTE: manual discards (buyer gives up an item, seller clears an expired hold)
-// live in orders.ts (buyerDiscardItem / sellerDiscardExpiredItem) — they may have
+// live in orders.ts (buyerDiscardItem / sellerDiscardExpiredItem): they may have
 // to release escrow, which this module can't reach without an import cycle.
 
 /** Auto-discard items whose ship-later hold expired with no buyer action. Escrow
  *  orders still LOCKED are left for the order timer, which forfeits them to the
- *  seller (releasing the escrow) rather than plain-discarding — otherwise the
+ *  seller (releasing the escrow) rather than plain-discarding: otherwise the
  *  escrowed item price would be stranded. Direct-mode orders (already RELEASED)
  *  just discard: the buyer forfeits, the seller keeps the card. */
 export async function processFulfillmentTimers(
@@ -670,7 +670,7 @@ export async function processFulfillmentTimers(
 }
 
 /** PII retention: null the buyer's address snapshot on shipments delivered more
- *  than `retentionDays` ago — we only keep it long enough to get the package there.
+ *  than `retentionDays` ago: we only keep it long enough to get the package there.
  *  shipTo is NOT-NULL Json (so JSON null), privateLeg2 is nullable. Idempotent. */
 export async function purgeDeliveredShipmentPii(
   retentionDays = 90,

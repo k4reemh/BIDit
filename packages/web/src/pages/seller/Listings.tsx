@@ -53,7 +53,7 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
           {!isWheel && l.buyNowPrice && <span className="pill lc__store"><Bag width={12} height={12} /> ${l.buyNowPrice}</span>}
           <span className="lc__start">Start ${l.startingBid}</span>
         </div>
-        {/* Store (buy now) price — items only, until sold out */}
+        {/* Store (buy now) price: items only, until sold out */}
         {!isWheel && l.status !== 'SOLD' && (
           priceOpen ? (
             <div className="lc__priceform">
@@ -96,7 +96,7 @@ export default function Listings() {
   const onCreated = () => { setModal(null); load(); };
 
   // Live-refresh statuses: when an auction ends the listing flips off LIVE
-  // (to QUEUED/SOLD) server-side — reload so the seller can immediately start the
+  // (to QUEUED/SOLD) server-side: reload so the seller can immediately start the
   // next one without a manual page refresh.
   useEffect(() => {
     const stop = openSocket({

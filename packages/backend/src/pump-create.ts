@@ -2,14 +2,14 @@
  * Auto-create a seller's pump.fun livestream coin.
  *
  * The lifecycle lives in PumpCoinCreateAttempt (PREPARED → SUBMITTED →
- * CONFIRMED | FAILED | SUPERSEDED — see schema.prisma), and two provider shapes
+ * CONFIRMED | FAILED | SUPERSEDED: see schema.prisma), and two provider shapes
  * feed it (see chain/pump-provider.ts):
  *
  *  - off-chain (default): the seller signs pump.fun's sign-in message, we create
- *    the coin through pump.fun's own API. One round trip, settled or not — no
+ *    the coin through pump.fun's own API. One round trip, settled or not, no
  *    chain, no fee, no wallet warning.
  *  - on-chain (escape hatch): the seller signs a create transaction. That path
- *    follows the withdrawals durable-settlement stance — the tx signature is
+ *    follows the withdrawals durable-settlement stance: the tx signature is
  *    fixed BEFORE broadcast, an ambiguous send is never treated as failure, and
  *    only the chain can declare an attempt dead.
  *
@@ -57,7 +57,7 @@ const OFFCHAIN_STUCK_MS = 2 * 60_000;
 
 /** On-chain token-metadata name limit (bytes, not chars). */
 const NAME_LIMIT_BYTES = 32;
-const NAME_SUFFIX = "'s BIDit Livestream"; // ASCII apostrophe — 19 bytes
+const NAME_SUFFIX = "'s BIDit Livestream"; // ASCII apostrophe: 19 bytes
 
 const utf8Bytes = (s: string): number => Buffer.byteLength(s, 'utf8');
 
@@ -92,7 +92,7 @@ export function webOrigin(): string {
   return first ?? 'http://localhost:5174';
 }
 
-/** Coin description shown on pump.fun — sells the stream and links the watch
+/** Coin description shown on pump.fun: sells the stream and links the watch
  *  page. Off-chain creates don't know their mint when the metadata is uploaded
  *  (pump.fun assigns it), so an empty mint links the site root instead. */
 export function pumpCoinDescription(handle: string, mint: string): string {
@@ -106,7 +106,7 @@ export function pumpCoinDescription(handle: string, mint: string): string {
 const __dir = dirname(fileURLToPath(import.meta.url));
 
 /** Branded coin image uploaded to pump.fun's IPFS. Null (mock mode / asset not
- *  yet shipped) is fine — the mock provider ignores it. */
+ *  yet shipped) is fine: the mock provider ignores it. */
 export function loadCoinImage(): Buffer | null {
   try {
     return readFileSync(join(__dir, '..', 'assets', 'pump-coin.png'));
@@ -139,7 +139,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Build a signable create attempt for this seller. Guards: seller must not
  *  already have a linked coin; any older PREPARED attempt is superseded so
  *  exactly one attempt is ever submittable. `messageB58` (what the creator
- *  wallet signs) is returned alongside but never persisted — a reload just
+ *  wallet signs) is returned alongside but never persisted: a reload just
  *  prepares again. */
 export async function prepareCoinCreate(
   sellerId: string,
@@ -175,7 +175,7 @@ export async function prepareCoinCreate(
   });
 
   // Insert under the lock, re-checking the link and superseding any PREPARED
-  // row that appeared while the provider round-trip ran — the last inserter is
+  // row that appeared while the provider round-trip ran: the last inserter is
   // the only submittable attempt.
   const attempt = await prisma.$transaction(async (tx) => {
     await takeSellerLock(tx, sellerId);
@@ -210,7 +210,7 @@ export async function prepareCoinCreate(
   };
 }
 
-/** Mark CONFIRMED and link the mint as the seller's coin — idempotent, and it
+/** Mark CONFIRMED and link the mint as the seller's coin: idempotent, and it
  *  never overwrites a coin the seller linked some other way mid-flight. */
 export async function finalizeConfirmed(
   attemptId: string,
@@ -237,7 +237,7 @@ export async function finalizeConfirmed(
           create: { userId: attempt.sellerId, pumpCoinAddress: attempt.mint },
         });
       } catch {
-        // P2002 (another seller somehow holds this mint) — keep the confirm, flag it.
+        // P2002 (another seller somehow holds this mint): keep the confirm, flag it.
         lastError = 'confirmed on-chain but the mint could not be linked (already taken)';
       }
     } else if (profile.pumpCoinAddress !== attempt.mint) {
@@ -275,7 +275,7 @@ async function statusDto(
 
 /** Off-chain submit: verify the seller's pump.fun sign-in signature ourselves,
  *  then create the coin through pump.fun in one call. There is no chain and no
- *  in-flight state to reconcile — it either comes back with a mint or it fails,
+ *  in-flight state to reconcile: it either comes back with a mint or it fails,
  *  and a failure leaves the seller exactly where they started. */
 async function submitOffchain(
   attempt: PumpCoinCreateAttempt,
@@ -386,7 +386,7 @@ export async function submitCoinCreate(
     throw new PumpCreateError(410, 'ATTEMPT_DEAD', 'That attempt already failed. Start a fresh one.');
   }
 
-  // Wallet mismatch: the attempt is bound to the wallet the seller connected —
+  // Wallet mismatch: the attempt is bound to the wallet the seller connected,
   // for a tx it is the fee payer, for an off-chain create it is the pump.fun
   // account the coin lands in. Either way another wallet's signature is wrong.
   if (attempt.creatorWallet && proof && 'publicKey' in proof && proof.publicKey !== attempt.creatorWallet) {
@@ -401,7 +401,7 @@ export async function submitCoinCreate(
     return submitOffchain(attempt, proof, provider, prisma);
   }
 
-  // Expiry pre-check — don't waste a broadcast on a provably dead blockhash.
+  // Expiry pre-check: don't waste a broadcast on a provably dead blockhash.
   if (attempt.lastValidBlockHeight !== null) {
     const height = await provider.currentBlockHeight();
     if (height !== null && height > attempt.lastValidBlockHeight) {
@@ -430,7 +430,7 @@ export async function submitCoinCreate(
   try {
     await provider.broadcast(raw);
   } catch (err) {
-    // broadcast() throwing means "definitely not sent" — safe to declare dead.
+    // broadcast() throwing means "definitely not sent": safe to declare dead.
     await prisma.pumpCoinCreateAttempt.update({
       where: { id: attempt.id },
       data: { status: 'FAILED', lastError: `broadcast failed: ${(err as Error).message}` },
@@ -459,7 +459,7 @@ export async function submitCoinCreate(
 }
 
 /** Latest attempt + lazy reconcile: a SUBMITTED row left behind by a closed tab
- *  is resolved against the chain right here, on the next page view — no
+ *  is resolved against the chain right here, on the next page view, no
  *  background worker. */
 export async function getCoinCreateStatus(
   sellerId: string,
@@ -475,7 +475,7 @@ export async function getCoinCreateStatus(
     return { status: 'NONE', linkedCoin: profile?.pumpCoinAddress ?? null };
   }
   // An off-chain create settles inside its own request. A SUBMITTED row that
-  // outlived it means the process died mid-call — mark it dead so the card
+  // outlived it means the process died mid-call: mark it dead so the card
   // offers a retry instead of spinning forever. (If pump.fun did create the
   // coin, it shows on their profile and can be pasted in Settings.)
   if (provider.kind === 'offchain' && attempt.status === 'SUBMITTED') {

@@ -3,7 +3,7 @@ import Logo from './Logo';
 import { XLogo, GitHub } from '../icons';
 import { CATEGORIES } from '../data';
 
-/** Every footer link goes somewhere real — no placeholder columns. */
+/** Every footer link goes somewhere real, no placeholder columns. */
 const COLS: { h: string; links: { label: string; to?: string; href?: string }[] }[] = [
   {
     h: 'Marketplace',

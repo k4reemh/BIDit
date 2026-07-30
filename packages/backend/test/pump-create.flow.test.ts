@@ -21,7 +21,7 @@ beforeEach(async () => {
 const linkedCoinOf = async (sellerId: string) =>
   (await prisma.sellerProfile.findUnique({ where: { userId: sellerId } }))?.pumpCoinAddress ?? null;
 
-describe('coin create — happy path', () => {
+describe('coin create: happy path', () => {
   it('prepare → submit confirms, links the mint, and resolves the room', async () => {
     const s = await makeUser('seller');
     const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
@@ -49,7 +49,7 @@ describe('coin create — happy path', () => {
   });
 });
 
-describe('coin create — guards', () => {
+describe('coin create: guards', () => {
   it('refuses to prepare when a coin is already linked', async () => {
     const s = await makeUser('seller');
     await setSellerCoin(s.userId, 'EXISTING_COIN', prisma);
@@ -92,7 +92,7 @@ describe('coin create — guards', () => {
   });
 });
 
-describe('coin create — expiry and wallet mismatch', () => {
+describe('coin create: expiry and wallet mismatch', () => {
   it('an expired blockhash 410s, marks the attempt FAILED, and a fresh attempt succeeds', async () => {
     const s = await makeUser('seller');
     provider.expireNextPrepare();
@@ -128,7 +128,7 @@ describe('coin create — expiry and wallet mismatch', () => {
   });
 });
 
-describe('coin create — races and ambiguity', () => {
+describe('coin create: races and ambiguity', () => {
   it('two racing submits broadcast exactly once and both land on the same outcome', async () => {
     const s = await makeUser('seller');
     const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
@@ -224,7 +224,7 @@ describe('onboarding no longer touches the coin link', () => {
 });
 
 describe('DB uniqueness backstop', () => {
-  it('pumpCoinAddress is DB-unique — a raw duplicate write is rejected', async () => {
+  it('pumpCoinAddress is DB-unique: a raw duplicate write is rejected', async () => {
     const a = await makeUser('seller');
     const b = await makeUser('seller');
     await setSellerCoin(a.userId, 'UNIQ_COIN', prisma);

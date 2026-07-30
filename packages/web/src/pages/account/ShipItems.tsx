@@ -37,7 +37,7 @@ export default function ShipItems() {
     setSession(await updateMe({ bundleShipping: !session.bundleShipping }));
   };
 
-  // Group ready-to-ship items by seller — a shipment can only hold one seller's items.
+  // Group ready-to-ship items by seller: a shipment can only hold one seller's items.
   const bySeller = new Map<string, FulfillmentItem[]>();
   for (const it of data?.items ?? []) {
     const arr = bySeller.get(it.sellerId) ?? [];
@@ -118,7 +118,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
   const toggle = (id: string) =>
     setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  // Live UPS estimate for the current selection — refreshes as items or the
+  // Live UPS estimate for the current selection: refreshes as items or the
   // privacy toggle change. Debounced so rapid clicks don't spam the backend.
   const selKey = [...sel].sort().join(',');
   useEffect(() => {

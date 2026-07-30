@@ -28,7 +28,7 @@ export default function TopNav({
   const searchRef = useRef<HTMLInputElement>(null);
   const catsRef = useRef<HTMLDivElement>(null);
 
-  // "/" focuses search from anywhere — the kbd hint in the box is a real shortcut.
+  // "/" focuses search from anywhere: the kbd hint in the box is a real shortcut.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;

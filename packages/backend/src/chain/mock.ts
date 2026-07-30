@@ -60,7 +60,7 @@ export class MockChain implements ChainClient {
    * surface so the withdrawal state machine can be tested exactly:
    *  - failNextSend():      throws BEFORE moving funds (pre-broadcast failure).
    *  - ambiguousNextSend(): returns a signature whose status is 'unknown' and does
-   *                         NOT move funds yet — a broadcast whose fate is still
+   *                         NOT move funds yet: a broadcast whose fate is still
    *                         open. Resolve it later with resolveTransfer(sig, …).
    *  - default:             confirms immediately and moves the funds.
    */

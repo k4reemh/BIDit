@@ -2,7 +2,7 @@
  * The realtime WebSocket server (Chunk 3).
  *
  * Thin transport over the Chunk 2 engine: a BID_INTENT runs the exact `placeBid`
- * pipeline — the socket layer never re-implements validation or touches money.
+ * pipeline: the socket layer never re-implements validation or touches money.
  * Every state-changing broadcast carries `serverNow` so clients re-sync their
  * countdown and never drift.
  *
@@ -135,7 +135,7 @@ export class RealtimeServer {
     this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws' });
     this.wss.on('connection', (ws, req) => void this.onConnection(ws, req));
     // When a user's sessions are revoked (logout / "log out everywhere" / erasure),
-    // drop their live sockets — the connection authenticates once at connect time
+    // drop their live sockets: the connection authenticates once at connect time
     // and would otherwise keep full capability until it happened to disconnect.
     this.unsubRevoke = onSessionRevoked((userId) => this.closeUserSockets(userId));
     this.scheduler = new AuctionScheduler({
@@ -186,7 +186,7 @@ export class RealtimeServer {
     await this.sendBalanceUpdate(userId);
   }
 
-  /** Sockets currently subscribed to a room on this instance — the live-grid
+  /** Sockets currently subscribed to a room on this instance: the live-grid
    *  viewer count. Local-only by design: the deploy is single-instance, and a
    *  slightly-low number under a future multi-instance bus is harmless. */
   roomViewerCount(room: string): number {
@@ -386,7 +386,7 @@ export class RealtimeServer {
 
   // ---- message handlers ---------------------------------------------------
 
-  /** A room is a seller's id — only real sellers have broadcast channels. Rejecting
+  /** A room is a seller's id, only real sellers have broadcast channels. Rejecting
    *  anything else stops a client from spinning up subscriptions to arbitrary
    *  strings (unbounded bus-subscription growth). */
   private async isValidRoom(room: string): Promise<boolean> {
@@ -419,7 +419,7 @@ export class RealtimeServer {
       if (state) this.sendToConn(conn, state.message);
     }
     // Catch-up: a client whose socket blipped right as the clock hit zero reconnects
-    // on a NEW connection and won't see that auction above (it's no longer RUNNING) —
+    // on a NEW connection and won't see that auction above (it's no longer RUNNING):
     // it would sit on a frozen timer, never learning who won. On that connection's
     // first subscribe, replay the most-recent close so it can sync the result. Gated
     // to the first subscribe so the 12s heartbeat re-subscribes don't re-fire it.
@@ -518,7 +518,7 @@ export class RealtimeServer {
     }
   }
 
-  /** Seller moderation — delete/block are enforced owner-only in the domain layer;
+  /** Seller moderation: delete/block are enforced owner-only in the domain layer;
    *  a non-owner attempt just throws and is ignored here. */
   private async handleChatDelete(conn: Conn, msg: ChatDeleteMessage): Promise<void> {
     try {
@@ -528,7 +528,7 @@ export class RealtimeServer {
         await this.bus.publish(roomChannel(msg.room), JSON.stringify(out));
       }
     } catch {
-      /* not the room owner / bad id — silently ignore */
+      /* not the room owner / bad id: silently ignore */
     }
   }
 
@@ -547,7 +547,7 @@ export class RealtimeServer {
         await this.bus.publish(roomChannel(msg.room), JSON.stringify(out));
       }
     } catch {
-      /* not the room owner — silently ignore */
+      /* not the room owner: silently ignore */
     }
   }
 
@@ -736,7 +736,7 @@ export class RealtimeServer {
   /**
    * Take the won prize out of the wheel's stock.
    *
-   * A prize's `weight` is its remaining copies — it doubles as the odds weight,
+   * A prize's `weight` is its remaining copies: it doubles as the odds weight,
    * so 3 copies are 3× as likely as 1 and the odds re-normalize by themselves as
    * stock drains. At zero the entry drops off the wheel entirely.
    *
@@ -833,7 +833,7 @@ export class RealtimeServer {
       where: { id: userId },
       select: { handle: true, avatarUrl: true },
     });
-    // A media URL, not the inline image — these ride in every bid broadcast.
+    // A media URL, not the inline image: these ride in every bid broadcast.
     return { handle: user?.handle ?? null, avatarUrl: mediaUrl('avatar', userId, user?.avatarUrl) };
   }
 

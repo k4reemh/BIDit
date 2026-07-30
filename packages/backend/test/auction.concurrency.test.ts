@@ -81,7 +81,7 @@ describe('the multi-auction exploit is blocked under concurrency', () => {
     const a = await makeRunningAuction({ startingBid: '60', clock });
     const b = await makeRunningAuction({ startingBid: '60', clock });
 
-    // Fire both $60 bids concurrently — combined they exceed the $100 balance.
+    // Fire both $60 bids concurrently: combined they exceed the $100 balance.
     const [r1, r2] = await Promise.all([
       placeBid({ auctionId: a.auctionId, userId: user.userId, amount: usdc('60') }, clock, prisma),
       placeBid({ auctionId: b.auctionId, userId: user.userId, amount: usdc('60') }, clock, prisma),
@@ -94,7 +94,7 @@ describe('the multi-auction exploit is blocked under concurrency', () => {
       BidRejectReason.INSUFFICIENT_BALANCE,
     );
 
-    // Exactly $60 held — never $120.
+    // Exactly $60 held, never $120.
     expect(await getActiveHolds(user.accountId, prisma)).toBe(usdc('60'));
     await assertGlobalInvariants();
   });
@@ -123,7 +123,7 @@ describe('invariants hold under randomized concurrent load', () => {
     });
 
     const results = await Promise.allSettled(bids);
-    // No bid should throw — every outcome is a clean accept or typed reject.
+    // No bid should throw, every outcome is a clean accept or typed reject.
     for (const r of results) expect(r.status).toBe('fulfilled');
 
     await assertGlobalInvariants();

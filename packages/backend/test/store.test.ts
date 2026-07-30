@@ -81,7 +81,7 @@ describe('store buy-now (direct payout)', () => {
     expect(await getSettledBalance(b.accountId, prisma)).toBe(usdc('50')); // untouched
   });
 
-  it('spends from AVAILABLE balance — funds held under a live bid cannot be double-spent', async () => {
+  it('spends from AVAILABLE balance: funds held under a live bid cannot be double-spent', async () => {
     const clock = new ManualClock(T0);
     const { listing } = await makeStoreListing({ price: '30' });
     const buyer = await makeFundedUser('50');
@@ -97,7 +97,7 @@ describe('store buy-now (direct payout)', () => {
       InsufficientFundsError,
     );
 
-    // The claim was rolled back — stock intact, no order, no money moved.
+    // The claim was rolled back: stock intact, no order, no money moved.
     const l = await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } });
     expect(l.quantity).toBe(3);
     expect(await prisma.order.count()).toBe(0);

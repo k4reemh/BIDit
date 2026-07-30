@@ -45,7 +45,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
         website: website.trim(),
         pitch: pitch.trim(),
         // Only a coin the seller actually PASTED is sent. Sending '' here used
-        // to null the link — which would wipe a coin the create flow just made.
+        // to null the link, which would wipe a coin the create flow just made.
         ...(usedPaste && coin.trim() ? { coinAddress: coin.trim() } : {}),
         socials,
         origin: {

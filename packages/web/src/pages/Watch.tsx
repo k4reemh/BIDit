@@ -7,14 +7,14 @@ import Avatar from '../components/Avatar';
 import ShopOverlay from '../components/ShopOverlay';
 import { Bag, Verified, Theater, TheaterExit } from '../icons';
 
-// livekit-client is heavy — only load it on the watch page (and only this chunk).
+// livekit-client is heavy, only load it on the watch page (and only this chunk).
 const PumpStream = lazy(() => import('../components/PumpStream'));
 import { resolveCoin, getPumpCoin, type ResolvedRoom, type PumpCoin, type Session } from '../api';
 
 /**
  * In-site watch + bid page for a pump.fun coin. Left: a stream "theater" showing
  * the coin's art + whether the seller is live on pump.fun (their video can't be
- * embedded — it's frame-blocked and behind a viewer token — so we link out).
+ * embedded (it's frame-blocked and behind a viewer token) so we link out).
  * Right: the always-on BidPanel, where the auction/giveaway runs on OUR backend,
  * so people can bid without the extension (and from regions where pump.fun is
  * blocked).

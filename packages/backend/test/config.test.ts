@@ -11,12 +11,12 @@ describe('assertStartupConfig', () => {
     expect(r.isProd).toBe(false);
   });
 
-  it('requires a strong AUTH_SECRET on ANY real chain — even devnet with no prod flag (H2)', () => {
+  it('requires a strong AUTH_SECRET on ANY real chain, even devnet with no prod flag (H2)', () => {
     // A network-exposed devnet/staging box that forgot BIDIT_ENV=production must
-    // not boot on the shipped default — anyone could forge admin tokens.
+    // not boot on the shipped default: anyone could forge admin tokens.
     expect(() => assertStartupConfig('devnet', {})).toThrow(/AUTH_SECRET is missing/);
     expect(() => assertStartupConfig('devnet', { AUTH_SECRET: AUTH_SECRET_FALLBACK })).toThrow(/insecure default/);
-    // A strong secret is enough for a plain (non-prod) devnet boot — no PII/custody yet.
+    // A strong secret is enough for a plain (non-prod) devnet boot, no PII/custody yet.
     expect(() => assertStartupConfig('devnet', { AUTH_SECRET: STRONG })).not.toThrow();
   });
 

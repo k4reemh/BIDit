@@ -11,7 +11,7 @@ const enqueue = (key: string, from: string, to: string, amount: bigint) =>
   prisma.chainTransfer.create({ data: { key, fromWallet: from, toWallet: to, amount, memo: key } });
 const row = (key: string) => prisma.chainTransfer.findUniqueOrThrow({ where: { key } });
 
-describe('ChainSettler — durable internal transfer outbox', () => {
+describe('ChainSettler: durable internal transfer outbox', () => {
   it('confirms a leg and moves the funds', async () => {
     const chain = new MockChain();
     await enqueue('lock:o1', 'treasury', 'escrow', usdc('20'));
@@ -20,7 +20,7 @@ describe('ChainSettler — durable internal transfer outbox', () => {
     expect(await chain.balance('escrow')).toBe(usdc('20'));
   });
 
-  it('an ambiguous send is not moved until it confirms — and never double-moves', async () => {
+  it('an ambiguous send is not moved until it confirms, and never double-moves', async () => {
     const chain = new MockChain();
     chain.ambiguousNextSend();
     await enqueue('lock:o2', 'treasury', 'escrow', usdc('20'));
@@ -32,14 +32,14 @@ describe('ChainSettler — durable internal transfer outbox', () => {
     expect(submitted.txSig).toBeTruthy();
     expect(await chain.balance('escrow')).toBe(0n); // in flight, not moved
 
-    // The tx actually lands — resolve + tick → confirmed, moved exactly once.
+    // The tx actually lands: resolve + tick → confirmed, moved exactly once.
     chain.resolveTransfer(submitted.txSig!, 'confirmed');
     expect(await settler.tick()).toBe(1);
     expect((await row('lock:o2')).status).toBe('CONFIRMED');
     expect(await chain.balance('escrow')).toBe(usdc('20')); // moved once, not twice
   });
 
-  it('a leg the chain proves dead is retried with a fresh send (safe — funds stay ours)', async () => {
+  it('a leg the chain proves dead is retried with a fresh send (safe: funds stay ours)', async () => {
     const chain = new MockChain();
     chain.ambiguousNextSend();
     await enqueue('lock:o3', 'treasury', 'escrow', usdc('20'));

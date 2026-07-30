@@ -1,13 +1,13 @@
 /**
- * "Forgot my password" — a short numeric code, mailed to the address on the
+ * "Forgot my password": a short numeric code, mailed to the address on the
  * account, that authorizes setting a new password.
  *
  * Two properties matter beyond the usual code hygiene (HMAC-stored, expiring,
- * attempt-capped, resend-throttled — same shape as email-verify.ts):
+ * attempt-capped, resend-throttled, same shape as email-verify.ts):
  *
  *  1. Requesting a reset NEVER reveals whether an email is registered. The
  *     endpoint answers the same either way, so this can't be used to enumerate
- *     users — worth caring about on a marketplace holding real balances.
+ *     users: worth caring about on a marketplace holding real balances.
  *  2. A completed reset revokes every existing session. If the reason for the
  *     reset was a compromised account, the attacker's token dies with it.
  */
@@ -36,7 +36,7 @@ const codeMatches = (code: string, hash: string): boolean => {
 const normEmail = (e: string) => e.trim().toLowerCase();
 
 /**
- * Start a reset. Resolves regardless of whether the email exists — the caller
+ * Start a reset. Resolves regardless of whether the email exists: the caller
  * must answer identically either way. Returns true only so tests can assert a
  * mail actually went out.
  */

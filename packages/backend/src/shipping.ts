@@ -1,13 +1,13 @@
 /**
  * Shipping rate estimator. Cost is a function of origin, destination, weight and
- * parcel size. We model UPS Ground *published* rates locally — a distance→zone
- * lookup (from the two postal codes) × a zone/weight rate table — then charge a
+ * parcel size. We model UPS Ground *published* rates locally: a distance→zone
+ * lookup (from the two postal codes) × a zone/weight rate table, then charge a
  * configurable fraction of that (default 80%, roughly a negotiated rate) as the
  * buyer's shipping fee. No external API, no keys, and it can never fail while an
  * auction is settling.
  *
  * Swap in a live carrier later by implementing ShippingRateProvider and calling
- * setRateProvider() — quoteShipping()/quoteShippingBreakdown() are unchanged.
+ * setRateProvider(): quoteShipping()/quoteShippingBreakdown() are unchanged.
  *
  * The rate table models UPS Ground published rates in the ORIGIN country's
  * currency (Canada quotes in CAD, US in USD). The site settles in USD, so a
@@ -43,7 +43,7 @@ export interface RateQuery {
 
 export interface ShippingRateProvider {
   /** Carrier's published (retail) quote in USDC micro-units, before our discount.
-   *  Never throws — returns a sane default on bad input. */
+   *  Never throws: returns a sane default on bad input. */
   quote(q: RateQuery): bigint;
 }
 
@@ -95,7 +95,7 @@ const US_CENTROIDS: Record<string, LatLng> = {
 };
 
 const COUNTRY_FALLBACK: Record<string, LatLng> = {
-  CA: { lat: 51.05, lng: -114.07 }, // Calgary — the app's home base
+  CA: { lat: 51.05, lng: -114.07 }, // Calgary, the app's home base
   US: { lat: 39.83, lng: -98.58 }, // geographic center of the US
 };
 
@@ -143,7 +143,7 @@ export function zoneForKm(km: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Weight: billable grams scale continuously — a light card is cheaper than a
+// Weight: billable grams scale continuously, a light card is cheaper than a
 // heavy slab, with no pound floor. Dimensional weight (metric /5000 divisor)
 // only applies to genuinely large parcels, which UPS bills by size; the default
 // card mailer is tiny, so its actual weight is used as-is.
@@ -165,7 +165,7 @@ export function billableGrams(weightGrams: number, dims: Dimensions = DEFAULT_DI
 // ---------------------------------------------------------------------------
 // UPS Ground published-rate model (approximate, in dollars). A per-zone handling
 // base for a near-weightless parcel, plus a per-pound rate applied to the actual
-// (continuous) weight — so at ~1 lb it lands near UPS's published 1 lb rate, and
+// (continuous) weight, so at ~1 lb it lands near UPS's published 1 lb rate, and
 // lighter parcels cost proportionally less. Cross-border adds an international
 // multiplier + floor. Monotonic in both distance and weight.
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ export function quoteShippingBreakdown(
   };
 }
 
-/** Quote shipping for a parcel of items (weights summed) — the fee we charge. */
+/** Quote shipping for a parcel of items (weights summed): the fee we charge. */
 export function quoteShipping(origin: ShipLocation, dest: ShipLocation, weightGrams: number, dims?: Dimensions): bigint {
   return applyDiscount(rateProvider.quote({ origin, dest, weightGrams, dims }));
 }

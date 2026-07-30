@@ -1,7 +1,7 @@
 /**
  * Drives auction closing from the server. A plain interval that polls for due
  * auctions; the heavy lifting (and the under-lock deadline re-check) lives in
- * closeDueAuctions. Polling Postgres is fine for v1 — a Redis sorted-set keyed
+ * closeDueAuctions. Polling Postgres is fine for v1: a Redis sorted-set keyed
  * by endsAt can replace the poll later without touching callers.
  *
  * Tests call `tick()` directly with a ManualClock; they never start the interval.

@@ -74,7 +74,7 @@ describe('timer extension (anti-snipe)', () => {
     }
   });
 
-  it('bumps +1s when a bid lands in the 3–5s band', async () => {
+  it('bumps +1s when a bid lands in the 3-5s band', async () => {
     const clock = new ManualClock(T0);
     const { auctionId } = await makeRunningAuction({ startingBid: '10', clock });
     const a = await makeFundedUser('100');
@@ -82,7 +82,7 @@ describe('timer extension (anti-snipe)', () => {
 
     await placeBid({ auctionId, userId: a.userId, amount: usdc('10') }, clock, prisma);
 
-    // Jump to 16s in: remaining = 4s (3–5s band) -> +1s -> endsAt = T0+21s.
+    // Jump to 16s in: remaining = 4s (3-5s band) -> +1s -> endsAt = T0+21s.
     clock.advance(16_000);
     const res = await placeBid({ auctionId, userId: b.userId, amount: usdc('11') }, clock, prisma);
     expect(res.ok).toBe(true);
@@ -126,7 +126,7 @@ describe('timer extension (anti-snipe)', () => {
     if (res.ok) {
       expect(res.extended).toBe(true);
       expect(res.snapshot.endsAt?.getTime()).toBe(T0 + 20_500);
-      // Deadline is now exactly 5s from "now" — the perpetual-final-seconds cap.
+      // Deadline is now exactly 5s from "now": the perpetual-final-seconds cap.
       expect(res.snapshot.remainingMs).toBe(5_000);
     }
   });
@@ -197,7 +197,7 @@ describe('bid validation pipeline', () => {
     expect(res).toEqual({ ok: false, reason: BidRejectReason.BID_TOO_LOW });
   });
 
-  it('ALREADY_LEADING — no bidding against yourself', async () => {
+  it('ALREADY_LEADING, no bidding against yourself', async () => {
     const clock = new ManualClock(T0);
     const { auctionId } = await makeRunningAuction({ startingBid: '10', clock });
     const a = await makeFundedUser('100');
@@ -279,7 +279,7 @@ describe('server-driven closing', () => {
     const listing = await prisma.listing.findUnique({ where: { id: listingId } });
     expect(listing?.status).toBe(ListingStatus.SOLD);
 
-    // Winner's hold remains ACTIVE — captured at settlement (Chunk 5).
+    // Winner's hold remains ACTIVE: captured at settlement (Chunk 5).
     const winnerHolds = await prisma.hold.findMany({
       where: { auctionId, status: HoldStatus.ACTIVE },
     });

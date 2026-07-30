@@ -1,5 +1,5 @@
 /**
- * Order lifecycle (Chunk 5) — the delivery-gated escrow state machine.
+ * Order lifecycle (Chunk 5): the delivery-gated escrow state machine.
  *
  *   PENDING_SETTLEMENT -> LOCKED -> SHIPPED -> DELIVERED -> DISPUTE_WINDOW -> RELEASED
  *                           |                                    |
@@ -40,8 +40,8 @@ export type DisputeOutcome = 'RELEASE' | 'REFUND';
 /**
  * Post-sale physical fulfillment, shared by the direct and escrow settle paths:
  * create the buyer's "Ready to ship" item, fold it into any active weekly bundle,
- * and notify both sides. Direct vs escrow differ only in how the *money* moves —
- * the item ships the same way — so this lives in one place. Idempotent per order.
+ * and notify both sides. Direct vs escrow differ only in how the *money* moves:
+ * the item ships the same way, so this lives in one place. Idempotent per order.
  */
 async function postSaleFulfillment(
   params: {
@@ -89,7 +89,7 @@ async function postSaleFulfillment(
 /**
  * Turn a SETTLING auction into a LOCKED order: create the order, lock the winner's
  * funds into escrow, and drop the won card into the shipping pipeline (same as
- * direct mode — escrow only changes when the money releases). Idempotent (one
+ * direct mode: escrow only changes when the money releases). Idempotent (one
  * order per auction).
  */
 export async function settleAuction(
@@ -142,7 +142,7 @@ export async function settleAuction(
       escrowRef: ref,
       lockedAt: now,
       // The seller's ship-clock starts when the BUYER PAYS SHIPPING (set in
-      // createAndPayShipment), not at win — otherwise a buyer who hasn't paid
+      // createAndPayShipment), not at win: otherwise a buyer who hasn't paid
       // shipping yet would be wrongly auto-refunded. A win the buyer never pays
       // shipping for is instead forfeited to the seller when the ship-later hold
       // expires (processOrderTimers). So: no deadline yet.
@@ -150,7 +150,7 @@ export async function settleAuction(
     },
   });
 
-  // One unit sold — decrement the listing. While stock remains it flips back to
+  // One unit sold: decrement the listing. While stock remains it flips back to
   // QUEUED so the seller can auction the next unit; at zero it's SOLD.
   const listing = await prisma.listing.update({
     where: { id: auction.listing.id },
@@ -181,7 +181,7 @@ export async function settleAuction(
  * On a sale, the winning bid moves buyer -> seller 100% immediately; the seller's
  * balance is withdrawable at once. Creates a RELEASED order for the record (so it
  * shows in Purchases/Orders), then decrements the listing exactly like the escrow
- * path. There is NO buyer protection here — payment is final on close.
+ * path. There is NO buyer protection here: payment is final on close.
  */
 export async function settleAuctionDirect(
   auctionId: string,
@@ -218,7 +218,7 @@ export async function settleAuctionDirect(
       sellerId,
       amount,
       platformFee: 0n,
-      sellerProceeds: amount, // 100% to the seller — no fee
+      sellerProceeds: amount, // 100% to the seller, no fee
       status: OrderStatus.RELEASED,
       lockedAt: now,
       releasedAt: now,
@@ -226,7 +226,7 @@ export async function settleAuctionDirect(
   });
 
   // Move the money (idempotent). If this throws, the order stays but no funds
-  // moved — safe to retry.
+  // moved: safe to retry.
   await settleDirectSale({ buyerAccountId, sellerAccountId, amount, orderId: created.id, auctionId }, prisma);
 
   // Same stock accounting as the escrow path.
@@ -273,7 +273,7 @@ async function transition(
 /**
  * Atomically CLAIM a status transition: flip the status only if the order is still
  * in an expected pre-state, in one conditional write. Returns true iff THIS call
- * won it. The DB serializes the update, so exactly one racer wins — this is what
+ * won it. The DB serializes the update, so exactly one racer wins: this is what
  * makes escrow release and refund mutually exclusive (a dispute racing the
  * auto-release timer can't drive one order to both a payout AND a refund). The
  * money move is done ONLY after a won claim; the shared ledger idempotency key
@@ -352,7 +352,7 @@ export async function openDispute(
  *  - 'SHIPPED':        LOCKED -> SHIPPED (seller dropped it off).
  *  - 'DISPUTE_WINDOW': SHIPPED/LOCKED -> DISPUTE_WINDOW (delivered; opens the 2-day
  *                      window, after which processOrderTimers auto-releases).
- * Only orders in an escrow state are touched — direct-payout orders are already
+ * Only orders in an escrow state are touched: direct-payout orders are already
  * RELEASED, so this is a safe no-op in direct mode. Idempotent (guarded by status).
  * Returns the affected order ids.
  */
@@ -444,7 +444,7 @@ export async function releaseOrder(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Order> {
   // Claim DISPUTE_WINDOW → RELEASED atomically. If a buyer disputed first (racing
-  // this timer), the claim wins 0 rows and we do NOT release — the dispute path owns
+  // this timer), the claim wins 0 rows and we do NOT release: the dispute path owns
   // the outcome. Money moves only after a won claim.
   const won = await claimTransition(prisma, orderId, [OrderStatus.DISPUTE_WINDOW], { status: OrderStatus.RELEASED, releasedAt: clock.now() });
   if (!won) return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -477,7 +477,7 @@ export async function releaseOrdersForShipment(
 // Timers (server-driven, like the auction scheduler)
 // ---------------------------------------------------------------------------
 
-/** Buyer abandoned a win — never arranged shipping before the ship-later hold
+/** Buyer abandoned a win, never arranged shipping before the ship-later hold
  *  expired. The seller keeps the item AND is paid: release the escrow to them.
  *  LOCKED -> RELEASED. (Direct-mode orders are already RELEASED, so this only ever
  *  applies to escrow.) */
@@ -576,7 +576,7 @@ export async function processOrderTimers(
   const forfeited: string[] = [];
 
   // 0. Crash recovery: an order whose status was flipped terminal (RELEASED/
-  //    REFUNDED) but whose escrow move never posted — a crash in the tiny window
+  //    REFUNDED) but whose escrow move never posted: a crash in the tiny window
   //    between the atomic claim and the money move. Re-run the idempotent settle so
   //    no escrowed order is left half-applied. Only escrow-locked orders qualify
   //    (direct-payout orders are RELEASED without ever escrowing).
@@ -591,7 +591,7 @@ export async function processOrderTimers(
     select: { id: true, status: true },
   });
   for (const o of maybeUnsettled) {
-    if (!(await escrowLockApplied(o.id, prisma))) continue; // direct order — never escrowed
+    if (!(await escrowLockApplied(o.id, prisma))) continue; // direct order, never escrowed
     if (await escrowSettleApplied(o.id, prisma)) continue; // already settled
     if (o.status === OrderStatus.RELEASED) await escrow.release(o.id);
     else await escrow.refund(o.id);

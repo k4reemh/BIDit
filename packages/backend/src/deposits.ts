@@ -1,7 +1,7 @@
 /**
  * Deposit rail: hand each user a USDC deposit address, watch the chain for
  * inbound transfers, and credit the ledger (idempotent on the tx signature).
- * The ledger is unchanged from Chunk 1 — it just now reflects real money in.
+ * The ledger is unchanged from Chunk 1: it just now reflects real money in.
  */
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
@@ -11,7 +11,7 @@ import { deriveDepositAddress } from './wallet.js';
 
 /**
  * Ensure the user has a persisted deposit address; returns it. Addresses are
- * derived from the operator master seed (see wallet.ts) — a real Solana address
+ * derived from the operator master seed (see wallet.ts): a real Solana address
  * with no stored private key. Legacy `mock…` addresses are upgraded in place.
  */
 export async function ensureDepositAddress(
@@ -61,7 +61,7 @@ export class DepositWatcher {
   private cursor: string | null = null;
   /** Guards against overlapping polls: on a slow/rate-limited RPC a poll can run
    *  longer than the interval, and without this the next tick would fire on top of
-   *  it and pile MORE RPC calls on — a 429 death-spiral. One watcher per process. */
+   *  it and pile MORE RPC calls on: a 429 death-spiral. One watcher per process. */
   private running = false;
 
   constructor(
@@ -87,12 +87,12 @@ export class DepositWatcher {
   }
 
   /** One poll. Detected+swept deposits are first written durably (DepositReceipt),
-   *  THEN credited from those records — so a crash between the on-chain sweep and
+   *  THEN credited from those records, so a crash between the on-chain sweep and
    *  the ledger credit can never lose a user's money (the next tick / startup
    *  reconcile finishes it). Returns the number of receipts credited this tick.
-   *  Never throws — a failed poll is logged and retried next tick. */
+   *  Never throws: a failed poll is logged and retried next tick. */
   async tick(): Promise<number> {
-    if (this.running) return 0; // a previous poll is still in flight — don't stack
+    if (this.running) return 0; // a previous poll is still in flight: don't stack
     this.running = true;
     try {
       const { events, cursor } = await this.chain.pollDeposits(this.cursor);
@@ -103,7 +103,7 @@ export class DepositWatcher {
           await this.prisma.depositReceipt.upsert({
             where: { txSig: event.txSig },
             create: { userId: event.userId, amountMicros: event.amountMicros, txSig: event.txSig },
-            update: {}, // already recorded — no-op
+            update: {}, // already recorded, no-op
           });
         } catch (err) {
           console.error('[deposit-watcher] record failed for', event.txSig, (err as Error)?.message ?? err);
@@ -123,7 +123,7 @@ export class DepositWatcher {
   /**
    * Credit every recorded-but-uncredited deposit. Idempotent: the ledger credit
    * is keyed on the tx signature, and `creditedAt` is flipped only after it lands,
-   * so a crash anywhere in here just leaves the row to be retried — never a double
+   * so a crash anywhere in here just leaves the row to be retried, never a double
    * credit. Called each tick and once on startup (reconcile) to recover orphans.
    */
   async creditPending(): Promise<number> {

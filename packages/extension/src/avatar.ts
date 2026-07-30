@@ -1,4 +1,4 @@
-/** Deterministic gradient avatar from a handle — no backend, no image fetch. */
+/** Deterministic gradient avatar from a handle, no backend, no image fetch. */
 const PALETTE: ReadonlyArray<readonly [string, string]> = [
   ['#22e0a1', '#4f8cff'],
   ['#9b6bff', '#4f8cff'],
@@ -20,7 +20,7 @@ export function avatarColors(handle: string): readonly [string, string] {
   return PALETTE[hash(handle) % PALETTE.length]!;
 }
 
-/** A gradient circle with the handle's initial — sized in px. */
+/** A gradient circle with the handle's initial: sized in px. */
 export function makeAvatar(handle: string, size = 24): HTMLElement {
   const [a, b] = avatarColors(handle);
   const node = document.createElement('div');

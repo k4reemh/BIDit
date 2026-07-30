@@ -3,7 +3,7 @@
  * the whole BIDit money flow. Run with:  npm run devnet:e2e
  *
  * It loads packages/backend/.env.devnet for the Solana config (SOLANA_RPC,
- * USDC_MINT, *_SECRET keypairs, DEPOSIT_SEED) — those values stay on your machine.
+ * USDC_MINT, *_SECRET keypairs, DEPOSIT_SEED): those values stay on your machine.
  * The ledger runs on a throwaway local Postgres (test profile); the MONEY is real
  * devnet. Every on-chain step prints a Solana Explorer link.
  *
@@ -20,7 +20,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Load .env.devnet WITHOUT overriding anything already set (with-db sets DATABASE_URL).
 function loadEnvFile(file: string): void {
   if (!existsSync(file)) {
-    console.error(`\nMissing ${file} — see docs/DEVNET.md to create it.\n`);
+    console.error(`\nMissing ${file}: see docs/DEVNET.md to create it.\n`);
     process.exit(1);
   }
   for (const line of readFileSync(file, 'utf8').split('\n')) {
@@ -59,7 +59,7 @@ const fmt = (m: bigint) => `$${formatUsdc(m)}`;
 async function main() {
   const chain = await getChainClient();
   if (chain.cluster === 'mock') {
-    console.error('\nSOLANA_RPC not set — getChainClient() returned MockChain. Set up .env.devnet first.\n');
+    console.error('\nSOLANA_RPC not set: getChainClient() returned MockChain. Set up .env.devnet first.\n');
     process.exit(1);
   }
   console.log(`\n== BIDit devnet e2e (cluster: ${chain.cluster}) ==`);
@@ -70,7 +70,7 @@ async function main() {
   await ensureSystemAccounts(prisma);
   const escrow = new ProgramEscrow(chain, prisma);
   const settler = new ChainSettler(chain, prisma);
-  // Escrow legs are enqueued in the durable outbox, not sent inline — drain them
+  // Escrow legs are enqueued in the durable outbox, not sent inline: drain them
   // to the chain (a few ticks, allowing for confirmation) after each escrow op.
   const drainChain = async () => {
     for (let i = 0; i < 25; i++) {
@@ -105,7 +105,7 @@ async function main() {
   // --- 2. win an auction at $20 ------------------------------------------
   const listing = await createListing(
     seller.id,
-    { title: 'Charizard — Base Set Holo (devnet)', startingBid: usdc('5'), photos: [] },
+    { title: 'Charizard, Base Set Holo (devnet)', startingBid: usdc('5'), photos: [] },
     prisma,
   );
   const { auctionId } = await startAuctionFromListing(listing.id, { durationSeconds: 20 }, clock, prisma);
@@ -135,7 +135,7 @@ async function main() {
 
   // --- 5. buyback worker (devnet: reserved; mainnet: real Jupiter swap) ---
   const buyback = await new BuybackWorker(new MockSwapper(), prisma).run();
-  console.log(`5) buyback recorded: ${buyback ? fmt(buyback.amount) : 'none'} (reserved in buyback wallet — no $BID/LP on devnet)`);
+  console.log(`5) buyback recorded: ${buyback ? fmt(buyback.amount) : 'none'} (reserved in buyback wallet, no $BID/LP on devnet)`);
   console.log(`   buyback pending pool: ${fmt(await getBuybackPending(prisma))}\n`);
 
   // --- 6. seller withdraws their proceeds to a real devnet address --------
@@ -145,7 +145,7 @@ async function main() {
   console.log(`   withdrawal ${w.status}${w.txSig ? `; on-chain: ${explorer(w.txSig)}` : ''}`);
   // On a real chain the transfer is broadcast (SUBMITTED) and settles out of band;
   // drive the reconciler until it reaches a terminal state, exactly as the server
-  // does on its interval — proving the durable settlement path end to end.
+  // does on its interval: proving the durable settlement path end to end.
   const reconciler = new WithdrawalReconciler(chain, prisma);
   for (let i = 0; i < 20; i++) {
     const fresh = await prisma.withdrawal.findUniqueOrThrow({ where: { id: w.id } });
@@ -158,7 +158,7 @@ async function main() {
   }
   console.log(`   seller ledger balance now: ${fmt(await getSettledBalance(sellerAcct, prisma))}\n`);
 
-  console.log('Done — deposit -> win -> escrow -> release -> buyback -> withdraw, on real devnet USDC.\n');
+  console.log('Done: deposit -> win -> escrow -> release -> buyback -> withdraw, on real devnet USDC.\n');
   await prisma.$disconnect();
 }
 

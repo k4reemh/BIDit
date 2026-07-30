@@ -1,5 +1,5 @@
 /**
- * Live chat — the authoritative domain logic for a seller's room chat.
+ * Live chat: the authoritative domain logic for a seller's room chat.
  *
  * A "room" is a seller's userId (same key the auction/giveaway broadcasts use).
  * Any logged-in viewer may post; the seller (the room owner) can delete a message
@@ -87,7 +87,7 @@ export async function postChatMessage(
   const cooldown = await roomChatCooldownMs(params.room, prisma);
   if (cooldown > 0) {
     // DB-backed cooldown: the sender's most recent message in this room (deleted or
-    // not — you can't delete your own, so this can't be gamed). Authoritative across
+    // not: you can't delete your own, so this can't be gamed). Authoritative across
     // instances, unlike an in-memory timer.
     const last = await prisma.chatMessage.findFirst({
       where: { roomId: params.room, userId: params.userId },
@@ -115,7 +115,7 @@ export async function postChatMessage(
 /**
  * Who may moderate a room: the seller who owns it, plus anyone they've added as
  * a moderator. Moderators get exactly the chat powers (delete, block, cooldown)
- * and nothing else — listings, orders and money stay owner-only.
+ * and nothing else: listings, orders and money stay owner-only.
  */
 export async function canModerateRoom(
   room: string,

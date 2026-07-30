@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BIDit — Admin</title>
+    <title>BIDit: Admin</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -56,8 +56,8 @@
           <h2>Ledger audit</h2>
           <table id="audit"><tbody></tbody></table>
           <div class="row" style="justify-content:space-between; margin-top:10px">
-            <div>System total (must be $0): <b id="sysTotal">—</b></div>
-            <div>Buyback pending: <b id="buyback">—</b></div>
+            <div>System total (must be $0): <b id="sysTotal">-</b></div>
+            <div>Buyback pending: <b id="buyback">-</b></div>
           </div>
         </div>
 
@@ -98,7 +98,7 @@
         tb.innerHTML = '<tr><th>Handle</th><th>Coin</th><th>Verified</th><th></th></tr>';
         for (const s of sellers) {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${s.handle}</td><td class="muted">${s.pumpCoinAddress || '—'}</td><td><span class="badge ${s.verified ? 'ok' : 'no'}">${s.verified ? 'yes' : 'no'}</span></td>`;
+          tr.innerHTML = `<td>${s.handle}</td><td class="muted">${s.pumpCoinAddress || '-'}</td><td><span class="badge ${s.verified ? 'ok' : 'no'}">${s.verified ? 'yes' : 'no'}</span></td>`;
           const td = document.createElement('td'); td.className = 'right';
           if (!s.verified) {
             const b = document.createElement('button'); b.textContent = 'Verify';

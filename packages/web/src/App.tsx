@@ -44,9 +44,9 @@ export interface User {
   followers: number;
   verified: boolean;
   available: string;
-  /** Total wallet balance (only drops when the user wins) — shown in the UI. */
+  /** Total wallet balance (only drops when the user wins): shown in the UI. */
   settled: string;
-  /** Operator account — reveals the Admin entry in the profile menu. */
+  /** Operator account: reveals the Admin entry in the profile menu. */
   isAdmin: boolean;
 }
 
@@ -76,7 +76,7 @@ export default function App() {
     });
   }, []);
 
-  // Live balance over WebSocket — updates the moment a deposit lands, a bid is
+  // Live balance over WebSocket: updates the moment a deposit lands, a bid is
   // held/released, or a withdrawal clears. Reconnects on login/logout.
   useEffect(() => {
     if (!session) return;

@@ -7,7 +7,7 @@ build/
 # Local embedded Postgres data dirs (dev + test profiles)
 packages/backend/.pgdata*/
 
-# Env (local secrets / keypairs / local DB url) — never commit these
+# Env (local secrets / keypairs / local DB url), never commit these
 .env
 .env.*
 !.env.example
@@ -19,7 +19,7 @@ packages/backend/src/generated/
 .DS_Store
 .claude/
 
-# internal operator runbooks — kept local, not for the public repo
+# internal operator runbooks: kept local, not for the public repo
 docs/DEPLOY.md
 docs/DEVNET.md
 docs/MAINNET-TEST.md

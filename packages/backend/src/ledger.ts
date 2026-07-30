@@ -1,5 +1,5 @@
 /**
- * The balance ledger — BIDit's financial spine.
+ * The balance ledger: BIDit's financial spine.
  *
  * Design rules (do not break):
  *  1. The server is authoritative. Amounts are bigint micro-units, never floats.
@@ -37,7 +37,7 @@ import {
 
 /** Interactive-transaction client handed to us by prisma.$transaction. */
 type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
-/** Anything we can read balances from — the base client or a transaction. */
+/** Anything we can read balances from: the base client or a transaction. */
 type Reader = PrismaClient | Tx;
 
 const TX_OPTS = { timeout: 15_000, maxWait: 15_000 } as const;
@@ -87,7 +87,7 @@ async function lockAccount(tx: Tx, accountId: string): Promise<void> {
 
 /**
  * An internal wallet→wallet USDC move to enqueue in the durable ChainTransfer
- * outbox — recorded in the SAME transaction as its ledger move, so the physical
+ * outbox: recorded in the SAME transaction as its ledger move, so the physical
  * transfer is never lost or double-recorded relative to the ledger truth. A
  * ChainSettler drives it to CONFIRMED out of band (see chain-settle.ts).
  */
@@ -332,7 +332,7 @@ export interface SettlePurchaseParams {
 /**
  * The 95/5 split that powers the flywheel: buyer is debited the full amount,
  * the seller is credited 95%, and the PLATFORM account accrues the 5% cut that
- * funds $BID buybacks. All three legs sum to zero — money is conserved exactly.
+ * funds $BID buybacks. All three legs sum to zero: money is conserved exactly.
  */
 export async function settlePurchase(
   params: SettlePurchaseParams,
@@ -378,7 +378,7 @@ export async function settlePurchase(
 /**
  * Direct sale settlement (no escrow, no fee): capture the winner's ACTIVE hold
  * and move the full amount buyer -> seller in one atomic, idempotent step. Used
- * for the no-escrow payout mode — the seller's settled balance rises immediately
+ * for the no-escrow payout mode: the seller's settled balance rises immediately
  * and is withdrawable. Mirrors escrowLock's hold-capture but pays the seller
  * directly instead of routing through the ESCROW account.
  */
@@ -394,7 +394,7 @@ export async function settleDirectSale(
       await lockAccount(tx, params.buyerAccountId);
       if (params.auctionId !== null) {
         // Auction win: capture the winner's hold so their funds are actually
-        // spent (not just reserved) — the hold itself covered this amount.
+        // spent (not just reserved): the hold itself covered this amount.
         await tx.hold.updateMany({
           where: {
             auctionId: params.auctionId,
@@ -409,7 +409,7 @@ export async function settleDirectSale(
         }
       } else {
         // Store purchase (no auction → no hold to capture): pay from AVAILABLE
-        // balance only — funds reserved under live bids stay untouchable, or a
+        // balance only: funds reserved under live bids stay untouchable, or a
         // buyer could spend the same dollars twice.
         const available = await getAvailableBalance(params.buyerAccountId, tx);
         if (available < params.amount) {
@@ -442,7 +442,7 @@ export async function settleDirectSale(
 
 /**
  * Charge a buyer for a shipment. The platform runs shipping (buys the carrier
- * label), so the WHOLE fee — base shipping plus any privacy premium — goes to the
+ * label), so the WHOLE fee (base shipping plus any privacy premium) goes to the
  * operator FEE pool; the seller is paid nothing here. Paid from AVAILABLE balance
  * (funds locked in active bids stay put). Idempotent per shipment. Both legs sum
  * to zero. Reuses existing ledger types to stay out of the enum drift test.
@@ -501,7 +501,7 @@ export async function settleShipping(
 
 /**
  * Lock a winner's funds into escrow: capture their ACTIVE hold and move the
- * amount buyer -> ESCROW. NO fee is taken here — the 5% is only charged on
+ * amount buyer -> ESCROW. NO fee is taken here: the 5% is only charged on
  * release, so a refund can return 100%. Idempotent per order.
  */
 export async function escrowLock(
@@ -515,7 +515,7 @@ export async function escrowLock(
     await prisma.$transaction(async (tx) => {
       await lockAccount(tx, params.buyerAccountId);
       if (params.auctionId !== null) {
-        // Auction win: the winner's hold covers the amount — capture it.
+        // Auction win: the winner's hold covers the amount, capture it.
         await tx.hold.updateMany({
           where: {
             auctionId: params.auctionId,
@@ -529,7 +529,7 @@ export async function escrowLock(
           throw new InsufficientFundsError(params.buyerAccountId, settled, params.amount);
         }
       } else {
-        // Store purchase (no hold): AVAILABLE balance only — live-bid holds
+        // Store purchase (no hold): AVAILABLE balance only, live-bid holds
         // stay untouchable so the same dollars can't be spent twice.
         const available = await getAvailableBalance(params.buyerAccountId, tx);
         if (available < params.amount) {
@@ -570,7 +570,7 @@ export async function escrowLock(
  */
 /** The ONE idempotency key for an order's terminal escrow move. Release and refund
  *  are mutually-exclusive outcomes, so they SHARE this key: the ledger's unique
- *  constraint then guarantees at most one of them ever posts for a given order —
+ *  constraint then guarantees at most one of them ever posts for a given order:
  *  a disputed order racing the auto-release timer can never drain escrow twice. */
 export const escrowSettleKey = (orderId: string) => `escrow-settle:${orderId}`;
 
@@ -580,7 +580,7 @@ export async function escrowSettleApplied(orderId: string, reader: Reader = defa
   return alreadyApplied(escrowSettleKey(orderId), reader);
 }
 
-/** Whether an order's escrow LOCK posted — i.e. its funds actually entered escrow.
+/** Whether an order's escrow LOCK posted: i.e. its funds actually entered escrow.
  *  Direct-payout orders never lock, so this lets recovery skip them (re-releasing a
  *  direct order would post an escrow move against funds that were never escrowed). */
 export async function escrowLockApplied(orderId: string, reader: Reader = defaultPrisma): Promise<boolean> {
@@ -637,13 +637,13 @@ export async function escrowRelease(
   return { sellerProceeds, buybackFee, platformFee };
 }
 
-/** Refund escrow: ESCROW -> 100% buyer (REFUND). No fee — never taken. */
+/** Refund escrow: ESCROW -> 100% buyer (REFUND). No fee, never taken. */
 export async function escrowRefund(
   params: { buyerAccountId: string; amount: Micros; orderId: string; chainLegs?: ChainLeg[] },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   assertPositive(params.amount);
-  const key = escrowSettleKey(params.orderId); // SHARED with release — release XOR refund
+  const key = escrowSettleKey(params.orderId); // SHARED with release: release XOR refund
   if (await alreadyApplied(key, prisma)) return;
   try {
     await prisma.$transaction(async (tx) => {

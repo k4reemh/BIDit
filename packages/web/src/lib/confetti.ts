@@ -11,7 +11,7 @@ export function runConfetti(
 ): void {
   const ctx = canvas?.getContext('2d');
   if (!canvas || !ctx) return;
-  // Cap DPR at 1.5 — a full-screen clearRect at native 4K every frame is the main
+  // Cap DPR at 1.5: a full-screen clearRect at native 4K every frame is the main
   // cost and reads as jank; 1.5 is indistinguishable for confetti.
   const dpr = Math.min(1.5, window.devicePixelRatio || 1);
   const W = (canvas.width = window.innerWidth * dpr);

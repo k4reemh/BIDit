@@ -100,7 +100,7 @@ export const ServerMessageType = {
 } as const;
 export type ServerMessageType = (typeof ServerMessageType)[keyof typeof ServerMessageType];
 
-/** Reasons a bid can be turned down — drives client UX. Superset of the Chunk 2
+/** Reasons a bid can be turned down: drives client UX. Superset of the Chunk 2
  *  pipeline reasons plus transport-level ones. */
 export const RealtimeRejectReason = {
   ...BidRejectReason,
@@ -116,7 +116,7 @@ export interface AuctionStateMessage {
   type: 'AUCTION_STATE';
   room: string;
   auctionId: string;
-  /** The listing behind this auction — lets the client fetch a shipping estimate. */
+  /** The listing behind this auction: lets the client fetch a shipping estimate. */
   listingId: string;
   /** The item being auctioned, for the panel's current-item card. */
   title: string;
@@ -127,7 +127,7 @@ export interface AuctionStateMessage {
   /** Leader's profile photo, if they have one. */
   leaderAvatar?: string | null;
   minNextBid: string;
-  /** Nominal auction length (seconds) — lets the client draw a countdown bar. */
+  /** Nominal auction length (seconds): lets the client draw a countdown bar. */
   durationSeconds: number;
   endsAt: number | null;
   /** When this is a randomizer, the prize pool (label + quantity), so bidders can
@@ -144,7 +144,7 @@ export interface BidAcceptedMessage {
   leaderHandle: string;
   /** Leader's profile photo, if they have one. */
   leaderAvatar?: string | null;
-  /** True when this bid pushed the deadline forward (anti-snipe) — drives the "EXTENDED!" flash. */
+  /** True when this bid pushed the deadline forward (anti-snipe): drives the "EXTENDED!" flash. */
   extended: boolean;
   endsAt: number | null;
   serverNow: number;
@@ -164,12 +164,12 @@ export interface AuctionClosedMessage {
   /** Winner's profile photo, for the win celebration. */
   winnerAvatar?: string | null;
   amount: string | null;
-  /** True when a wheel spin will decide the prize — the client should defer the
+  /** True when a wheel spin will decide the prize: the client should defer the
    *  win celebration and wait for the RANDOMIZER_SPIN that follows. */
   wheel?: boolean;
   /** True when this is a catch-up replay sent to a (re)subscribing client that
    *  missed the live close (e.g. a dropped socket). The client should sync the
-   *  result quietly — surface the winner, but skip the full-screen celebration. */
+   *  result quietly: surface the winner, but skip the full-screen celebration. */
   replay?: boolean;
   serverNow: number;
 }
@@ -177,7 +177,7 @@ export interface AuctionClosedMessage {
  * Fired right after an auction with a wheel closes. Carries the entire reel and
  * the landing index the server picked, so every client renders the identical
  * decelerating spin and lands on the same prize. The animation is a pure
- * function of (reel, targetIndex, durationMs, startsAt) — a late joiner computes
+ * function of (reel, targetIndex, durationMs, startsAt): a late joiner computes
  * its position from `startsAt` and still lands together with everyone else.
  */
 export interface RandomizerSpinMessage {
@@ -193,7 +193,7 @@ export interface RandomizerSpinMessage {
   /** The unique prize list, sent once. `reel[i]` is `entries[i % entries.length]`,
    *  so clients read prize art from here instead of the repeated slots. */
   entries: WheelEntry[];
-  /** Which reel index lands in the centre band — i.e. the prize. */
+  /** Which reel index lands in the centre band: i.e. the prize. */
   targetIndex: number;
   /** How long the spin animation runs. */
   durationMs: number;
@@ -232,7 +232,7 @@ export interface GiveawayEntriesMessage {
   room: string;
   giveawayId: string;
   count: number;
-  /** Most-recent entrants (capped), newest first — drives the flying avatars. */
+  /** Most-recent entrants (capped), newest first: drives the flying avatars. */
   recent: GiveawayEntrant[];
   serverNow: number;
 }
@@ -260,7 +260,7 @@ export interface GiveawayWinnerMessage {
   entrantCount: number;
   /** The full roll strip the client hops through. */
   roll: GiveawayEntrant[];
-  /** Which roll index settles under the spotlight — i.e. the winner. */
+  /** Which roll index settles under the spotlight: i.e. the winner. */
   targetIndex: number;
   durationMs: number;
   /** Epoch ms the reveal starts; clients sync their position to this. */
@@ -300,12 +300,12 @@ export interface ChatHistoryMessage {
   room: string;
   messages: ChatLine[];
   cooldownMs: number;
-  /** True when this viewer may delete/block in this room — the seller or one of
+  /** True when this viewer may delete/block in this room: the seller or one of
    *  their moderators. Drives whether the client shows moderation controls. */
   canModerate?: boolean;
   serverNow: number;
 }
-/** A message was removed (seller moderation) — clients drop it from the feed. */
+/** A message was removed (seller moderation): clients drop it from the feed. */
 export interface ChatDeletedMessage {
   type: 'CHAT_DELETED';
   room: string;
@@ -348,7 +348,7 @@ export type ServerMessage =
   | ErrorMessage;
 
 // --------------------------------------------------------------------------
-// Channel helpers (bus fan-out keys) — shared so server instances agree.
+// Channel helpers (bus fan-out keys): shared so server instances agree.
 // --------------------------------------------------------------------------
 
 export const roomChannel = (room: string): string => `room:${room}`;

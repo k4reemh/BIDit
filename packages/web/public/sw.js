@@ -1,8 +1,8 @@
-/* BIDit service worker — makes the app installable and resilient offline,
+/* BIDit service worker: makes the app installable and resilient offline,
  * WITHOUT ever caching live/money data.
  *
  * The backend API lives on a different origin, so cross-origin requests are
- * ignored here by design — balances, auctions and orders are always fetched
+ * ignored here by design: balances, auctions and orders are always fetched
  * fresh from the network. We only touch same-origin GETs (the app shell +
  * static assets), and navigations are network-first so users can never get
  * stuck on a stale build while online. */

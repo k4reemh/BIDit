@@ -1,7 +1,7 @@
 /**
  * Seller verification. A seller is UNVERIFIED when they apply and earns the
  * Verified badge (plus priority dispute support) once they fulfill
- * VERIFY_THRESHOLD orders — or an admin verifies them manually.
+ * VERIFY_THRESHOLD orders, or an admin verifies them manually.
  */
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
@@ -9,7 +9,7 @@ import { notify } from './notifications.js';
 
 export const VERIFY_THRESHOLD = 10;
 
-/** Orders a seller has fulfilled — items that have shipped (or been delivered).
+/** Orders a seller has fulfilled: items that have shipped (or been delivered).
  *  This is the metric that earns the badge. */
 export function sellerFulfilledCount(sellerId: string, prisma: PrismaClient = defaultPrisma): Promise<number> {
   return prisma.fulfillmentItem.count({ where: { sellerId, status: { in: ['SHIPPED', 'DELIVERED'] } } });

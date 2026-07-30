@@ -7,7 +7,7 @@ import {
 const SECTIONS = [
   { id: 'overview', label: 'What is BIDit', icon: Grid },
   { id: 'how', label: 'How an auction works', icon: Radio },
-  { id: 'overlay', label: 'Getting the overlay', icon: Eye },
+  { id: 'watch', label: 'Where to watch and bid', icon: Eye },
   { id: 'balance', label: 'Balance & deposits', icon: Wallet },
   { id: 'escrow', label: 'Escrow & settlement', icon: Shield },
   { id: 'shipping', label: 'Shipping & delivery', icon: Truck },
@@ -55,7 +55,7 @@ export default function Docs() {
 
       <article className="docs__body">
         <header className="docs__hero">
-          <span className="hero__tag"><span className="dot" /> Docs · Beta (devnet)</span>
+          <span className="hero__tag"><span className="dot" /> Docs · Live on Solana mainnet</span>
           <h1 className="display docs__h1">How BIDit works</h1>
           <p className="docs__lead">
             BIDit turns a live pump.fun stream into a real-time auction house. Sellers run live auctions
@@ -69,16 +69,16 @@ export default function Docs() {
         <section id="overview" className="docs__sec">
           <h2 className="docs__h2"><Grid width={22} height={22} /> What is BIDit</h2>
           <p>
-            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything: cards, clothes,
-            tech, bounties. The BIDit browser overlay drops a live auction panel right onto the stream. Viewers place
-            bids in real time, the highest bidder when the clock hits zero wins, and the item ships to them. Money moves
-            in USDC. No chat comments, no manual invoicing, no “DM me to pay.”
+            BIDit is <b>“Whatnot for degens.”</b> A seller goes live on pump.fun to show off anything: cards, fashion,
+            sneakers, tech, collectibles. Their stream plays on the BIDit watch page with a live auction panel next to
+            it. Viewers place bids in real time, the highest bidder when the clock hits zero wins, and the item ships to
+            them. Money moves in USDC. No chat comments, no manual invoicing, no “DM me to pay.”
           </p>
           <div className="docs__cards3">
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Radio width={18} height={18} /></span>
               <b>Live, on the stream</b>
-              <p className="muted">The auction runs as an overlay on the pump.fun page you’re already watching.</p>
+              <p className="muted">The seller’s pump.fun stream and the auction run side by side on one page.</p>
             </div>
             <div className="docs__mini card">
               <span className="docs__mini-ic"><Wallet width={18} height={18} /></span>
@@ -93,7 +93,7 @@ export default function Docs() {
           </div>
           <div className="docs__note">
             <Info width={18} height={18} />
-            <p><b>Core principle:</b> the server is authoritative. The overlay and website only render state. Every bid,
+            <p><b>Core principle:</b> the server is authoritative. The app only renders state. Every bid,
             hold, and payout is decided and recorded server-side on a double-entry ledger, so balances can never
             drift or double-spend.</p>
           </div>
@@ -108,8 +108,8 @@ export default function Docs() {
               <span className="docs__step-n">1</span>
               <div>
                 <b>Seller starts the auction</b>
-                <p className="muted">The seller queues a card, then hits “Start auction” on their stream. The overlay
-                appears for every viewer with the item, photo, and a starting bid.</p>
+                <p className="muted">The seller queues an item, then hits “Start auction” on their stream. It appears
+                for every viewer at once with the photo, title, and a starting bid.</p>
               </div>
             </li>
             <li>
@@ -148,53 +148,54 @@ export default function Docs() {
           </ol>
         </section>
 
-        {/* OVERLAY */}
-        <section id="overlay" className="docs__sec">
-          <h2 className="docs__h2"><Eye width={22} height={22} /> Getting the overlay</h2>
+        {/* WATCH AND BID */}
+        <section id="watch" className="docs__sec">
+          <h2 className="docs__h2"><Eye width={22} height={22} /> Where to watch and bid</h2>
           <p>
-            The overlay is a lightweight browser extension. It injects the auction panel onto pump.fun coin pages and
-            talks to BIDit securely in the background. The stream page can’t see or block it.
+            Everything happens on the BIDit site. There is nothing to install: the seller’s pump.fun stream plays inside
+            the BIDit watch page, with the auction panel beside it. It works the same on desktop and mobile.
           </p>
           <ol className="docs__steps">
             <li>
               <span className="docs__step-n">1</span>
               <div>
-                <b>Install the extension</b>
-                <p className="muted">During beta it loads unpacked: build the extension, then in Chrome open
-                <code> chrome://extensions</code>, enable Developer mode, and “Load unpacked” the <code>dist/</code>
-                folder. (A one-click Chrome Web Store listing is coming for launch.)</p>
+                <b>Sign in and fund your balance</b>
+                <p className="muted">Create an account and deposit USDC (see
+                <a href="#balance"> Balance &amp; deposits</a>). You bid from that balance, so there is no wallet
+                pop-up on every bid.</p>
               </div>
             </li>
             <li>
               <span className="docs__step-n">2</span>
               <div>
-                <b>Sign in & fund your balance</b>
-                <p className="muted">Open the BIDit popup, sign in, and deposit USDC to your balance (see
-                <a href="#balance"> Balance & deposits</a>). You bid from this balance. No wallet pop-up per bid.</p>
+                <b>Open a live seller</b>
+                <p className="muted">Pick a stream from <Link to="/">Live right now</Link> on the homepage, or filter by
+                category on <Link to="/browse">Browse</Link>. That opens the watch page with the stream and the bid
+                panel side by side.</p>
               </div>
             </li>
             <li>
               <span className="docs__step-n">3</span>
               <div>
-                <b>Open a live seller’s pump.fun page</b>
-                <p className="muted">When a seller is live and running an auction, the panel appears in the top-right of
-                the stream. It’s draggable, shows the current bid, a countdown, the leader, and a live bid feed.</p>
+                <b>Bid</b>
+                <p className="muted">The panel shows the current bid, the countdown, who is leading, and a live feed.
+                Press bid to take the next increment, or wait and answer late. Theatre mode gives the stream more room
+                while keeping the panel in reach.</p>
               </div>
             </li>
             <li>
               <span className="docs__step-n">4</span>
               <div>
-                <b>Bid</b>
-                <p className="muted">Tap BID to place the next increment, or wait and snipe. If you win, a full-screen
-                “You won” celebration fires and the order lands in your Purchases.</p>
+                <b>Win</b>
+                <p className="muted">If you are on top at zero, a full-screen celebration fires and the item lands in
+                your <Link to="/purchases">Purchases</Link>, ready to ship.</p>
               </div>
             </li>
           </ol>
           <div className="docs__note">
             <Info width={18} height={18} />
-            <p>You can also watch and manage auctions from the website. Sellers get a live monitor at
-            <Link to="/seller/live"> Seller → Live</Link>, and every account can track bids and orders from their
-            dashboard. The overlay is just the fastest way to bid while watching.</p>
+            <p>Sellers run their side from the dashboard: start auctions and watch bids land on
+            <Link to="/seller/live"> Seller → Live</Link>, which mirrors what viewers see.</p>
           </div>
         </section>
 
@@ -294,7 +295,8 @@ export default function Docs() {
             <li><b>Buy now, ship later.</b> Let wins sit in Ready to ship (held up to 14 days), then pick which to send and pay shipping once. Don’t want one? Discard it.</li>
             <li><b>The 14-day window.</b> Pay shipping within 14 days of the purchase. Discarding an item, or letting the window pass, forfeits it: the seller keeps the item and the sale still pays out to them.</li>
             <li><b>One package per seller.</b> Bundling and ship-later group a single seller’s items into one shipment with one shipping charge.</li>
-            <li><b>Delivery.</b> The seller adds tracking and marks it shipped. When it arrives, tap <b>Confirm received</b>.</li>
+            <li><b>BIDit buys the label.</b> Once you pay shipping, the seller confirms the box size and BIDit generates and pays for the carrier label. The seller prints it and drops the package off, so tracking always comes from the carrier rather than the seller’s word.</li>
+            <li><b>Delivery.</b> Carrier scans move the order to delivered. When it arrives, tap <b>Confirm received</b> to release escrow early, or let the dispute window run out on its own.</li>
             <li><b>Set your address first.</b> Add it under Payments &amp; Shipping so we can quote and label correctly.</li>
           </ul>
         </section>
@@ -353,8 +355,9 @@ export default function Docs() {
           </ul>
           <div className="docs__note">
             <Info width={18} height={18} />
-            <p>BIDit is in <b>beta on Solana devnet</b>. Balances and buybacks run against test USDC while the flow is
-            hardened; the live-token DEX swap turns on with mainnet. Nothing here is investment advice.</p>
+            <p>BIDit runs on <b>Solana mainnet with real USDC</b>. Buyback amounts accrue from live sales and are
+            recorded on the ledger; the on-chain DEX swap that spends that pool is being rolled out. Nothing here is
+            investment advice.</p>
           </div>
         </section>
 
@@ -389,7 +392,7 @@ export default function Docs() {
             <li><b>+5,000</b>: Refer a friend who purchases an item <i>(coming soon)</i>.</li>
             <li><b>+3,000</b>: Sell and fulfill your first item on BIDit.</li>
             <li><b>+3,000</b>: Sell and fulfill 10 items.</li>
-            <li><b>+10,000</b>: Become a Verified Seller (sell and fulfill $500 worth of items).</li>
+            <li><b>+10,000</b>: Become a Verified Seller (fulfill 10 orders).</li>
           </ul>
           <p>
             See where you stand on the <Link to="/leaderboard">Points Leaderboard</Link>.
@@ -424,11 +427,11 @@ export default function Docs() {
           <h2 className="docs__h2"><UserCheck width={22} height={22} /> Selling on BIDit</h2>
           <p>Setup takes a couple of minutes:</p>
           <ol className="docs__steps">
-            <li><span className="docs__step-n">1</span><div><b>Become a seller</b><p className="muted">Apply from your dashboard. In beta, sellers are auto-approved; KYC verification arrives with mainnet.</p></div></li>
-            <li><span className="docs__step-n">2</span><div><b>Link your pump.fun coin</b><p className="muted">Connect the coin/stream you broadcast on so the overlay knows which page to appear on for your viewers.</p></div></li>
+            <li><span className="docs__step-n">1</span><div><b>Become a seller</b><p className="muted">Apply from your dashboard. Sellers are approved automatically today, and start out unverified: fulfil 10 orders to earn the Verified badge. Formal KYC arrives as volume grows.</p></div></li>
+            <li><span className="docs__step-n">2</span><div><b>Link your pump.fun coin</b><p className="muted">Connect the coin you stream on, or let BIDit create one for you. That coin is what points viewers at your watch page.</p></div></li>
             <li><span className="docs__step-n">3</span><div><b>Build your listings</b><p className="muted">Add a single card, or add a <b>randomizer</b> with a weighted prize pool. The two are separate create flows in your Listings.</p></div></li>
             <li><span className="docs__step-n">4</span><div><b>Go live & run auctions</b><p className="muted">Start an auction from your queue; watch bids roll in on the <Link to="/seller/live">Live monitor</Link>.</p></div></li>
-            <li><span className="docs__step-n">5</span><div><b>Ship & get paid</b><p className="muted">Mark orders shipped with tracking. On delivery, escrow releases 95% to you in USDC. Payouts and the split live under <Link to="/seller/payouts">Payouts</Link>.</p></div></li>
+            <li><span className="docs__step-n">5</span><div><b>Ship & get paid</b><p className="muted">Confirm the package size, print the label BIDit buys for you, and drop it off. On delivery, escrow releases 95% to you in USDC. Payouts and the split live under <Link to="/seller/payouts">Payouts</Link>.</p></div></li>
           </ol>
           <Link className="btn btn-primary" to="/seller">Open the Seller Studio <ArrowRight width={17} height={17} /></Link>
         </section>
@@ -440,7 +443,7 @@ export default function Docs() {
             <li><b>Server-authoritative.</b> Every bid, hold, and payout is validated and recorded server-side on a double-entry ledger. The client can’t fake a balance or a win.</li>
             <li><b>Escrow by default.</b> Buyer funds are never handed to a seller before the card is delivered.</li>
             <li><b>No keys, ever.</b> BIDit never asks for your private key. Deposits go to an address; the ledger tracks your balance.</li>
-            <li><b>Beta &amp; devnet.</b> The platform currently runs on Solana devnet with test USDC. Mainnet is gated behind a security audit, hardened key custody, an on-chain escrow program, and KYC/AML.</li>
+            <li><b>Real money, early platform.</b> BIDit runs on Solana mainnet and every balance is real USDC. Custody is currently operator-held: BIDit controls the treasury and escrow wallets, so you are trusting the platform the way you would any custodial marketplace. A non-custodial on-chain escrow program and third-party audit are the next milestones. Withdrawals are capped at $1,000 per day per account while the payout path is hardened.</li>
           </ul>
         </section>
 
@@ -452,9 +455,10 @@ export default function Docs() {
               ['Do I need a crypto wallet to bid?', 'You need somewhere to send USDC from. Once your BIDit balance is funded you bid from that balance. No wallet pop-up per bid.'],
               ['What happens to my money if I get outbid?', 'The hold on your bid releases back to your available balance instantly, ready for your next bid or a withdrawal.'],
               ['When does the seller actually get paid?', 'Not when you win. The winning bid sits in escrow and only releases (95% to the seller) after the item is delivered and the dispute window passes.'],
-              ['What if the item never arrives?', 'If a seller doesn’t ship in time the order auto-cancels and you’re refunded 100%. You can also open a dispute within the window.'],
+              ['What if the seller never ships?', 'You get a 100% refund. Once you have paid shipping the seller has 7 days to send it; miss that and the order cancels itself and the full item price returns to your balance. You can also open a dispute inside the window after delivery.'],
               ['Is there a fee for buyers?', 'No. Buyers pay only their winning bid. The 5% fee comes out of the seller’s side on shipped sales: 4% funds the $BID buyback and 1% a community treasury for buyer protection.'],
-              ['Is this real money right now?', 'It’s live on Solana devnet with test USDC during beta. Real-money mainnet turns on after audit, key custody, and compliance work.'],
+              ['Is this real money?', 'Yes. BIDit runs on Solana mainnet and every balance is real USDC. Deposits, bids, payouts and withdrawals all move real funds, so treat your balance the way you would any exchange balance.'],
+              ['Do I need SOL for gas?', 'No. BIDit pays the network fees on both deposits and withdrawals. You only ever need USDC.'],
             ].map(([q, a]) => (
               <details key={q} className="docs__q">
                 <summary>{q}</summary>

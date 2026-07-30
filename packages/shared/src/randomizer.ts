@@ -3,7 +3,7 @@
  *
  * A seller attaches a set of prize entries to a listing; the auction is "bid to
  * win a roll." When it closes the SERVER alone decides which slot the wheel
- * lands on — exactly like every other outcome in BIDit, the server decides and
+ * lands on: exactly like every other outcome in BIDit, the server decides and
  * the client only renders. The server then broadcasts the full reel + landing
  * index so the seller and every viewer replay the identical spin (see
  * RandomizerSpinMessage in protocol.ts).
@@ -45,7 +45,7 @@ export function seedToInt(seedHex: string): number {
   return h >>> 0;
 }
 
-/** Deterministic float in [0,1) from a seed — mulberry32. */
+/** Deterministic float in [0,1) from a seed: mulberry32. */
 export function seedFloat(seedHex: string): number {
   let a = seedToInt(seedHex);
   a |= 0;
@@ -79,7 +79,7 @@ export function pickSlot(entries: WheelEntry[], seedHex: string): number {
 
 /**
  * Build the scrolling reel for the chosen prize. The strip is the entry list
- * repeated `repeats` times (a uniform slot reel — weighting only biases the
+ * repeated `repeats` times (a uniform slot reel: weighting only biases the
  * *landing*, never the display), with the prize placed a few repeats deep so
  * the spin has a long, decelerating run before it settles.
  */
@@ -111,7 +111,7 @@ export function buildReel(
  * clean WheelEntry[]. Drops anything without a label and omits empty optional
  * fields entirely (no `undefined` keys) so the result is safe to store as JSON.
  */
-/** Caps on a seller-controlled wheel — it's repeated REEL_REPEATS× and broadcast to
+/** Caps on a seller-controlled wheel: it's repeated REEL_REPEATS× and broadcast to
  *  every viewer, so an uncapped wheel is a realtime-DoS vector. */
 export const MAX_WHEEL_ENTRIES = 64;
 const MAX_WHEEL_LABEL_LEN = 120;
@@ -119,7 +119,7 @@ const MAX_WHEEL_TIER_LEN = 40;
 /** Prize art is uploaded as an inline data URL, so this has to fit one. The
  *  seller UI downscales to a ~200px thumbnail (single-digit KB); this is the
  *  backstop. It was 2000, which silently truncated every data URL into a broken
- *  image — the reason wheel prizes rendered blank. */
+ *  image: the reason wheel prizes rendered blank. */
 const MAX_WHEEL_IMAGE_LEN = 60_000;
 
 export function normalizeWheelEntries(raw: unknown): WheelEntry[] {

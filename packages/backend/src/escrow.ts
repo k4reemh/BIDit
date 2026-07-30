@@ -33,7 +33,7 @@ export interface EscrowProvider {
   refund(orderId: string): Promise<void>;
 }
 
-/** v1 escrow — simulated, ledger-only. No chain, no keys, no real funds. */
+/** v1 escrow: simulated, ledger-only. No chain, no keys, no real funds. */
 export class DevWalletEscrow implements EscrowProvider {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
@@ -74,7 +74,7 @@ export class DevWalletEscrow implements EscrowProvider {
 }
 
 /**
- * On-chain escrow — the same ledger movements as DevWalletEscrow, but each also
+ * On-chain escrow: the same ledger movements as DevWalletEscrow, but each also
  * ENQUEUES its internal wallet→wallet USDC move into the durable ChainTransfer
  * outbox, ATOMICALLY with the ledger write (one DB transaction). It does NOT
  * broadcast here: a ChainSettler drives each leg to the chain idempotently and

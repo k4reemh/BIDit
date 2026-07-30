@@ -3,7 +3,7 @@ import { X, Check } from '../icons';
 
 const KEY = 'bidit_tip_bid';
 
-/** First-run coach card above the bid panel — teaches how bidding works, right
+/** First-run coach card above the bid panel: teaches how bidding works, right
  *  where you do it. Dismissible; the choice sticks. */
 export default function BidTip() {
   const [show, setShow] = useState(() => localStorage.getItem(KEY) !== '1');

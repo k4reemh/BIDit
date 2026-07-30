@@ -137,7 +137,7 @@ describe('fulfillment', () => {
     const buyerBefore = await getSettledBalance(buyer.accountId, prisma);
     await buyerDiscardItem(item.id, buyer.userId, new DevWalletEscrow(prisma), clock, prisma);
     expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
-    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(buyerBefore); // no refund — forfeit
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(buyerBefore); // no refund: forfeit
   });
 
   it('seller discard needs the 14-day hold to expire first', async () => {

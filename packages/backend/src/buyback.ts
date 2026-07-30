@@ -17,7 +17,7 @@ export interface Swapper {
   buyBid(amountMicros: bigint): Promise<string>;
 }
 
-/** Test/dev swapper — records the buy, no chain. */
+/** Test/dev swapper: records the buy, no chain. */
 export class MockSwapper implements Swapper {
   readonly swaps: bigint[] = [];
   async buyBid(amountMicros: bigint): Promise<string> {

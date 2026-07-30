@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "BIDit — live auction marketplace for trading cards, layered on Pump.fun streams, settled in USDC.",
+  "description": "BIDit, live auction marketplace for trading cards, layered on Pump.fun streams, settled in USDC.",
   "workspaces": [
     "packages/*"
   ],

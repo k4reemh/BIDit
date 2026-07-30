@@ -1,5 +1,5 @@
 /**
- * Content script — runs in the Pump.fun page. Detects the coin, injects the
+ * Content script: runs in the Pump.fun page. Detects the coin, injects the
  * BIDit panel into an isolated shadow root floating over the page, and bridges
  * the panel to the background service worker. It does no networking itself.
  */
@@ -203,7 +203,7 @@ function init(): void {
   panel = mountPanel();
   connect(coin);
 
-  // Pump.fun is an SPA — watch for coin changes without a full reload.
+  // Pump.fun is an SPA: watch for coin changes without a full reload.
   let lastHref = location.href;
   window.setInterval(() => {
     if (location.href === lastHref) return;

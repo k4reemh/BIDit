@@ -11,7 +11,7 @@ const HOW = [
 ];
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 const LAST = 5;
-/** The one step nobody can skip — everything downstream keys off the username. */
+/** The one step nobody can skip: everything downstream keys off the username. */
 const HANDLE_STEP = 1;
 const TITLES = [
   'Welcome to BIDit',
@@ -37,8 +37,8 @@ export default function Onboarding({
 }: {
   session: Session;
   onDone: (s: Session) => void;
-  /** Close without finishing. The account already exists — they just haven't
-   *  set it up — so this leaves them signed in and shows the flow again next
+  /** Close without finishing. The account already exists: they just haven't
+   *  set it up, so this leaves them signed in and shows the flow again next
    *  visit. Everything here is reachable later from Settings. */
   onDismiss: () => void;
 }) {
@@ -86,13 +86,13 @@ export default function Onboarding({
     // taken name is reported here instead of four screens later.
     if (step === HANDLE_STEP) {
       const h = handle.trim().toLowerCase();
-      if (!HANDLE_RE.test(h)) { setError('3–20 characters: letters, numbers or underscores.'); return; }
+      if (!HANDLE_RE.test(h)) { setError('3-20 characters: letters, numbers or underscores.'); return; }
       setBusy(true);
       try {
         await claimHandle(h);
       } catch (err) {
         // A backend that predates /me/handle answers 404. That's a deploy-skew
-        // problem, not the user's — don't strand them on this step; the final
+        // problem, not the user's: don't strand them on this step; the final
         // submit still validates the name.
         if (!(err instanceof ApiError && err.status === 404)) {
           setError(err instanceof Error ? err.message : 'Could not take that username.');
@@ -103,7 +103,7 @@ export default function Onboarding({
       }
     }
     if (step === ADDRESS_STEP && (shipName.trim() || line1.trim())) {
-      // Partly filled is still worth keeping — they can finish it in Settings.
+      // Partly filled is still worth keeping: they can finish it in Settings.
       setBusy(true);
       try {
         await updateMe({
@@ -136,7 +136,7 @@ export default function Onboarding({
   }, [onDismiss]);
 
   return (
-    // A centered popup over the site — one focused card, no split-screen.
+    // A centered popup over the site, one focused card, no split-screen.
     <div className="obx" onClick={onDismiss}>
       <main className="obx__panel" onClick={(e) => e.stopPropagation()}>
         <button className="obx__close" onClick={onDismiss} aria-label="Close setup">×</button>

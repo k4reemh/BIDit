@@ -35,7 +35,7 @@ describe('coin <-> seller resolution', () => {
     expect(await prisma.sellerProfile.count({ where: { userId: b.room } })).toBe(1);
   });
 
-  it('self-serve coin claim is FIRST-claim-wins — a second seller cannot hijack it', async () => {
+  it('self-serve coin claim is FIRST-claim-wins: a second seller cannot hijack it', async () => {
     // The hijack this blocks: whoever streams on SHARED_COIN owns the room buyers
     // route to, so silently repointing it steals their USDC. First-claim-wins means
     // only an admin can move a coin once a seller holds it.

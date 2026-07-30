@@ -1,5 +1,5 @@
 /**
- * HTTP transport policy helpers — pure and env-injectable so they're unit-tested
+ * HTTP transport policy helpers: pure and env-injectable so they're unit-tested
  * without standing up the server.
  */
 
@@ -10,7 +10,7 @@ export function corsIsProd(env: NodeJS.ProcessEnv = process.env): boolean {
 
 /** Canonical form for comparing origins: no trailing slash, lower-cased. Browsers
  *  send an Origin with no path, but humans paste allowlist values with a trailing
- *  slash or odd casing — normalising both sides avoids a silent total outage. */
+ *  slash or odd casing: normalising both sides avoids a silent total outage. */
 function normalizeOrigin(o: string): string {
   return o.trim().replace(/\/+$/, '').toLowerCase();
 }

@@ -1,12 +1,12 @@
 /**
- * Seller store ("buy now") — Whatnot-style fixed-price sales alongside auctions.
+ * Seller store ("buy now"): Whatnot-style fixed-price sales alongside auctions.
  *
  * A listing with a `buyNowPrice` also appears in the seller's shop and can be
  * bought outright. A purchase claims one unit, charges the buyer from AVAILABLE
  * balance (funds reserved under live bids stay untouchable), pays the seller
  * through the same rails as an auction win, and enters the exact same
  * fulfillment/shipping flow. Buy-now is only allowed while the listing is
- * QUEUED — never while its auction is LIVE — so store sales can't race the
+ * QUEUED (never while its auction is LIVE) so store sales can't race the
  * auction engine over the last unit.
  */
 import { ListingStatus, OrderStatus, splitAmount, formatUsdc } from '@bidit/shared';
@@ -61,7 +61,7 @@ export interface PurchaseOptions {
  * QUEUED + in-stock listings match, so two buyers can't oversell the last unit
  * and a LIVE auction's unit can't be bought out from under it). If the charge
  * then fails for lack of funds, the claim is rolled back. Money moves through
- * the same ledger ops as auction wins — with `auctionId: null` they enforce the
+ * the same ledger ops as auction wins, with `auctionId: null` they enforce the
  * AVAILABLE-balance check.
  */
 export async function purchaseListing(
@@ -75,7 +75,7 @@ export async function purchaseListing(
   if (!listing || listing.buyNowPrice === null) throw new ItemUnavailableError();
   if (listing.sellerId === buyerId) throw new ItemUnavailableError('You can’t buy your own listing');
 
-  // Claim a unit. The WHERE doubles as the availability check — status must be
+  // Claim a unit. The WHERE doubles as the availability check: status must be
   // QUEUED (not LIVE mid-auction, not SOLD) and stock must remain.
   const claimed = await prisma.listing.updateMany({
     where: {
@@ -134,7 +134,7 @@ export async function purchaseListing(
     }
   } catch (err) {
     // Settlement failed (insufficient funds, a bad amount, a chain error…). The
-    // money side is transactional, so nothing moved — undo the order + stock claim
+    // money side is transactional, so nothing moved: undo the order + stock claim
     // for ANY error, not just InsufficientFundsError, so a failure can never orphan
     // a PENDING order with permanently-decremented stock.
     await prisma.order.delete({ where: { id: created.id } }).catch(() => {});
@@ -155,7 +155,7 @@ export async function purchaseListing(
     await prisma.listing.update({ where: { id: listingId }, data: { status: ListingStatus.SOLD } });
   }
 
-  // Same physical-fulfillment entry as an auction win — in BOTH modes. (This used
+  // Same physical-fulfillment entry as an auction win: in BOTH modes. (This used
   // to be direct-mode only, so an escrow store buy created an Order but no
   // FulfillmentItem and vanished from the buyer's Purchases / Ready-to-ship.)
   await createFulfillmentItem(

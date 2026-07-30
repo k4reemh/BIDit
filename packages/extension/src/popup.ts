@@ -1,4 +1,4 @@
-/** Popup UI — email/password login + connection status + wallet balance. Talks
+/** Popup UI: email/password login + connection status + wallet balance. Talks
  *  only to the service worker over a port; does no networking itself. */
 import { PORT_NAME, type SwToUi } from './messages.js';
 
@@ -45,6 +45,6 @@ function submitLogin(): void {
 $('loginBtn').addEventListener('click', submitLogin);
 passwordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitLogin(); });
 $('logoutBtn').addEventListener('click', () => {
-  settled.textContent = '—';
+  settled.textContent = '-';
   port.postMessage({ cmd: 'LOGOUT' });
 });

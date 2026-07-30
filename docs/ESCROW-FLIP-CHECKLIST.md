@@ -1,24 +1,28 @@
-# Escrow flip — pre-launch checklist
+# Escrow flip: pre-launch checklist
 
-The exact, ordered steps to switch `BIDIT_PAYOUT_MODE=direct → escrow` safely for
-real beta use. Do them in order; don't flip until every box is checked.
+> **Status: done.** The blueprint ships `BIDIT_PAYOUT_MODE=escrow`, so this
+> checklist is kept as the record of what was verified and as the runbook if the
+> mode ever has to be re-flipped.
+
+The exact, ordered steps to switch `BIDIT_PAYOUT_MODE=direct` to `escrow` safely
+for real use. Do them in order; don't flip until every box is checked.
 
 ## 0. Ship the code
-- [ ] `git push` — the escrow build (steps 1–8), the withdrawal durable-settlement
+- [ ] `git push`: the escrow build (steps 1-8), the withdrawal durable-settlement
       fix, and this pre-flip work must be on the branch Render deploys.
 - [ ] Render deploys the new backend. It's still `BIDIT_PAYOUT_MODE=direct`, so
-      escrow stays **dormant** — nothing changes for live users yet. Good.
+      escrow stays **dormant**: nothing changes for live users yet. Good.
 
 ## 1. Wallets (real money)
 - [ ] `TREASURY_SECRET`, `ESCROW_SECRET`, `BUYBACK_SECRET`, `FEE_SECRET` are all set
       on Render to **distinct** mainnet keypairs. (A missing secret silently falls
-      back to treasury — the startup guard now refuses to boot escrow mode if any
+      back to treasury: the startup guard now refuses to boot escrow mode if any
       of escrow/buyback/fee collapses onto treasury, so this is enforced, but
       verify anyway.)
-- [ ] Each of **treasury, escrow, buyback, fee** holds a little **SOL** for gas —
+- [ ] Each of **treasury, escrow, buyback, fee** holds a little **SOL** for gas:
       every wallet pays gas for its own outgoing legs (lock/release/refund), not
       just treasury.
-- [ ] `SOLANA_RPC` is a paid endpoint (Helius/QuickNode) — the public RPC
+- [ ] `SOLANA_RPC` is a paid endpoint (Helius/QuickNode): the public RPC
       rate-limits (429s) the settler's confirmation polling.
 - [ ] `SHIPPO_API_KEY` set (delivery → auto-release). Without it, mark delivered
       via the admin test controls instead.
@@ -39,7 +43,7 @@ real beta use. Do them in order; don't flip until every box is checked.
       mode" error).
 
 ## 4. Smoke test on mainnet (small, do it yourself first)
-- [ ] Win a $1–2 auction with a second account → confirm the order is **LOCKED**
+- [ ] Win a $1-2 auction with a second account → confirm the order is **LOCKED**
       and the `treasury → escrow` leg settles (Reconcile wallets shows escrow up).
 - [ ] Pay shipping → confirm size → make the label in `/admin` → mark shipped →
       mark delivered → after the 2-day window (or "Release payment now"), confirm

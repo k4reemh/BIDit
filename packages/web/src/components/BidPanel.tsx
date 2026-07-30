@@ -20,12 +20,12 @@ import { Gift, Dice, Chevron, Truck } from '../icons';
 interface Feed { who: string; avatar: string | null; amt: string; key: number }
 
 /**
- * The in-site bidding sidebar — a clean, always-on version of the extension
+ * The in-site bidding sidebar: a clean, always-on version of the extension
  * overlay. Connects to a seller's room, renders the live auction + giveaway +
  * wheel, and (for a signed-in viewer) bids / enters directly on the site, so no
  * extension is needed. Requires sign-in because the socket is token-gated.
  *
- * Wallet balance shows the viewer's total money and does NOT drop while bidding —
+ * Wallet balance shows the viewer's total money and does NOT drop while bidding:
  * a live bid only reserves funds; the balance is only spent when they WIN.
  */
 export default function BidPanel({
@@ -67,7 +67,7 @@ export default function BidPanel({
   const [shipMode, setShipMode] = useState<ShippingMode>((session?.shippingMode as ShippingMode) ?? 'SHIP_LATER');
   const [shipEst, setShipEst] = useState<ListingShipEstimate | null>(null);
 
-  // Live shipping estimate for the item on the block — for the "~$ est. shipping"
+  // Live shipping estimate for the item on the block, for the "~$ est. shipping"
   // note under the bid. Refetches whenever the auctioned listing changes.
   const listingId = auction?.listingId ?? null;
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function BidPanel({
         offset.current = m.serverNow - Date.now();
         setAuction((a) => (a ? { ...a, currentBid: m.amount, leaderHandle: m.leaderHandle, leaderAvatar: m.leaderAvatar, endsAt: m.endsAt } : a));
         setFeed((f) => [{ who: m.leaderHandle, avatar: m.leaderAvatar ?? null, amt: m.amount, key: keyRef.current++ }, ...f].slice(0, 6));
-        if (m.extended) setExtended(Date.now()); // late bid pushed the clock — flash EXTENDED
+        if (m.extended) setExtended(Date.now()); // late bid pushed the clock: flash EXTENDED
       },
       onClosed: (m) => {
         setSoldMsg(m.winnerHandle ? `Sold to @${m.winnerHandle} for $${m.amount}` : 'Auction ended, no sale');
@@ -109,7 +109,7 @@ export default function BidPanel({
         // catch-up for a missed close, so surface the winner but don't re-fire the
         // full-screen celebration. Guard on auctionId so a duplicated close (a
         // flaky socket can deliver it more than once) celebrates exactly once
-        // instead of remounting — and flickering — the overlay.
+        // instead of remounting (and flickering) the overlay.
         if (!m.wheel && !m.replay && m.winnerHandle && m.amount && celebratedId.current !== m.auctionId) {
           celebratedId.current = m.auctionId;
           setWin({ winnerHandle: m.winnerHandle, winnerAvatar: m.winnerAvatar, amount: m.amount, title: item.current.title, imageUrl: item.current.image, isMe: m.winnerHandle === myHandle });

@@ -7,7 +7,7 @@ const RESEND_SECONDS = 60;
 
 /**
  * Blocking step shown right after signup: the account exists but stays
- * unverified until the emailed code comes back. Deliberately has no skip —
+ * unverified until the emailed code comes back. Deliberately has no skip:
  * bidding, buying, withdrawing and selling are all gated on this server-side,
  * so letting someone past would only produce confusing failures later.
  *

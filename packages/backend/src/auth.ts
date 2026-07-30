@@ -2,7 +2,7 @@
  * Real auth (Chunk 6). Two ways in, one session token out:
  *  - Wallet signature (Pump-native): the client signs a challenge with their
  *    Solana wallet; we verify the ed25519 signature. No chain calls, pure crypto.
- *  - Dev login: a handle, no signature — for local demos without a wallet.
+ *  - Dev login: a handle, no signature, for local demos without a wallet.
  *
  * Sessions are stateless HMAC tokens (no DB/Redis needed). They replace the old
  * `dev.<userId>` stub everywhere (WebSocket + REST).
@@ -13,14 +13,14 @@ import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 
 // ---------------------------------------------------------------------------
-// Password hashing (email sign-up) — scrypt, no external deps.
+// Password hashing (email sign-up): scrypt, no external deps.
 // Stored as "scrypt$<saltHex>$<hashHex>".
 // ---------------------------------------------------------------------------
 
 const scrypt = promisify(scryptCb) as (password: string | Buffer, salt: string | Buffer, keylen: number) => Promise<Buffer>;
 
 /** Max accepted password length. scrypt hashes on the event loop, so an unbounded
- *  password (the body cap is 4 MB) could stall all request handling — bound it. */
+ *  password (the body cap is 4 MB) could stall all request handling: bound it. */
 export const MAX_PASSWORD_LEN = 128;
 
 /** Hash a password (async so scrypt yields the event loop instead of blocking it). */
@@ -32,7 +32,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
   if (!stored) return false;
-  // Never feed an over-long password into scrypt (event-loop DoS) — a legit
+  // Never feed an over-long password into scrypt (event-loop DoS): a legit
   // password is capped at registration, so a long one here is never valid.
   if (password.length > MAX_PASSWORD_LEN) return false;
   const [scheme, saltHex, hashHex] = stored.split('$');
@@ -66,7 +66,7 @@ function hmac(body: string): string {
 const revokedBefore = new Map<string, number>();
 
 /** Listeners fired when a user's sessions are revoked. The realtime server
- *  registers here to drop that user's live sockets — a revoked HTTP session must
+ *  registers here to drop that user's live sockets: a revoked HTTP session must
  *  not leave an authenticated WebSocket open. A hook keeps auth.ts free of a
  *  dependency on the WS layer. */
 const revokeListeners = new Set<(userId: string) => void>();
@@ -118,7 +118,7 @@ export function verifySession(token: string | null | undefined): string | null {
     const uid = typeof payload.uid === 'string' ? payload.uid : null;
     if (!uid) return null;
     // Revoked if the token predates the user's epoch. Pre-upgrade tokens (no iat)
-    // count as iat=0, so a logout revokes them too — but nobody is logged out on
+    // count as iat=0, so a logout revokes them too, but nobody is logged out on
     // deploy, since no epoch is set until the first revocation.
     const iat = typeof payload.iat === 'number' ? payload.iat : 0;
     const revokedAt = revokedBefore.get(uid);
@@ -186,7 +186,7 @@ export function outstandingChallengeCount(): number {
 // ---------------------------------------------------------------------------
 // The WebSocket auths via a query param, and URLs leak (proxy logs, history,
 // monitoring). Instead of putting the long-lived session token there, the client
-// trades it — over an authenticated POST — for a ONE-TIME ticket that's valid for
+// trades it (over an authenticated POST) for a ONE-TIME ticket that's valid for
 // ~60s. A leaked socket URL is then worthless: the ticket is already used/expired.
 
 const WS_TICKET_TTL_MS = 60_000;
@@ -204,7 +204,7 @@ function pruneWsTickets(now: number): void {
   }
 }
 
-/** Drop every outstanding WS ticket for a user — called on revocation so a ticket
+/** Drop every outstanding WS ticket for a user: called on revocation so a ticket
  *  minted moments before a logout/erasure can't be redeemed for a fresh socket. */
 function purgeUserWsTickets(userId: string): void {
   for (const [k, v] of wsTickets) {

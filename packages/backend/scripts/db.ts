@@ -1,5 +1,5 @@
 /**
- * Local PostgreSQL via embedded-postgres — a real Postgres server, no Docker and
+ * Local PostgreSQL via embedded-postgres: a real Postgres server, no Docker and
  * no system install. Gives us genuine row-lock / concurrent-transaction
  * semantics so the double-spend tests actually mean something.
  */
@@ -49,7 +49,7 @@ export async function startDb(): Promise<void> {
   try {
     await pg.createDatabase(PG_DB);
   } catch {
-    // Database already exists — fine for a persistent data dir.
+    // Database already exists: fine for a persistent data dir.
   }
   instance = pg;
   console.log('[db] ready:', DATABASE_URL);

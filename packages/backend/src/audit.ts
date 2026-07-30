@@ -1,9 +1,9 @@
 /**
- * Wallet ↔ ledger reconciliation — the pre-flip and ongoing safety check for
+ * Wallet ↔ ledger reconciliation: the pre-flip and ongoing safety check for
  * escrow mode. Each segregated wallet's on-chain USDC must equal its ledger
  * account; treasury holds every user's pooled balance. Any mismatch not explained
  * by in-flight ChainTransfer legs means the physical wallets and the ledger have
- * diverged — investigate before flipping BIDIT_PAYOUT_MODE to escrow.
+ * diverged: investigate before flipping BIDIT_PAYOUT_MODE to escrow.
  *
  *   escrow  wallet  ==  ESCROW ledger account   (funds held per order)
  *   buyback wallet  ==  PLATFORM ledger account (4% buyback pool)

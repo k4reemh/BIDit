@@ -1,12 +1,12 @@
 /**
- * Minimal Phantom (window.solana) integration — deliberately NOT the wallet-
+ * Minimal Phantom (window.solana) integration: deliberately NOT the wallet-
  * adapter stack. The only thing BIDit ever asks a wallet to do is sign the
  * coin-create transaction our backend prepared.
  *
  * Signing uses Phantom's standard object-form `signTransaction(tx)`, which
  * handles BOTH legacy and versioned (v0) transactions. (The older low-level
  * `request({method:'signTransaction', params:{message}})` lane chokes on v0
- * bytes — its legacy parser reads the version prefix as a signer count and
+ * bytes: its legacy parser reads the version prefix as a signer count and
  * dies with "Reached end of buffer unexpectedly".) @solana/web3.js is loaded
  * lazily so it only ships to browsers that actually reach the signing step.
  */
@@ -74,7 +74,7 @@ const bytesToB64 = (bytes: Uint8Array): string => {
  *  This is a MESSAGE signature, not a transaction: Phantom shows the exact words
  *  being signed, nothing can be spent, and none of the "this dApp may be
  *  malicious" transaction-simulation warnings appear. The signature is returned
- *  base64 (keeping a base58 library out of the web bundle) and is single-use —
+ *  base64 (keeping a base58 library out of the web bundle) and is single-use:
  *  the backend verifies it, spends it on one create, and never stores it. */
 export async function signLoginMessage(message: string): Promise<string> {
   const p = provider();

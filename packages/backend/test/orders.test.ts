@@ -126,7 +126,7 @@ describe('direct-payout settlement (no escrow, no fee)', () => {
     expect(await getSettledBalance(buyerAcc, prisma)).toBe(usdc('60'));
     expect(await getAvailableBalance(buyerAcc, prisma)).toBe(usdc('60'));
 
-    // Idempotent — re-running doesn't double-pay.
+    // Idempotent: re-running doesn't double-pay.
     const again = await settleAuctionDirect(auctionId, clock, prisma);
     expect(again?.id).toBe(order?.id);
     expect(await getSettledBalance(sellerAcc, prisma)).toBe(usdc('40'));
@@ -156,7 +156,7 @@ describe('settlement (auction close -> LOCKED order)', () => {
     expect(await getSystemTotal(prisma)).toBe(0n);
   });
 
-  it('is idempotent — settling twice yields the same single order', async () => {
+  it('is idempotent: settling twice yields the same single order', async () => {
     const clock = new ManualClock(T0);
     const { auctionId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
     const a = await settleAuction(auctionId, escrow, clock, prisma);
@@ -331,7 +331,7 @@ describe('dispute resolved as RELEASE pays the seller', () => {
   });
 });
 
-describe('escrow release/refund are mutually exclusive (M2 — no double-spend)', () => {
+describe('escrow release/refund are mutually exclusive (M2, no double-spend)', () => {
   it('firing BOTH the release and the refund on one order pays out only once', async () => {
     const clock = new ManualClock(T0);
     const { auctionId, sellerId, buyer } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
@@ -342,7 +342,7 @@ describe('escrow release/refund are mutually exclusive (M2 — no double-spend)'
     // The TOCTOU the audit found: both terminal money moves fire on the same order.
     // The SHARED ledger idempotency key means only the first posts.
     await escrow.release(order.id);
-    await escrow.refund(order.id); // deduped — must NOT also pay out
+    await escrow.refund(order.id); // deduped: must NOT also pay out
 
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n); // not -$20 (no drain)
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // release won
@@ -395,7 +395,7 @@ describe('guards', () => {
     await expect(markDelivered(order.id, clock, prisma)).rejects.toThrow();
   });
 
-  it('escrow release is idempotent — no double payout', async () => {
+  it('escrow release is idempotent, no double payout', async () => {
     const clock = new ManualClock(T0);
     const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
     const sellerAcct = await sellerAccountId(sellerId);

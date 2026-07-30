@@ -7,7 +7,7 @@
  * controlled): address = ed25519( HMAC-SHA256(masterSeed, "deposit:"+userId) ).
  *
  * Given the same userId + seed you always get the same address, and the spending
- * key can be re-derived on demand (for sweeping deposits into the treasury) —
+ * key can be re-derived on demand (for sweeping deposits into the treasury):
  * nothing secret is ever written to the database.
  *
  * DEVNET ONLY. For mainnet the master seed must move into a KMS/HSM and the
@@ -31,7 +31,7 @@ export function deriveDepositAddress(userId: string): string {
 
 /**
  * Re-derive the full keypair (secret + public) for sweeping. Kept in-process
- * only, never persisted or returned over the wire. Not used yet — here so the
+ * only, never persisted or returned over the wire. Not used yet: here so the
  * deposit-sweeper can find funds without a stored secret.
  */
 export function deriveDepositKeypair(userId: string): { address: string; secretKey: Uint8Array } {

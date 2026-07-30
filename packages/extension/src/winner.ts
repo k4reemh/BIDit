@@ -1,5 +1,5 @@
 /**
- * The auction-win celebration — a full-viewport overlay injected over the stream
+ * The auction-win celebration: a full-viewport overlay injected over the stream
  * (its own shadow root, doesn't touch the page or the panel). 3D pop-in +
  * confetti, two flavors (you won vs someone else won), and the BIDit twist: it
  * shows how much of the sale routed to the $BID buyback. Auto-dismisses.

@@ -87,7 +87,7 @@ export async function loadSessionRevocations(prisma: PrismaClient = defaultPrism
 
 /** True if `err` is Prisma's unique-constraint violation (P2002) on `field`.
  *  The DB @unique index is the real guard against races that slip past the
- *  pre-check — this lets us turn the raw DB error into a friendly message. */
+ *  pre-check: this lets us turn the raw DB error into a friendly message. */
 function isUniqueViolation(err: unknown, field: string): boolean {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false;
   const target = err.meta?.target;
@@ -104,7 +104,7 @@ async function uniquePlaceholderHandle(prisma: PrismaClient): Promise<string> {
 
 /**
  * Create a real account with email + password (hashed). Persists to Postgres.
- * `handle` is optional — when omitted a placeholder is generated and the user
+ * `handle` is optional, when omitted a placeholder is generated and the user
  * picks their real username during onboarding. New users start onboarded=false.
  */
 export async function registerWithEmail(
@@ -120,7 +120,7 @@ export async function registerWithEmail(
   let handle: string;
   if (input.handle && input.handle.trim()) {
     handle = input.handle.trim().toLowerCase();
-    if (!HANDLE_RE.test(handle)) throw new AuthError('Handle must be 3–20 chars: letters, numbers or underscores.');
+    if (!HANDLE_RE.test(handle)) throw new AuthError('Handle must be 3-20 chars: letters, numbers or underscores.');
     if (await prisma.user.findUnique({ where: { handle } })) throw new AuthError('That handle is taken.');
   } else {
     handle = await uniquePlaceholderHandle(prisma);
@@ -155,7 +155,7 @@ export async function setHandle(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User> {
   const handle = rawHandle.trim().toLowerCase();
-  if (!HANDLE_RE.test(handle)) throw new AuthError('Username must be 3–20 chars: letters, numbers or underscores.');
+  if (!HANDLE_RE.test(handle)) throw new AuthError('Username must be 3-20 chars: letters, numbers or underscores.');
   const taken = await prisma.user.findUnique({ where: { handle }, select: { id: true } });
   if (taken && taken.id !== userId) throw new AuthError('That username is taken.');
   try {
@@ -176,7 +176,7 @@ export async function completeOnboarding(
 
   if (input.handle && input.handle.trim()) {
     const handle = input.handle.trim().toLowerCase();
-    if (!HANDLE_RE.test(handle)) throw new AuthError('Username must be 3–20 chars: letters, numbers or underscores.');
+    if (!HANDLE_RE.test(handle)) throw new AuthError('Username must be 3-20 chars: letters, numbers or underscores.');
     const taken = await prisma.user.findUnique({ where: { handle } });
     if (taken && taken.id !== userId) throw new AuthError('That username is taken.');
     data.handle = handle;
@@ -216,7 +216,7 @@ function cleanAvatar(raw: string): string | null {
   const v = raw.trim();
   if (!v) return null;
   if (v.length > MAX_AVATAR_LEN) return null;
-  // Inline image or a plain URL only — never a script:/javascript: payload,
+  // Inline image or a plain URL only, never a script:/javascript: payload,
   // since this string is rendered as an <img src> by every client.
   if (!/^data:image\/(png|jpeg|webp|gif);base64,/.test(v) && !/^https:\/\//.test(v)) return null;
   return v;
@@ -228,7 +228,7 @@ export async function updateProfile(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User> {
   // A chosen shipping mode also drives the weekly-bundle opt-in (kept in sync so
-  // the fulfillment path — which keys off bundleShipping — stays consistent).
+  // the fulfillment path (which keys off bundleShipping) stays consistent).
   const mode = patch.shippingMode && (SHIP_MODES as readonly string[]).includes(patch.shippingMode) ? patch.shippingMode : undefined;
   return prisma.user.update({
     where: { id: userId },
@@ -303,7 +303,7 @@ export async function requireSeller(userId: string, prisma: PrismaClient = defau
 
 /**
  * Become a seller. Auto-approved: the SellerProfile is created immediately so
- * they can list and go live right away — but UNVERIFIED (no badge) until they
+ * they can list and go live right away, but UNVERIFIED (no badge) until they
  * fulfill 10 orders or an admin verifies them. Never clobbers an admin's role,
  * and re-applying never un-verifies.
  */

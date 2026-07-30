@@ -1,5 +1,5 @@
 /**
- * BIDit Points — activity rewards redeemed against future community airdrops
+ * BIDit Points: activity rewards redeemed against future community airdrops
  * (5% of $BID supply is locked at launch for them).
  *
  * Two ways to earn:
@@ -99,7 +99,7 @@ export const MISSIONS: readonly MissionDef[] = [
   { id: 'refer_friend', title: 'Refer a friend', desc: 'They sign up and purchase an item.', points: 5_000n, comingSoon: true },
   { id: 'first_sale', title: 'Make your first sale', desc: 'Sell and fulfill your first item on BIDit.', points: 3_000n },
   { id: 'sell_10', title: 'Fulfill 10 orders', desc: 'Sell and fulfill 10 items on BIDit.', points: 3_000n },
-  { id: 'verified_seller', title: 'Become a Verified Seller', desc: 'Sell and fulfill $500 worth of items.', points: 10_000n },
+  { id: 'verified_seller', title: 'Become a Verified Seller', desc: 'Fulfill 10 orders to earn the Verified badge.', points: 10_000n },
 ] as const;
 
 const missionKind = (id: string) => `mission:${id}`;
@@ -211,7 +211,7 @@ export interface LeaderboardRow {
   points: bigint;
 }
 
-/** Top point earners, ranked. Public — shows only public profile fields. */
+/** Top point earners, ranked. Public: shows only public profile fields. */
 export async function getLeaderboard(limit = 25, prisma: PrismaClient = defaultPrisma): Promise<LeaderboardRow[]> {
   const users = await prisma.user.findMany({
     where: { points: { gt: 0n } },

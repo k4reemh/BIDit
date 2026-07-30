@@ -1,9 +1,9 @@
 /**
- * Launch growth promo — "Start selling on BIDit, earn a $100 USDC bonus."
+ * Launch growth promo: "Start selling on BIDit, earn a $100 USDC bonus."
  *
  * A seller who *joins during the first 3 days of launch* and then fulfils $100 of
  * orders earns a $100 USDC match. The match is paid **manually, off-platform**
- * (nothing here moves treasury funds) — this module only tracks eligibility and
+ * (nothing here moves treasury funds): this module only tracks eligibility and
  * progress so you know who to pay.
  *
  * Enrollment window is driven by BIDIT_PROMO_START (set at launch). Unset ⇒ the
@@ -18,7 +18,7 @@ export const PROMO_WINDOW_MS = 3 * DAY_MS; // enroll within the first 3 days
 export const PROMO_BONUS_USD = 100; // the $100 match
 export const PROMO_THRESHOLD = usdc('100'); // fulfil $100 (micro-units)
 
-/** Promo start (ms since epoch) from BIDIT_PROMO_START — an ISO-8601 date or a
+/** Promo start (ms since epoch) from BIDIT_PROMO_START: an ISO-8601 date or a
  *  raw ms timestamp. Returns null (promo inactive) if unset or unparseable. */
 export function promoStartMs(): number | null {
   const raw = process.env.BIDIT_PROMO_START?.trim();
@@ -47,7 +47,7 @@ export function isEnrolled(joinedMs: number, startMs = promoStartMs()): boolean 
   return startMs !== null && joinedMs >= startMs && joinedMs < startMs + PROMO_WINDOW_MS;
 }
 
-/** Fulfilled sale value (micro-units) for a seller — items shipped or delivered.
+/** Fulfilled sale value (micro-units) for a seller: items shipped or delivered.
  *  Mirrors the "fulfilled" metric used for verification, but sums value. */
 async function fulfilledValue(sellerId: string, prisma: PrismaClient): Promise<bigint> {
   const rows = await prisma.fulfillmentItem.findMany({

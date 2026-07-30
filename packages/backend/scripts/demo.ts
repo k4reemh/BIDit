@@ -1,5 +1,5 @@
 /**
- * A narrated walk through the ledger with simulated money — proof the engine
+ * A narrated walk through the ledger with simulated money: proof the engine
  * works end to end. Run with: npm run demo  (from packages/backend or root).
  */
 import { prisma } from '../src/db.js';

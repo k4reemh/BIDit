@@ -23,7 +23,7 @@ export const Theater = (p: SVGProps<SVGSVGElement>) => (
 export const TheaterExit = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><rect x="2.5" y="5.5" width="19" height="13" rx="2" /><path d="M5.5 10 8 12l-2.5 2M18.5 10 16 12l2.5 2" /></svg>
 );
-/** Filled seal-with-check — the verified-seller mark on live cards. */
+/** Filled seal-with-check: the verified-seller mark on live cards. */
 export const Verified = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base({ ...p, strokeWidth: 0, fill: 'currentColor', stroke: 'none' })}>
     <path d="M12 1.8 14.5 4l3.3-.3.9 3.2 2.9 1.7-1.4 3 1.4 3-2.9 1.7-.9 3.2-3.3-.3L12 21.6 9.5 19.4l-3.3.3-.9-3.2-2.9-1.7 1.4-3-1.4-3L5.3 7l.9-3.2 3.3.3L12 1.8Z" />

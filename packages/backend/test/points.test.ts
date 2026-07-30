@@ -52,7 +52,7 @@ describe('automatic accrual on sales', () => {
     expect(sellerRow.points).toBe(200n); // $10 sold → 200 pts
   });
 
-  it('is idempotent per order — a retried award pays nothing extra', async () => {
+  it('is idempotent per order: a retried award pays nothing extra', async () => {
     const clock = new ManualClock(T0);
     const buyer = await makeFundedUser('100');
     await winAuction(buyer.userId, '10', clock);
@@ -153,7 +153,7 @@ describe('leaderboard', () => {
   it('ranks users by points, highest first, skipping zero-point users', async () => {
     const a = await makeUser('buyer');
     const b = await makeUser('buyer');
-    await makeUser('buyer'); // zero points — should not appear
+    await makeUser('buyer'); // zero points: should not appear
     await prisma.user.update({ where: { id: a.userId }, data: { points: 5_000n } });
     await prisma.user.update({ where: { id: b.userId }, data: { points: 12_000n } });
 

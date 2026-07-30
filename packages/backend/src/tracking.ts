@@ -3,7 +3,7 @@
  *
  * A TrackingProvider tells us the carrier status of a tracking number. The
  * ShipmentTracker polls in-flight shipments and, on delivery, marks the shipment
- * DELIVERED and opens the 2-day dispute window on the linked order(s) — after
+ * DELIVERED and opens the 2-day dispute window on the linked order(s): after
  * which processOrderTimers auto-releases the escrow. Mirrors DepositWatcher.
  *
  * The provider is behind an interface so tests inject a deterministic mock;
@@ -18,7 +18,7 @@ import { advanceOrdersForShipment } from './orders.js';
 export type TrackStatus = 'pre_transit' | 'transit' | 'delivered' | 'failure' | 'unknown';
 
 export interface TrackingProvider {
-  /** Current carrier status for a tracking number. Never throws — returns
+  /** Current carrier status for a tracking number. Never throws: returns
    *  'unknown' on any error so a flaky lookup just retries next tick. */
   getStatus(carrier: string, trackingNumber: string): Promise<TrackStatus>;
 }
@@ -49,7 +49,7 @@ const CARRIER_TOKENS: Record<string, string> = {
 };
 
 /** Best-effort carrier guess from the tracking-number shape. The rescue path for
- *  labels saved before the carrier field was required — without it those shipments
+ *  labels saved before the carrier field was required, without it those shipments
  *  can never be tracked. Only guesses when the pattern is distinctive. */
 export function guessCarrier(tracking: string): string | null {
   const t = tracking.replace(/\s+/g, '').toUpperCase();
@@ -64,14 +64,14 @@ export function guessCarrier(tracking: string): string | null {
 }
 
 /** Resolve the Shippo carrier token from what the operator typed, falling back to
- *  the tracking-number shape. Returns null when we genuinely can't tell — better to
+ *  the tracking-number shape. Returns null when we genuinely can't tell: better to
  *  log loudly than to query the wrong (or the `shippo` TEST) carrier and get 404s. */
 export function resolveCarrierToken(carrier: string | null | undefined, tracking: string): string | null {
   const raw = (carrier ?? '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
   if (raw) {
     const mapped = CARRIER_TOKENS[raw];
     if (mapped) return mapped;
-    // Already an exact Shippo-style token (lowercase, underscores) — pass through.
+    // Already an exact Shippo-style token (lowercase, underscores): pass through.
     const asToken = raw.replace(/\s+/g, '_');
     if (/^[a-z][a-z0-9_]{1,}$/.test(asToken)) return asToken;
   }
@@ -86,10 +86,10 @@ export class ShippoTracker implements TrackingProvider {
   async getStatus(carrier: string, trackingNumber: string): Promise<TrackStatus> {
     const token = resolveCarrierToken(carrier, trackingNumber);
     if (!token) {
-      // Never fall back to Shippo's `shippo` TEST carrier — a real tracking number
+      // Never fall back to Shippo's `shippo` TEST carrier: a real tracking number
       // 404s there, which is exactly how a delivered package stays "not delivered".
       console.warn(
-        `[tracking] no carrier for ${trackingNumber} (carrier=${JSON.stringify(carrier)}) — set the carrier on the label so Shippo can be queried`,
+        `[tracking] no carrier for ${trackingNumber} (carrier=${JSON.stringify(carrier)}): set the carrier on the label so Shippo can be queried`,
       );
       return 'unknown';
     }
@@ -136,7 +136,7 @@ export class MockTrackingProvider implements TrackingProvider {
   }
 }
 
-/** ShippoTracker when SHIPPO_API_KEY is set, otherwise null (tracking disabled — a
+/** ShippoTracker when SHIPPO_API_KEY is set, otherwise null (tracking disabled: a
  *  local/dev deploy without Shippo relies on buyer-confirm or the admin override). */
 export function getTrackingProvider(): TrackingProvider | null {
   const key = process.env.SHIPPO_API_KEY;
@@ -184,7 +184,7 @@ export class ShipmentTracker {
         try {
           const status = await this.provider.getStatus(s.carrier ?? '', s.trackingNumber!);
           if (status !== 'transit' && status !== 'delivered') continue;
-          // First movement: the carrier has the package — mark it shipped (notifies
+          // First movement: the carrier has the package, mark it shipped (notifies
           // the buyer, closes any weekly bundle). This is the ONLY thing that flips a
           // package to SHIPPED in normal operation; the seller never self-attests.
           if (s.status === 'LABEL_CREATED') {

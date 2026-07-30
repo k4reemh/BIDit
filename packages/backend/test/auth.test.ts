@@ -134,7 +134,7 @@ describe('WebSocket tickets', () => {
     expect(typeof ticket).toBe('string');
     expect(ticket.length).toBeGreaterThan(20);
     expect(consumeWsTicket(ticket)).toBe('user-123'); // valid
-    expect(consumeWsTicket(ticket)).toBeNull(); // consumed — can't be replayed
+    expect(consumeWsTicket(ticket)).toBeNull(); // consumed: can't be replayed
   });
 
   it('rejects unknown, empty, or missing tickets', () => {

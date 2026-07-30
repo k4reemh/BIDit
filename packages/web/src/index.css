@@ -1,5 +1,5 @@
 /* ============================================================================
-   BIDit — white & navy design system, orange CTA
+   BIDit: white & navy design system, orange CTA
    ========================================================================== */
 :root {
   --bg: #f4f6fa;
@@ -34,7 +34,7 @@
   --shadow-lg: 0 20px 48px rgba(20, 22, 28, 0.13);
 
   /* Full-width feature bands (Points, seller CTA). Light in light mode, navy in
-     dark — they used to be navy in both, which read as a bug on a light page. */
+     dark: they used to be navy in both, which read as a bug on a light page. */
   --band: #ffffff;
   --band-ink: #0b2447;
   --band-sub: #5c6e88;
@@ -49,7 +49,7 @@
   --font: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
 }
 
-/* Dark mode — "Navy Immersive": deep-navy surfaces, white text, orange stays.
+/* Dark mode: "Navy Immersive": deep-navy surfaces, white text, orange stays.
    Only the color tokens change; the whole token-driven UI follows. */
 :root[data-theme="dark"] {
   --bg: #050a14;
@@ -85,7 +85,7 @@
   --band-chip: rgba(255, 255, 255, 0.06);
   --band-accent: #ff8a33;
 }
-/* Soft-tinted alert/status boxes that were baked light — dark equivalents. */
+/* Soft-tinted alert/status boxes that were baked light: dark equivalents. */
 :root[data-theme="dark"] .auth__error,
 :root[data-theme="dark"] .ob__error,
 :root[data-theme="dark"] .bp__reject,
@@ -342,7 +342,7 @@ img { display: block; max-width: 100%; }
   .browse__q { max-width: 100%; }
 }
 
-/* how it works — editorial numbered steps, no icon cards */
+/* how it works: editorial numbered steps, no icon cards */
 .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
 .how__step { padding-top: 18px; border-top: 2px solid var(--line); transition: border-color 0.25s ease; }
 .how__step:hover { border-top-color: var(--accent); }
@@ -394,7 +394,7 @@ img { display: block; max-width: 100%; }
   background: rgba(23, 24, 28, 0.35); backdrop-filter: blur(4px); animation: risein 0.18s ease; }
 .modal { position: relative; width: 100%; max-width: 412px; padding: 30px; border-radius: var(--r-xl);
   background: var(--surface); box-shadow: var(--shadow-lg); animation: risein 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-  /* Never taller than the viewport — long content (e.g. a photo preview in the
+  /* Never taller than the viewport: long content (e.g. a photo preview in the
      add-item form) scrolls inside the modal instead of pushing it off-screen. */
   max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow-y: auto; overscroll-behavior: contain; }
 .modal__close { position: absolute; top: 16px; right: 18px; font-size: 23px; line-height: 1; color: var(--faint); }
@@ -1101,7 +1101,7 @@ img { display: block; max-width: 100%; }
 .chat { display: flex; flex-direction: column; margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
 .chat__head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line-2); font-weight: 650; font-size: 14px; }
 .chat__head svg { color: var(--accent-strong); }
-/* Fixed height (not max-height) so the panel — and the page around it — never
+/* Fixed height (not max-height) so the panel (and the page around it) never
    resizes as messages arrive; the feed scrolls internally. overscroll-behavior
    keeps wheel/touch scrolling inside the feed from chaining to the page. */
 .chat__feed { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; height: 340px; overflow-y: auto; overscroll-behavior: contain; }
@@ -1227,7 +1227,7 @@ img { display: block; max-width: 100%; }
   .watch__side { position: static; }
 }
 
-/* giveaway reveal — retuned proportions so the spotlight frames the avatar, not the name */
+/* giveaway reveal: retuned proportions so the spotlight frames the avatar, not the name */
 .gvr__reel { height: 122px; }
 .gvr__strip { top: 14px; }
 .gvr__tile { width: 96px; gap: 8px; }
@@ -1318,7 +1318,7 @@ img { display: block; max-width: 100%; }
   min-height: 128px; transition: border-color 0.14s, background 0.14s; overflow: hidden; }
 .imgup:hover { border-color: rgba(23,24,28,0.22); background: var(--surface-3); }
 .imgup--drag { border-color: var(--accent); background: var(--accent-soft); }
-/* With a photo attached the box locks to a thumbnail height — a tall upload
+/* With a photo attached the box locks to a thumbnail height: a tall upload
    must never stretch the form (it blew the add-item modal past the viewport). */
 .imgup--has { border-style: solid; cursor: default; height: 200px; }
 .imgup--compact { min-height: 0; width: 44px; height: 44px; flex: none; border-radius: 10px; }
@@ -1595,7 +1595,7 @@ img { display: block; max-width: 100%; }
 .adm-pool .bad { color: var(--red); }
 
 /* ---- onboarding (split-screen showpiece) ---- */
-/* Buyer onboarding — a single centered popup card over the dimmed site (was a
+/* Buyer onboarding: a single centered popup card over the dimmed site (was a
    full-screen two-column split, which read as broken at wide viewports). */
 .obx { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px;
   background: rgba(5, 9, 18, 0.62); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
@@ -1611,7 +1611,7 @@ img { display: block; max-width: 100%; }
 .obx__skip:hover { color: var(--ink); }
 /* Balances the logo so the progress segments stay centred in the header. */
 .obx__headpad { width: 74px; }
-/* Per-step "Add later" — sits left of the primary action in the footer. */
+/* Per-step "Add later": sits left of the primary action in the footer. */
 .obx__later { margin-left: auto; margin-right: 4px; font-size: 14px; font-weight: 600; color: var(--muted); }
 .obx__later:hover { color: var(--ink); }
 .obx__later:disabled { opacity: 0.5; cursor: default; }
@@ -1705,7 +1705,7 @@ img { display: block; max-width: 100%; }
 .promo-card__meta b { font-variant-numeric: tabular-nums; color: var(--ink); }
 
 /* ============================================================================
-   Mobile — app-style bottom nav, safe areas, and phone polish
+   Mobile: app-style bottom nav, safe areas, and phone polish
    ========================================================================== */
 /* Bottom tab bar: hidden on desktop, shown on phones. */
 .tabbar { display: none; }
@@ -1754,7 +1754,7 @@ img { display: block; max-width: 100%; }
   .hero__cta .btn { width: 100%; justify-content: center; }
   .hero__trust { flex-wrap: wrap; gap: 8px 14px; }
 
-  /* Live grid — 2-up like every live marketplace; one giant card wastes the fold. */
+  /* Live grid: 2-up like every live marketplace; one giant card wastes the fold. */
   .live-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .live-card__meta { padding: 10px 11px 12px; }
   .live-card__title { font-size: 13px; }
@@ -1922,7 +1922,7 @@ img { display: block; max-width: 100%; }
 .pts-band { position: relative; overflow: hidden; display: grid; grid-template-columns: 1.35fr 1fr; gap: 30px; align-items: center;
   padding: 44px 46px; border-radius: var(--r-xl); background: var(--band); color: var(--band-ink);
   border: 1px solid var(--band-line); }
-/* Subtle on white, richer on navy — the same 34% wash reads muddy in light mode. */
+/* Subtle on white, richer on navy: the same 34% wash reads muddy in light mode. */
 .pts-band__glow { position: absolute; right: -140px; top: -140px; width: 420px; height: 420px; border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 106, 0, 0.12), transparent 65%); pointer-events: none; }
 :root[data-theme="dark"] .pts-band__glow { background: radial-gradient(circle, rgba(255, 106, 0, 0.34), transparent 65%); }
@@ -2087,7 +2087,7 @@ img { display: block; max-width: 100%; }
   font-family: var(--font); font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
   color: var(--muted); background: var(--surface-3); }
 
-/* Buyer can't ship without a delivery address — say so before they try. */
+/* Buyer can't ship without a delivery address: say so before they try. */
 .ship-needaddr { display: flex; align-items: center; gap: 14px; }
 .ship-needaddr > div { flex: 1; }
 .ship-needaddr p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; }

@@ -99,7 +99,7 @@ describe('mergeCreatorSignature', () => {
       publicKey: creator.publicKey.toBase58(),
       signatureB58: bs58.encode(sig),
     });
-    // txSig is the fee payer's (creator's) signature — slot 0.
+    // txSig is the fee payer's (creator's) signature: slot 0.
     expect(txSig).toBe(bs58.encode(sig));
     // The merged tx re-parses and carries both signatures.
     const merged = VersionedTransaction.deserialize(raw);
@@ -144,7 +144,7 @@ describe('mergeCreatorSignature', () => {
     const mint = Keypair.generate();
     const { txB64 } = prepared(creator, mint);
 
-    // A different tx (new mint) fully signed by the creator — must not pass.
+    // A different tx (new mint) fully signed by the creator: must not pass.
     const other = buildCreateTx(creator, Keypair.generate());
     other.sign([creator]);
     const signedTxB64 = Buffer.from(other.serialize()).toString('base64');

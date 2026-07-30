@@ -8,9 +8,9 @@
  *  - EXTERNAL: the boundary between BIDit and the outside world (bank/chain).
  *    Deposits credit a user and debit EXTERNAL; withdrawals do the reverse.
  *    Its balance is the negative of all money currently inside the system.
- *  - PLATFORM: the buyback pool — collects the 4% buyback cut from every settled
+ *  - PLATFORM: the buyback pool, collects the 4% buyback cut from every settled
  *    sale (the "buyback-pending" tally that backs the buyback wallet).
- *  - FEE: the operator fee pool — collects the 1% fee cut plus all shipping fees
+ *  - FEE: the operator fee pool, collects the 1% fee cut plus all shipping fees
  *    buyers pay (backs the fee wallet).
  *  - ESCROW: holds a winner's committed funds between lock and release/refund.
  */
@@ -26,7 +26,7 @@ export type SystemAccountId =
 
 /**
  * The escrow wallet. v1 (DevWalletEscrow) is fully simulated and moves NO real
- * funds — this address is recorded as a reference only. The on-chain ProgramEscrow
+ * funds: this address is recorded as a reference only. The on-chain ProgramEscrow
  * (a later chunk) is where it becomes a real PDA/wallet.
  */
 export const ESCROW_WALLET_ADDRESS = '3BbGvG7ZxXQrodaMWR2vbjVr3431D1V8K8kFPAvgJ76D';

@@ -1,5 +1,5 @@
 /**
- * Giveaways (Whatnot-style) — the authoritative server logic.
+ * Giveaways (Whatnot-style): the authoritative server logic.
  *
  * A seller opens a giveaway during a live stream; viewers enter with one tap.
  * Two kinds gate who may enter:
@@ -45,7 +45,7 @@ export async function openGiveaway(
 ) {
   // Bound + de-fang the seller-controlled prize: it's broadcast to every viewer's
   // extension. Rendering is now textContent (not innerHTML), so this is belt-and-
-  // suspenders — strip control chars and cap the length so it can't be abused as a
+  // suspenders: strip control chars and cap the length so it can't be abused as a
   // payload carrier or blow up the broadcast.
   const prize = (input.prize ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, PRIZE_MAX_LEN);
   if (!prize) throw new Error('giveaway needs a prize');
@@ -73,7 +73,7 @@ export async function openGiveaway(
   });
 }
 
-/** Whether a user may enter — BUYER_ONLY requires a purchase from this seller. */
+/** Whether a user may enter: BUYER_ONLY requires a purchase from this seller. */
 export async function isEligible(
   giveaway: { sellerId: string; kind: string },
   userId: string,
@@ -108,14 +108,14 @@ export async function enterGiveaway(
     select: { id: true },
   });
   if (!existing) {
-    // The unique index makes concurrent double-taps safe — swallow the race.
+    // The unique index makes concurrent double-taps safe: swallow the race.
     await prisma.giveawayEntry.create({ data: { giveawayId, userId } }).catch(() => {});
   }
   const count = await prisma.giveawayEntry.count({ where: { giveawayId } });
   return { ok: true, count, alreadyEntered: existing !== null };
 }
 
-/** Ordered entrants (stable by createdAt, id) with handles — used for the roll. */
+/** Ordered entrants (stable by createdAt, id) with handles: used for the roll. */
 export async function listEntrants(
   giveawayId: string,
   prisma: PrismaClient = defaultPrisma,
@@ -152,7 +152,7 @@ export type DrawResult =
 /**
  * Draw the winner from the committed seed. Idempotent: entry is frozen once the
  * window closes, so recomputing from the stored seed always yields the same
- * winner — a repeat draw simply re-derives and re-broadcasts the same result.
+ * winner: a repeat draw simply re-derives and re-broadcasts the same result.
  */
 export async function drawGiveaway(
   giveawayId: string,

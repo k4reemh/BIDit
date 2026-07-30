@@ -72,7 +72,7 @@ export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 /** Revoke this session server-side (log out everywhere), then it's up to the
- *  caller to clear the local token. Best-effort — never blocks signing out. */
+ *  caller to clear the local token. Best-effort, never blocks signing out. */
 export const logout = () =>
   req<{ ok: boolean }>('/auth/logout', { method: 'POST', body: '{}' }).catch(() => undefined);
 
@@ -81,7 +81,7 @@ export const logout = () =>
 export const eraseMyData = () => req<{ ok: boolean }>('/me/erase', { method: 'POST', body: '{}' });
 
 /** Display a USDC decimal string with exactly 2 decimals ("5.5"→"5.50", "25"→"25.00"),
- *  rounded to the nearest cent — for shipping figures and wallet balances. */
+ *  rounded to the nearest cent, for shipping figures and wallet balances. */
 export const money2 = (s: string | number) => Number(s).toFixed(2);
 
 /** API failure carrying the backend's machine-readable code (when it sends one)
@@ -231,7 +231,7 @@ export const verifySellerAdmin = (sellerUserId: string) =>
   req<{ ok: boolean }>('/admin/verify-seller', { method: 'POST', body: JSON.stringify({ sellerUserId }) });
 
 /** Admin-only: force-move a pump.fun coin to a seller (the only way a claimed coin
- *  changes hands — self-serve claiming is first-claim-wins). */
+ *  changes hands: self-serve claiming is first-claim-wins). */
 export const adminReassignCoin = (sellerUserId: string, coinAddress: string) =>
   req<{ ok: boolean }>('/admin/seller-coin', { method: 'POST', body: JSON.stringify({ sellerUserId, coinAddress }) });
 
@@ -311,7 +311,7 @@ export const getLabelQueue = () => req<LabelQueueRow[]>('/admin/label-queue');
 export const createLabel = (shipmentId: string, labelUrl: string, trackingNumber: string, carrier?: string) =>
   req<Shipment>('/admin/shipment/label', { method: 'POST', body: JSON.stringify({ shipmentId, labelUrl, trackingNumber, carrier }) });
 
-// Admin test controls — drive the shipment pipeline by hand (Shippo does this in prod).
+// Admin test controls: drive the shipment pipeline by hand (Shippo does this in prod).
 export interface InflightShipment {
   id: string;
   status: string; // LABEL_CREATED | SHIPPED | DELIVERED
@@ -403,7 +403,7 @@ export const setSellerCoin = (coinAddress: string) =>
 // ---- seller coin auto-create ("<handle>'s BIDit Livestream") ---------------
 export interface CoinCreatePrepared {
   attemptId: string;
-  /** Null on the default (off-chain) path — pump.fun assigns the mint at create. */
+  /** Null on the default (off-chain) path: pump.fun assigns the mint at create. */
   mint: string | null;
   mode: 'offchain' | 'pumpportal' | 'mock' | 'mock-offchain';
   /** What the wallet must sign: a plain pump.fun sign-in message (default, free
@@ -601,7 +601,7 @@ export interface Purchase {
   image: string | null;
   amount: string;
   stage: 'to_ship' | 'in_transit' | 'delivered';
-  /** Won at auction (as opposed to bought outright) — gates "I just won" sharing. */
+  /** Won at auction (as opposed to bought outright): gates "I just won" sharing. */
   won?: boolean;
   tracking: string | null;
   carrier: string | null;
@@ -699,7 +699,7 @@ export const withdraw = (amount: string, toAddress: string) =>
   });
 
 /** Restore the signed-in user from a saved token (called on app load). Only a
- *  real 401 clears the token — a transient/network error keeps you signed in. */
+ *  real 401 clears the token: a transient/network error keeps you signed in. */
 export async function restore(): Promise<Session | null> {
   const t = getToken();
   if (!t) return null;
@@ -712,6 +712,6 @@ export async function restore(): Promise<Session | null> {
     if (!r.ok) return null;
     return (await r.json()) as Session;
   } catch {
-    return null; // network error — keep the token, retry next load
+    return null; // network error: keep the token, retry next load
   }
 }

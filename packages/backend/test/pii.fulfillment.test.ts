@@ -26,7 +26,7 @@ describe('PII encryption across the shipping flow', () => {
     });
     const buyer = await makeFundedUser('100');
 
-    // Write the address through the real profile path — it must be encrypted at rest.
+    // Write the address through the real profile path: it must be encrypted at rest.
     await updateProfile(buyer.userId, { shippingAddress: ADDR }, prisma);
     const urow = await prisma.user.findUniqueOrThrow({ where: { id: buyer.userId } });
     expect(typeof urow.shippingAddress).toBe('string');

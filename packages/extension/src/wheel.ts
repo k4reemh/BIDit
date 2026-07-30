@@ -1,10 +1,10 @@
 /**
- * The wheel-spin spotlight — a full-viewport centred overlay (its own shadow
+ * The wheel-spin spotlight: a full-viewport centred overlay (its own shadow
  * root, doesn't touch the page or the panel) that plays the randomizer reel.
  *
  * It is a pure replay of the server's RANDOMIZER_SPIN: the reel, the landing
  * index and the duration all come from the server, and the position is computed
- * from `startsAt` corrected for clock skew — so the seller and every viewer see
+ * from `startsAt` corrected for clock skew, so the seller and every viewer see
  * the identical reel decelerate onto the identical prize, in lockstep. A late
  * joiner picks up mid-spin and still lands with everyone else. When it settles
  * it hands off to the win celebration via `onLand`.

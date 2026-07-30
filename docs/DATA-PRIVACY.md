@@ -1,4 +1,4 @@
-# Data privacy — PII encryption, erasure & retention
+# Data privacy: PII encryption, erasure & retention
 
 ## Personal data we store
 
@@ -21,14 +21,14 @@ encryption. A leaked DB dump is therefore useless without the key.
   (passthrough). Turning the key on encrypts *new* writes; pre-existing plaintext
   rows keep working (they're re-encrypted next time they're written).
 - **Keep the key stable.** Once data is encrypted, losing/rotating the key makes
-  those rows unreadable — decryption fails closed (returns null), never garbage.
+  those rows unreadable: decryption fails closed (returns null), never garbage.
 - Covered fields: `User.shippingAddress`, `Shipment.shipTo`, `Shipment.privateLeg2`.
 
 ## Right to erasure
 
 `POST /me/erase` (authenticated; UI: Profile → "Delete my account & data")
-permanently wipes the caller's personal data — email, name, avatar, bio, saved
-shipping address, and login credentials (password + wallet) — anonymises the
+permanently wipes the caller's personal data: email, name, avatar, bio, saved
+shipping address, and login credentials (password + wallet): anonymises the
 handle to `deleted_<random>`, and revokes all sessions. The row itself is kept so
 the double-entry ledger and order history stay referentially intact (financial
 records are not deleted). Address snapshots on in-flight shipments are left so the

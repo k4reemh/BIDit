@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BIDit — dev test page</title>
+    <title>BIDit: dev test page</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -50,7 +50,7 @@
       <div class="card hide" id="meCard">
         <div class="row" style="justify-content:space-between">
           <div>Signed in as <b id="meHandle"></b></div>
-          <div class="bal">avail <b id="avail">—</b> · settled <b id="settled">—</b></div>
+          <div class="bal">avail <b id="avail">-</b> · settled <b id="settled">-</b></div>
         </div>
         <div class="row" style="margin-top:10px">
           <button class="secondary" id="depositBtn">Deposit $100</button>
@@ -60,18 +60,18 @@
 
       <div class="card hide" id="auctionCard">
         <div class="row" style="justify-content:space-between">
-          <span class="pill" id="status">—</span>
-          <span class="timer" id="timer">—</span>
+          <span class="pill" id="status">-</span>
+          <span class="timer" id="timer">-</span>
         </div>
         <div class="grid">
-          <div><div class="label">Current bid</div><div class="big" id="currentBid">—</div></div>
-          <div><div class="label">Leader</div><div class="big lead" id="leader">—</div></div>
+          <div><div class="label">Current bid</div><div class="big" id="currentBid">-</div></div>
+          <div><div class="label">Leader</div><div class="big lead" id="leader">-</div></div>
         </div>
         <div class="row">
           <input id="amount" type="number" step="0.01" placeholder="amount" />
           <button id="bidBtn">Bid</button>
         </div>
-        <div class="muted" style="margin-top:6px">min next bid: $<span id="minNext">—</span></div>
+        <div class="muted" style="margin-top:6px">min next bid: $<span id="minNext">-</span></div>
         <div id="reject"></div>
         <div id="feed"></div>
       </div>
@@ -141,8 +141,8 @@
             auctionId = m.auctionId;
             $('auctionCard').classList.remove('hide');
             $('status').textContent = m.status;
-            $('currentBid').textContent = m.currentBid ? '$' + m.currentBid : '—';
-            $('leader').textContent = m.leaderHandle || '—';
+            $('currentBid').textContent = m.currentBid ? '$' + m.currentBid : '-';
+            $('leader').textContent = m.leaderHandle || '-';
             $('minNext').textContent = m.minNextBid;
             if (!$('amount').value || document.activeElement !== $('amount')) $('amount').value = m.minNextBid;
             endsAt = m.endsAt;
@@ -156,7 +156,7 @@
           case 'AUCTION_CLOSED':
             endsAt = null;
             $('timer').textContent = 'CLOSED';
-            log(m.winnerHandle ? `SOLD to ${m.winnerHandle} for $${m.amount}` : 'closed — no sale');
+            log(m.winnerHandle ? `SOLD to ${m.winnerHandle} for $${m.amount}` : 'closed, no sale');
             break;
           case 'BALANCE_UPDATE':
             $('avail').textContent = '$' + m.available;

@@ -12,7 +12,7 @@ import {
 const POOL: WheelEntry[] = [
   { label: 'Destined Rivals ETB', tier: 'Box' },
   { label: 'Sealed Booster Box', tier: 'Box' },
-  { label: 'Charizard ex — Alt Art', tier: 'Chase' },
+  { label: 'Charizard ex, Alt Art', tier: 'Chase' },
   { label: 'Single Booster Pack', tier: 'Pack' },
 ];
 
@@ -30,7 +30,7 @@ describe('randomizer: weightedPick', () => {
     expect(weightedPick(POOL, 5)).toBe(POOL.length - 1);
   });
 
-  it('respects weights — a heavier slot owns a larger share of the range', () => {
+  it('respects weights: a heavier slot owns a larger share of the range', () => {
     const weighted: WheelEntry[] = [
       { label: 'common', weight: 8 },
       { label: 'rare', weight: 2 },
@@ -124,7 +124,7 @@ describe('randomizer: normalizeWheelEntries', () => {
     expect('tier' in out[0]!).toBe(false);
   });
 
-  it('caps the wheel size and clamps label length (M9 — realtime-DoS guard)', () => {
+  it('caps the wheel size and clamps label length (M9: realtime-DoS guard)', () => {
     const huge = Array.from({ length: 500 }, (_, i) => ({ label: `p${i}` }));
     expect(normalizeWheelEntries(huge).length).toBe(64); // MAX_WHEEL_ENTRIES
     const longLabel = normalizeWheelEntries([{ label: 'z'.repeat(1000) }]);

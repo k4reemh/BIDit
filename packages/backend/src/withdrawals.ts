@@ -1,10 +1,10 @@
 /**
- * Withdrawal rail — durable settlement state machine.
+ * Withdrawal rail: durable settlement state machine.
  *
  * Moving USDC out crosses two systems that cannot commit together: the ledger
  * (Postgres) and the chain (Solana). The naive "debit, send, and reverse the
- * debit if send throws" is unsafe: a send can *time out ambiguously* — the
- * transaction actually lands on-chain but the ack is lost — and blindly reversing
+ * debit if send throws" is unsafe: a send can *time out ambiguously*, the
+ * transaction actually lands on-chain but the ack is lost, and blindly reversing
  * then hands the user their USDC AND their balance back (a double-spend that
  * drains the treasury).
  *
@@ -16,7 +16,7 @@
  *                                 → (long outage)          → NEEDS_REVIEW[debit retained, operator]
  *
  * The debit is reversed ONLY when the chain positively reports the transfer is
- * dead — the tx erred on-chain, or its blockhash expired without it landing (see
+ * dead: the tx erred on-chain, or its blockhash expired without it landing (see
  * ChainClient.getTransferStatus). An ambiguous / still-in-flight send is NEVER
  * reversed; it is left SUBMITTED for the reconciler, which re-checks until the
  * chain gives a definite answer. Reversal is idempotent (ledger idempotency key +
@@ -34,7 +34,7 @@ import { debit, credit, getOrCreateUserAccount } from './ledger.js';
 import type { ChainClient } from './chain/index.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Statuses that represent money that is out or may still be out — everything
+/** Statuses that represent money that is out or may still be out: everything
  *  except FAILED (which has been reversed). Used for the cap and for reconcile. */
 const INFLIGHT = ['PENDING', 'SUBMITTED', 'CONFIRMED', 'NEEDS_REVIEW'] as const;
 /** Statuses still awaiting a definite on-chain answer. */
@@ -71,7 +71,7 @@ export function dailyWithdrawCapMicros(): bigint {
 }
 
 /** USDC a user has committed to withdrawing in the last 24h. Counts everything
- *  in-flight or confirmed; only FAILED (reversed) rows are excluded — so a stuck
+ *  in-flight or confirmed; only FAILED (reversed) rows are excluded, so a stuck
  *  or ambiguous withdrawal keeps consuming the cap until it is proven dead. */
 export async function withdrawnLast24h(
   userId: string,
@@ -91,14 +91,14 @@ export async function requestWithdrawal(
   chain: ChainClient,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<Withdrawal> {
-  // 1. Destination must be a valid on-chain address — before any ledger movement.
+  // 1. Destination must be a valid on-chain address: before any ledger movement.
   if (!chain.isValidAddress(toAddress)) {
     throw new WithdrawalError('That doesn’t look like a valid Solana address.');
   }
 
   // 1b. The destination must be EXTERNAL. Withdrawing into an operator wallet is an
   //     on-chain self-transfer (no funds leave) while the ledger still debits the
-  //     user — silently corrupting the treasury↔Σbalances reconciliation. Withdrawing
+  //     user: silently corrupting the treasury↔Σbalances reconciliation. Withdrawing
   //     into a user deposit address would round-trip back through the deposit sweep.
   //     Both are internal addresses and never valid withdrawal targets.
   const operatorWallets = (['treasury', 'escrow', 'buyback', 'fee'] as const).map((w) => chain.walletAddress(w));
@@ -112,7 +112,7 @@ export async function requestWithdrawal(
   //    cap. A transaction-scoped advisory lock keyed on the user serializes their
   //    withdrawals, so the total is re-read (seeing any just-created PENDING row)
   //    and the new row is created under the same lock. (Overspend is separately
-  //    prevented by the debit's account lock below — this only guards the cap.)
+  //    prevented by the debit's account lock below: this only guards the cap.)
   const cap = dailyWithdrawCapMicros();
   const accountId = await getOrCreateUserAccount(userId, prisma);
   const withdrawal = await prisma.$transaction(async (tx) => {
@@ -130,7 +130,7 @@ export async function requestWithdrawal(
 
   // 3. Debit first (this enforces the no-overspend / holds-respected guarantee).
   //    Throws InsufficientFundsError if available < amount. Nothing was sent and
-  //    the debit never posted, so there is nothing to reverse — just mark FAILED.
+  //    the debit never posted, so there is nothing to reverse, just mark FAILED.
   try {
     await debit(
       {
@@ -203,14 +203,14 @@ export async function settleWithdrawal(
     if (fate === 'failed') {
       return reverseWithdrawal(current, accountId, 'chain reported transfer dead', prisma);
     }
-    // 'unknown' — still in flight. Wait a beat and re-check (bounded).
+    // 'unknown', still in flight. Wait a beat and re-check (bounded).
     if (i < attempts - 1) await sleep(INLINE_SETTLE_DELAY_MS);
   }
   return current;
 }
 
 /**
- * Reverse a withdrawal's debit (credit the funds back) and mark it FAILED —
+ * Reverse a withdrawal's debit (credit the funds back) and mark it FAILED:
  * idempotently. Called ONLY when the transfer is proven dead (pre-broadcast throw,
  * or getTransferStatus === 'failed'). Credits BEFORE flipping status so a crash in
  * between just leaves the row for the reconciler to finish; the ledger idempotency
@@ -244,7 +244,7 @@ async function reverseWithdrawal(
 }
 
 /**
- * Finalizes in-flight withdrawals against the chain — the durable half of the
+ * Finalizes in-flight withdrawals against the chain: the durable half of the
  * state machine. Mirrors DepositWatcher: server-driven on an interval, and run
  * once on startup so any withdrawal that was mid-flight across a crash/restart is
  * resolved (confirmed, or reversed if the chain proves it never landed) instead of
@@ -273,7 +273,7 @@ export class WithdrawalReconciler {
       this.timer = null;
     }
   }
-  /** Startup recovery alias — resolve anything left in flight by a prior run. */
+  /** Startup recovery alias: resolve anything left in flight by a prior run. */
   reconcile(): Promise<number> {
     return this.tick();
   }

@@ -1,5 +1,5 @@
 /**
- * Notifications — one place to tell a user something happened, in-app (a row they
+ * Notifications, one place to tell a user something happened, in-app (a row they
  * poll for the bell) and by email (Resend, best-effort). Safe to call from money
  * paths: it never throws, and the email is fired in the background so it can't
  * slow a settlement.
@@ -29,7 +29,7 @@ export async function notify(input: NotifyInput, prisma: PrismaClient = defaultP
     return;
   }
   if (input.email === false) return;
-  // Fire the email in the background — never block or throw in the caller.
+  // Fire the email in the background, never block or throw in the caller.
   void (async () => {
     try {
       const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } });

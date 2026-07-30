@@ -19,7 +19,7 @@ beforeEach(async () => {
 
 /** Register + issue a code, returning the user id. The code itself is never
  *  readable (only its HMAC is stored), so tests brute-force the 6-digit space
- *  against `verifyEmailCode` only where they must — otherwise they assert on
+ *  against `verifyEmailCode` only where they must: otherwise they assert on
  *  behaviour that doesn't need the plaintext. */
 async function newUnverified(email = 'buyer@example.com') {
   const user = await registerWithEmail({ email, password: 'hunter2pw' });

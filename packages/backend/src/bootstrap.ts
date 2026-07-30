@@ -2,7 +2,7 @@ import { SYSTEM_ACCOUNT_IDS, AccountKind } from '@bidit/shared';
 import type { PrismaClient } from './db.js';
 
 /**
- * Ensure the two singleton system accounts exist. Idempotent — safe to call on
+ * Ensure the two singleton system accounts exist. Idempotent: safe to call on
  * every boot and in test setup.
  */
 export async function ensureSystemAccounts(prisma: PrismaClient): Promise<void> {

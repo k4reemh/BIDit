@@ -32,7 +32,7 @@ describe('session revocation (durable)', () => {
     // Simulate a revocation from an earlier run: persisted to the DB only, not in
     // this process's in-memory map yet.
     await prisma.user.update({ where: { id: u.userId }, data: { sessionsValidFrom: new Date() } });
-    expect(verifySession(tok)).toBe(u.userId); // stale — not hydrated, still passes
+    expect(verifySession(tok)).toBe(u.userId); // stale, not hydrated, still passes
 
     const n = await loadSessionRevocations(prisma);
     expect(n).toBeGreaterThanOrEqual(1);

@@ -2,7 +2,7 @@ import { XLogo } from '../icons';
 
 /**
  * "Post to X" for a win. Opens X's compose window with the post pre-filled;
- * nothing is posted on the user's behalf and no account is connected — they see
+ * nothing is posted on the user's behalf and no account is connected: they see
  * the text and choose to send it.
  *
  * The current page rides along as the link, so on a watch page the post points
@@ -18,7 +18,7 @@ export default function ShareOnX({
   item: string;
   kind: 'auction' | 'giveaway';
   /** Link to attach. Defaults to the current page, which is right on a watch
-   *  page but wrong on a private account page — pass the site root there. */
+   *  page but wrong on a private account page: pass the site root there. */
   url?: string;
   className?: string;
 }) {

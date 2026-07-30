@@ -4,7 +4,7 @@
  * without BIDIT_PII_KEY. AES-256-GCM.
  *
  * Values are stored as a tagged base64 string ("encv1:..."). Anything that isn't
- * tagged — legacy plaintext written before encryption was enabled, or null —
+ * tagged: legacy plaintext written before encryption was enabled, or null
  * passes through unchanged, so this can be turned on WITHOUT a migration (old rows
  * keep working; new writes get encrypted). Keep BIDIT_PII_KEY safe and stable:
  * once data is encrypted, removing the key makes it unreadable (fails closed).
@@ -49,7 +49,7 @@ export function decryptPii<T = unknown>(value: unknown): T | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string' || !value.startsWith(PREFIX)) return value as T; // legacy plaintext
   const k = key();
-  if (!k) return null; // encrypted but unreadable — fail closed
+  if (!k) return null; // encrypted but unreadable: fail closed
   try {
     const buf = Buffer.from(value.slice(PREFIX.length), 'base64');
     const iv = buf.subarray(0, 12);

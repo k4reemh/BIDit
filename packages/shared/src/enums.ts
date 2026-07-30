@@ -90,7 +90,7 @@ export const BidStatus = asEnum({
 export type BidStatus = (typeof BidStatus)[keyof typeof BidStatus];
 
 /**
- * Order lifecycle (Chunk 5 — delivery-gated escrow, Whatnot's model):
+ * Order lifecycle (Chunk 5: delivery-gated escrow, Whatnot's model):
  *   PENDING_SETTLEMENT -> LOCKED -> SHIPPED -> DELIVERED -> DISPUTE_WINDOW -> RELEASED
  *                           |                                    |
  *                        CANCELED (no-ship timeout)          DISPUTED -> REFUNDED | RELEASED
@@ -111,7 +111,7 @@ export const OrderStatus = asEnum({
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
 /**
- * Lifecycle of a hold — funds locked because a user is the current high bidder.
+ * Lifecycle of a hold: funds locked because a user is the current high bidder.
  *   ACTIVE   -> currently locked (the leader's stake)
  *   RELEASED -> freed because the user was outbid (or the auction was canceled)
  *   CAPTURED -> converted into a real ledger movement at settlement (Chunk 5)

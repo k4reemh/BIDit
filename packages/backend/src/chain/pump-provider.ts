@@ -2,25 +2,25 @@
  * Pump.fun coin-creation provider seam.
  *
  * BIDit auto-creates a seller's livestream coin ("<handle>'s BIDit Livestream")
- * with the SELLER as creator — pump.fun only offers "Start livestream" to the
+ * with the SELLER as creator: pump.fun only offers "Start livestream" to the
  * coin's creator, so the coin must be theirs, not ours. Two shapes exist, and
  * they are different enough that the type is a union rather than one interface
  * with optional halves:
  *
- *  - kind 'offchain' (DEFAULT on mainnet) — mirrors what pump.fun's own /create
+ *  - kind 'offchain' (DEFAULT on mainnet): mirrors what pump.fun's own /create
  *    page does for a 0-SOL launch: sign in with the wallet, upload metadata to
  *    their IPFS, POST the coin. No transaction, no chain, no fee, and the wallet
  *    prompt is a plain message signature, so no "this dApp may be malicious"
  *    warning. The coin lives on pump.fun until its first buyer pays to deploy it
- *    — which is all a stream-only coin ever needs.
+ *, which is all a stream-only coin ever needs.
  *
- *  - kind 'tx' — builds a real on-chain create transaction the seller signs.
+ *  - kind 'tx': builds a real on-chain create transaction the seller signs.
  *    Costs dust in network fees and makes wallets show the third-party-tx
  *    warning, so it is NOT selected automatically any more; it stays available
  *    behind BIDIT_PUMP_PROVIDER=pumpportal as an escape hatch.
  *
  * Implementations: MockPumpCreateProvider / MockOffchainProvider (dev, test,
- * preview — no network), PumpOffchainProvider, PumpPortalProvider.
+ * preview, no network), PumpOffchainProvider, PumpPortalProvider.
  */
 
 export class PumpCreateError extends Error {
@@ -56,7 +56,7 @@ export interface PreparedCreate {
   metadataUri: string | null;
   /** Serialized create tx, partially signed by the mint key (base64; tx kind only). */
   txB64: string | null;
-  /** Base58 of the tx message bytes — exactly what the creator wallet signs. */
+  /** Base58 of the tx message bytes: exactly what the creator wallet signs. */
   messageB58: string | null;
   /** Blockhash expiry height captured when the tx was (re)built. */
   lastValidBlockHeight: bigint | null;
@@ -68,14 +68,14 @@ export interface PreparedCreate {
 }
 
 /** The creator's signature, in one of two shapes: the raw ed25519 signature over
- *  the tx message (primary — the browser never parses the tx), or a fully signed
+ *  the tx message (primary: the browser never parses the tx), or a fully signed
  *  serialized tx (fallback lane for wallet APIs that only return whole txs). */
 export type CreatorProof =
   | { publicKey: string; signatureB58: string }
   | { signedTxB64: string };
 
 export interface CreateInput {
-  /** Base58 wallet that signs — as creator/fee-payer (tx) or as the pump.fun
+  /** Base58 wallet that signs, as creator/fee-payer (tx) or as the pump.fun
    *  account the coin is created under (off-chain). Null in mock mode. */
   creatorWallet: string | null;
   name: string;
@@ -83,7 +83,7 @@ export interface CreateInput {
   /** Built per-mint because the coin's description links to its own watch page.
    *  Off-chain creates don't know the mint yet, so they pass ''. */
   describe: (mint: string) => string;
-  /** The metadata's website field — also per-mint (the coin's watch URL). */
+  /** The metadata's website field: also per-mint (the coin's watch URL). */
   websiteFor?: (mint: string) => string;
   imagePng: Buffer | null;
 }
@@ -103,7 +103,7 @@ export interface TxCreateProvider extends BaseCreateProvider {
     raw: Uint8Array;
     txSig: string;
   };
-  /** Broadcast. Throwing means "definitely not sent" — after a successful return
+  /** Broadcast. Throwing means "definitely not sent": after a successful return
    *  the tx may land even if we never hear back (ack-loss is not failure). */
   broadcast(raw: Uint8Array): Promise<void>;
   getTxStatus(txSig: string, lastValidBlockHeight: bigint | null): Promise<'confirmed' | 'failed' | 'unknown'>;
@@ -114,14 +114,14 @@ export interface TxCreateProvider extends BaseCreateProvider {
 
 /** The seller's proof that they hold the wallet: an ed25519 signature over
  *  pump.fun's sign-in text. It grants a pump.fun session for that wallet, so it
- *  is handled like a credential — used once, in memory, never stored or logged. */
+ *  is handled like a credential: used once, in memory, never stored or logged. */
 export interface LoginProof {
   publicKey: string;
   signature: Uint8Array;
   timestamp: bigint;
 }
 
-/** Off-chain: no transaction at all — sign in as the seller and POST the coin. */
+/** Off-chain: no transaction at all, sign in as the seller and POST the coin. */
 export interface OffchainCreateProvider extends BaseCreateProvider {
   readonly kind: 'offchain';
   readonly mode: 'offchain' | 'mock-offchain';
@@ -133,7 +133,7 @@ export interface OffchainCreateProvider extends BaseCreateProvider {
 export type PumpCreateProvider = TxCreateProvider | OffchainCreateProvider;
 
 // ---------------------------------------------------------------------------
-// Mock — dev/test/preview. No chain, no Phantom: prepare returns a deterministic
+// Mock: dev/test/preview. No chain, no Phantom: prepare returns a deterministic
 // fake mint and submit "confirms" immediately, so the whole onboarding flow is
 // end-to-end testable with the embedded Postgres alone.
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ import { createHash } from 'node:crypto';
 import bs58 from 'bs58';
 
 /** Deterministic per (label, n): sha256 → 32 bytes → base58 (43-44 chars,
- *  alphanumeric) — passes the same shape checks as a real mint. */
+ *  alphanumeric): passes the same shape checks as a real mint. */
 function fakeMint(label: string, n: number): string {
   return bs58.encode(createHash('sha256').update(`pumpmock:${label}:${n}`).digest());
 }
@@ -156,7 +156,7 @@ export class MockPumpCreateProvider implements TxCreateProvider {
   private ambiguousSubmit = false;
   private fates = new Map<string, 'confirmed' | 'failed' | 'unknown'>();
   private counter = 0;
-  /** How many times broadcast() actually ran — the duplicate-submit race test
+  /** How many times broadcast() actually ran: the duplicate-submit race test
    *  asserts this stays at 1 no matter how many submits race. */
   broadcasts = 0;
 
@@ -224,7 +224,7 @@ export class MockPumpCreateProvider implements TxCreateProvider {
 }
 
 /** The exact text pump.fun's front-end asks a wallet to sign for /auth/login.
- *  Verified byte-for-byte against a real capture — the signature from a live
+ *  Verified byte-for-byte against a real capture: the signature from a live
  *  pump.fun sign-in validates against this string and no variant of it. */
 export const pumpLoginMessage = (timestampMs: bigint | number): string =>
   `Sign in to pump.fun: ${timestampMs}`;
@@ -239,7 +239,7 @@ export class MockOffchainProvider implements OffchainCreateProvider {
   private failPrepare = false;
   private failComplete: string | null = null;
   private counter = 0;
-  /** How many creates actually reached pump.fun — the duplicate-submit test
+  /** How many creates actually reached pump.fun: the duplicate-submit test
    *  asserts this stays at 1 however many submits race. */
   creates = 0;
 
@@ -287,7 +287,7 @@ export class MockOffchainProvider implements OffchainCreateProvider {
 }
 
 // ---------------------------------------------------------------------------
-// PumpPortal — the real mainnet provider.
+// PumpPortal: the real mainnet provider.
 //
 // prepare:  mint keypair (ephemeral) → metadata to pump.fun IPFS → unsigned
 //           create tx from PumpPortal's local API → VET → fresh blockhash →
@@ -319,7 +319,7 @@ const PUMP_WEB_HEADERS = { 'user-agent': PUMP_UA, origin: 'https://pump.fun', re
 
 /** Static safety line on the third-party-built tx BEFORE the mint key or the
  *  seller's wallet signs it: right fee payer, only whitelisted programs, and
- *  exactly one pump-program instruction (the create — a second one would be a
+ *  exactly one pump-program instruction (the create: a second one would be a
  *  smuggled buy). Throws PROVIDER_UNAVAILABLE with the details kept server-side. */
 export function vetCreateTx(bytes: Uint8Array, creatorWallet: string): VersionedTransaction {
   let tx: VersionedTransaction;
@@ -347,7 +347,7 @@ export function vetCreateTx(bytes: Uint8Array, creatorWallet: string): Versioned
 
 /** Merge the creator's proof into the mint-signed tx and verify EVERY required
  *  signature against the message bytes. The returned txSig (first signature) is
- *  final — it never changes across broadcast/retry. */
+ *  final: it never changes across broadcast/retry. */
 export function mergeCreatorSignature(
   txB64: string,
   proof: CreatorProof,
@@ -356,8 +356,8 @@ export function mergeCreatorSignature(
   const message = tx.message.serialize();
 
   if ('signedTxB64' in proof) {
-    // Fallback lane: the wallet returned a whole signed tx. It must be OUR tx —
-    // identical message bytes — with the signatures filled in.
+    // Fallback lane: the wallet returned a whole signed tx. It must be OUR tx:
+    // identical message bytes, with the signatures filled in.
     const theirs = VersionedTransaction.deserialize(Buffer.from(proof.signedTxB64, 'base64'));
     if (!Buffer.from(theirs.message.serialize()).equals(Buffer.from(message))) {
       throw new PumpCreateError(400, 'BAD_SIGNATURE', 'That signature belongs to a different transaction.');
@@ -419,7 +419,7 @@ export class PumpPortalProvider implements TxCreateProvider {
     }
     if (!input.imagePng) {
       // The branded PNG ships in the repo; missing it is a deploy problem, not a user one.
-      console.warn('[pump-create] assets/pump-coin.png missing — cannot build metadata');
+      console.warn('[pump-create] assets/pump-coin.png missing: cannot build metadata');
       throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable.');
     }
 
@@ -485,7 +485,7 @@ export class PumpPortalProvider implements TxCreateProvider {
     const txBytes = new Uint8Array(await portalRes.arrayBuffer());
 
     // 3. Vet, refresh the blockhash (the embedded one has been aging through two
-    //    API round-trips — a fresh one gives the seller the full signing window),
+    //    API round-trips: a fresh one gives the seller the full signing window),
     //    and partial-sign with the mint key.
     const tx = vetCreateTx(txBytes, input.creatorWallet);
     const { blockhash, lastValidBlockHeight } = await this.conn().getLatestBlockhash('confirmed');
@@ -541,7 +541,7 @@ export class PumpPortalProvider implements TxCreateProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Off-chain — the default. Replays exactly what pump.fun's own /create page does
+// Off-chain: the default. Replays exactly what pump.fun's own /create page does
 // for a 0-SOL launch, on the seller's behalf:
 //
 //   1. POST  frontend-api-v3/auth/login  {address, signature, timestamp}
@@ -565,7 +565,7 @@ const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 const CALL_TIMEOUT_MS = 15_000;
 
 /** Collect Set-Cookie from a response into a jar we replay on later calls.
- *  Deliberately opaque: we never parse, log, or persist the values — pump.fun's
+ *  Deliberately opaque: we never parse, log, or persist the values, pump.fun's
  *  session cookie is a credential for the seller's account, alive only for the
  *  few seconds this create takes. */
 class CookieJar {
@@ -598,7 +598,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       throw new PumpCreateError(400, 'BAD_WALLET', 'Connect a Solana wallet to create your coin.');
     }
     // Nothing to build yet: the seller signs a sign-in message, and the coin is
-    // created in one shot at submit. Fresh timestamp per attempt — pump.fun
+    // created in one shot at submit. Fresh timestamp per attempt: pump.fun
     // rejects stale sign-ins, and a fresh prepare precedes every signature.
     const timestamp = BigInt(Date.now());
     return {
@@ -647,7 +647,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Could not reach pump.fun. Try again in a minute.');
     }
     const presign = (await presignRes.json().catch(() => ({}))) as { data?: string };
-    // The presigned URL is short-lived (60s) and single-purpose — no secret of
+    // The presigned URL is short-lived (60s) and single-purpose, no secret of
     // ours, but no reason to log it either.
     if (!presign.data) {
       console.warn('[pump-create] ipfs-presign response had no upload URL');
@@ -671,13 +671,13 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
   async complete(input: CreateInput & { login: LoginProof }): Promise<{ mint: string; metadataUri: string | null }> {
     const wallet = input.login.publicKey;
     if (!input.imagePng) {
-      console.warn('[pump-create] assets/pump-coin.png missing — cannot build metadata');
+      console.warn('[pump-create] assets/pump-coin.png missing: cannot build metadata');
       throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable.');
     }
     const jar = new CookieJar();
 
     // 1. Sign in as the seller. The signature is theirs, single-use, and dies
-    //    with this request — the session it buys never leaves this function.
+    //    with this request: the session it buys never leaves this function.
     const loginRes = await this.call(`${PUMP_API}/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -694,7 +694,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       throw new PumpCreateError(
         502,
         'CREATE_FAILED',
-        'pump.fun would not accept the sign-in for this wallet — try again in a few minutes.',
+        'pump.fun would not accept the sign-in for this wallet: try again in a few minutes.',
       );
     }
     jar.absorb(loginRes);
@@ -704,7 +704,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       throw new PumpCreateError(
         502,
         'CREATE_FAILED',
-        'pump.fun did not start a session for this wallet — try again in a few minutes.',
+        'pump.fun did not start a session for this wallet: try again in a few minutes.',
       );
     }
 
@@ -772,8 +772,8 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
         502,
         'CREATE_FAILED',
         createRes.status === 429
-          ? 'pump.fun is rate-limiting new coins right now — try again in a few minutes.'
-          : 'pump.fun would not create the coin right now — try again in a few minutes.',
+          ? 'pump.fun is rate-limiting new coins right now: try again in a few minutes.'
+          : 'pump.fun would not create the coin right now, try again in a few minutes.',
       );
     }
     const created = (await createRes.json().catch(() => ({}))) as { mint?: string; address?: string };
@@ -785,7 +785,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
       throw new PumpCreateError(
         502,
         'CREATE_FAILED',
-        'pump.fun created the coin but did not return its address — check your pump.fun profile and paste it in Settings.',
+        'pump.fun created the coin but did not return its address: check your pump.fun profile and paste it in Settings.',
       );
     }
     return { mint, metadataUri };
@@ -796,7 +796,7 @@ export class PumpOffchainProvider implements OffchainCreateProvider {
  *
  *  Mainnet defaults to the off-chain path: free, no wallet warning, and the only
  *  one sellers should ever see. Everything else (mock cluster, devnet, tests,
- *  preview) gets a mock. `BIDIT_PUMP_PROVIDER` forces one for spikes —
+ *  preview) gets a mock. `BIDIT_PUMP_PROVIDER` forces one for spikes:
  *  `pumpportal` is the on-chain escape hatch, kept only for that. */
 export function getPumpCreateProvider(cluster: string): PumpCreateProvider {
   const forced = (process.env.BIDIT_PUMP_PROVIDER ?? '').trim().toLowerCase();

@@ -1,5 +1,5 @@
 /**
- * ChainSettler — drives the durable ChainTransfer outbox to the chain.
+ * ChainSettler: drives the durable ChainTransfer outbox to the chain.
  *
  * Escrow/shipping ledger moves enqueue internal wallet→wallet legs (see
  * ledger.ts / escrow.ts), recorded atomically with the ledger write. This settler
@@ -11,7 +11,7 @@
  *               unknown   → wait
  *
  * Every wallet here is operator-controlled, so a failed/expired send simply gets
- * a fresh attempt — the funds never leave our control, so this can neither lose
+ * a fresh attempt: the funds never leave our control, so this can neither lose
  * money nor double-move it. A SUBMITTED leg is only ever *resolved*, never re-sent,
  * so an in-flight (unknown) tx is never duplicated. Legs whose ends resolve to the
  * same wallet (direct-mode fallback where escrow/fee/buyback default to treasury)
@@ -49,7 +49,7 @@ export class ChainSettler {
       this.timer = null;
     }
   }
-  /** Startup recovery alias — finish anything left mid-flight by a prior run. */
+  /** Startup recovery alias: finish anything left mid-flight by a prior run. */
   reconcile(): Promise<number> {
     return this.tick();
   }
@@ -120,7 +120,7 @@ export class ChainSettler {
           data: { status: 'SUBMITTED', txSig: sig, lastValidBlockHeight: lvbh, attempts: { increment: 1 }, lastError: null },
         });
       } catch (err) {
-        // Pre-broadcast failure — nothing sent. Bump and retry next tick.
+        // Pre-broadcast failure: nothing sent. Bump and retry next tick.
         await this.prisma.chainTransfer.update({
           where: { id: row.id },
           data: { attempts: { increment: 1 }, lastError: `send: ${errMsg(err)}` },
@@ -129,14 +129,14 @@ export class ChainSettler {
       }
     }
 
-    if (!sig) return false; // SUBMITTED with no signature — wait for a later pass
+    if (!sig) return false; // SUBMITTED with no signature: wait for a later pass
     const fate = await this.chain.getTransferStatus(sig, lvbh);
     if (fate === 'confirmed') {
       await this.confirm(row.id);
       return true;
     }
     if (fate === 'failed') {
-      // Internal move that never landed (expired / on-chain error) — safe to retry
+      // Internal move that never landed (expired / on-chain error): safe to retry
       // from scratch with a fresh blockhash. Funds are still in our wallets.
       await this.prisma.chainTransfer.update({
         where: { id: row.id },
@@ -144,7 +144,7 @@ export class ChainSettler {
       });
       return false;
     }
-    return false; // unknown — still in flight, resolve on a later pass
+    return false; // unknown, still in flight, resolve on a later pass
   }
 
   private confirm(id: string): Promise<unknown> {

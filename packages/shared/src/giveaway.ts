@@ -1,12 +1,12 @@
 /**
- * Giveaways (Whatnot-style) — the deterministic winner-selection core.
+ * Giveaways (Whatnot-style): the deterministic winner-selection core.
  *
  * During a live stream a seller opens a giveaway; viewers enter with one tap.
  * Two kinds gate who may enter:
  *   - PUBLIC       any viewer watching the stream
  *   - BUYER_ONLY   only people who have purchased from this seller
  * When the entry window closes the SERVER alone draws the winner from a committed
- * random seed — the client only replays the reveal. Given the same seed and the
+ * random seed: the client only replays the reveal. Given the same seed and the
  * same ordered entrant list it always picks the same winner, which is what makes
  * the draw verifiable: the server commits `seedHash` when the giveaway opens and
  * reveals the raw `seed` at the draw (see the giveaway messages in protocol.ts).
@@ -31,7 +31,7 @@ export function normalizeGiveawayKind(raw: unknown): GiveawayKind {
 
 /**
  * Pick the winning entrant index in [0, count) from a hex seed. Uniform over the
- * ordered entrant list — every entrant has exactly one slot, so odds are equal.
+ * ordered entrant list, every entrant has exactly one slot, so odds are equal.
  */
 export function pickWinnerIndex(count: number, seedHex: string): number {
   if (count <= 0) throw new Error('giveaway has no entrants');
@@ -43,7 +43,7 @@ export function pickWinnerIndex(count: number, seedHex: string): number {
 export const ROLL_REPEATS = 6;
 
 /**
- * Build the reveal roll — the sequence of entrant avatars the spotlight hops
+ * Build the reveal roll: the sequence of entrant avatars the spotlight hops
  * through before landing on the winner. The strip is the entrant list repeated
  * `repeats` times (so the hop has a long, decelerating run) with the winner
  * placed a couple of repeats deep. A pure function of (entrants, winnerIndex):

@@ -1,13 +1,13 @@
 /**
- * The auction engine — Chunk 2.
+ * The auction engine: Chunk 2.
  *
  * Server-authoritative live auctions with Whatnot-style anti-snipe extension.
  * The bid pipeline is one atomic transaction guarded by two row locks, taken in
  * a fixed order to avoid deadlocks:
  *
- *   1. Auction row (FOR UPDATE) — serializes all bids for a given auction, so two
+ *   1. Auction row (FOR UPDATE): serializes all bids for a given auction, so two
  *      bids can never both be accepted as "leading".
- *   2. Bidder Account row (FOR UPDATE) — serializes a single user's concurrent
+ *   2. Bidder Account row (FOR UPDATE): serializes a single user's concurrent
  *      bids across different auctions, so they can never lead auctions whose
  *      holds sum to more than their settled balance.
  *
@@ -156,7 +156,7 @@ export async function placeBid(
   }
 
   return prisma.$transaction(async (tx): Promise<BidResult> => {
-    // (1) Lock the auction row — serializes bid processing for this auction.
+    // (1) Lock the auction row: serializes bid processing for this auction.
     await lockAuction(tx, params.auctionId);
     const auction = await tx.auction.findUnique({ where: { id: params.auctionId } });
     if (!auction) return { ok: false, reason: BidRejectReason.AUCTION_NOT_FOUND };
@@ -183,7 +183,7 @@ export async function placeBid(
       return { ok: false, reason: BidRejectReason.ALREADY_LEADING };
     }
 
-    // (5) Balance check — lock the bidder's account, then available >= amount.
+    // (5) Balance check: lock the bidder's account, then available >= amount.
     const account = await tx.account.findUnique({ where: { userId: params.userId } });
     if (!account) return { ok: false, reason: BidRejectReason.INSUFFICIENT_BALANCE };
     await lockAccount(tx, account.id);
@@ -343,7 +343,7 @@ async function closeOne(
       where: { id: auctionId },
       data: { status: AuctionStatus.CLOSED },
     });
-    // Nobody bid, so no unit was consumed — put the listing back in the queue so
+    // Nobody bid, so no unit was consumed: put the listing back in the queue so
     // the seller can auction it again (this is what makes an unsold item, incl.
     // one with quantity remaining, re-auctionable).
     const listing = await tx.listing.findUniqueOrThrow({ where: { id: auction.listingId }, select: { quantity: true } });

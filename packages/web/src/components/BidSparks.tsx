@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 /**
  * A tiny additive-blend spark emitter that burns at the timer bar's leading edge
- * during the final seconds — like a lit fuse racing the clock. Ported from the
+ * during the final seconds: like a lit fuse racing the clock. Ported from the
  * extension overlay. Only mount it while the auction is in its low-time state.
  */
 export default function BidSparks({ fill, active }: { fill: number; active: boolean }) {

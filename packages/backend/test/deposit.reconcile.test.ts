@@ -75,7 +75,7 @@ describe('durable deposit reconciliation', () => {
     await prisma.depositReceipt.create({ data: { userId: buyer.userId, amountMicros: usdc('25'), txSig: 'tx-half' } });
     expect(await getSettledBalance(accountId, prisma)).toBe(usdc('25'));
 
-    // Reconcile re-runs the (idempotent) credit and marks the receipt — no extra money.
+    // Reconcile re-runs the (idempotent) credit and marks the receipt, no extra money.
     await new DepositWatcher(chain, prisma).reconcile();
     expect(await getSettledBalance(accountId, prisma)).toBe(usdc('25'));
     expect((await prisma.depositReceipt.findUnique({ where: { txSig: 'tx-half' } }))!.creditedAt).not.toBeNull();

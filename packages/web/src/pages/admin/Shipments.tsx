@@ -164,7 +164,7 @@ function QueueCard({ row, onDone }: { row: LabelQueueRow; onDone: () => void }) 
               <div className="fld"><label>Tracking number</label><input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="1Z…" /></div>
               <div className="fld">
                 <label>Carrier</label>
-                {/* Exact Shippo carrier tokens — tracking is queried per-carrier, so
+                {/* Exact Shippo carrier tokens: tracking is queried per-carrier, so
                     a dropdown (not free text) guarantees a value Shippo accepts. */}
                 <select value={carrier} onChange={(e) => setCarrier(e.target.value)}>
                   <option value="">Select carrier…</option>

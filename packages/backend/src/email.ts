@@ -1,7 +1,7 @@
 /**
  * Transactional email via Resend. A thin seam: with RESEND_API_KEY set it sends
- * real mail; without it, it no-ops (logs) so every other environment — tests,
- * local, a friend's box without the key — works unchanged. Never throws.
+ * real mail; without it, it no-ops (logs) so every other environment: tests,
+ * local, a friend's box without the key: works unchanged. Never throws.
  */
 export interface EmailMessage {
   to: string;
@@ -39,7 +39,7 @@ export function paragraph(text: string): string {
  *  operator can tell at a glance whether codes are being mailed or only logged. */
 export const emailEnabled = (): boolean => !!process.env.RESEND_API_KEY;
 
-/** The From address in force. Exposed for the startup banner — a wrong or
+/** The From address in force. Exposed for the startup banner: a wrong or
  *  unverified From is the single most common reason nothing arrives. */
 export const emailFrom = (): string =>
   process.env.BIDIT_EMAIL_FROM ?? 'BIDit <onboarding@resend.dev>';
@@ -51,8 +51,8 @@ export interface SendResult {
 }
 
 /**
- * Send one transactional email. Never throws — a failed verification mail must
- * not fail the signup that triggered it — but it now REPORTS the outcome so
+ * Send one transactional email. Never throws: a failed verification mail must
+ * not fail the signup that triggered it, but it now REPORTS the outcome so
  * callers (and the admin test endpoint) can surface it. Silent failure here
  * used to be indistinguishable from success, which made a misconfigured domain
  * impossible to diagnose from outside the server logs.
@@ -74,7 +74,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
     const body = await res.text().catch(() => '');
     if (!res.ok) {
       // Resend's body says exactly what's wrong (unverified domain, bad From,
-      // sandbox-recipient restriction). Log it verbatim — it's the whole answer.
+      // sandbox-recipient restriction). Log it verbatim: it's the whole answer.
       console.error(`[email] send FAILED ${res.status} from=${from} to=${msg.to} :: ${body}`);
       return { ok: false, error: `Resend responded ${res.status}: ${body || '(empty body)'}` };
     }

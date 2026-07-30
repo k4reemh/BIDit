@@ -52,7 +52,7 @@ describe('deposit rail (chain -> ledger)', () => {
     expect(await watcher.tick()).toBe(1);
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('50'));
 
-    // Re-deliver the same on-chain tx — must NOT double-credit.
+    // Re-deliver the same on-chain tx: must NOT double-credit.
     chain.simulateDeposit(buyer.userId, usdc('50'), 'tx-1');
     await watcher.tick();
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('50'));
@@ -111,7 +111,7 @@ describe('full on-chain settlement flow (mock chain)', () => {
     clock.advance(21_000);
     expect((await closeDueAuctions(clock, prisma))[0]?.status).toBe(AuctionStatus.SETTLING);
 
-    // 3) Settle into escrow — funds move treasury -> escrow on-chain.
+    // 3) Settle into escrow: funds move treasury -> escrow on-chain.
     const order = (await settleAuction(auction.auctionId, escrow, clock, prisma))!;
     expect(order.status).toBe(OrderStatus.LOCKED);
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20')); // ledger: synchronous

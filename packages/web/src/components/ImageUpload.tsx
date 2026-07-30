@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Camera, X } from '../icons';
 
-/** Read an image file, downscale it, and return a compressed data URL — so photos
+/** Read an image file, downscale it, and return a compressed data URL, so photos
  *  can be stored inline (no upload infra) without bloating the DB. */
 async function fileToDataUrl(file: File, max: number = 900, quality: number = 0.82): Promise<string> {
   const bitmap = await createImageBitmap(file);

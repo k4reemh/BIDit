@@ -65,8 +65,8 @@ export function minNextBid(
 
 /**
  * Anti-snipe (Whatnot-style, tense ending): a bid in the final 5s nudges the
- * clock but never lets it exceed 5s — so the auction is perpetually about to end.
- *   3–5s left -> +1s   ·   under 3s left -> +2s   ·   over 5s left -> no extension
+ * clock but never lets it exceed 5s, so the auction is perpetually about to end.
+ *   3-5s left -> +1s   ·   under 3s left -> +2s   ·   over 5s left -> no extension
  * Always capped at ANTISNIPE_MAX_MS. Returns the new remaining ms (unchanged if
  * no extension). The server is authoritative for this; the client only renders it.
  */

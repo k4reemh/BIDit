@@ -55,7 +55,7 @@ describe('Shippo carrier token resolution', () => {
   });
 
   it('returns null rather than the `shippo` TEST carrier when it cannot tell', () => {
-    // Querying the test carrier with a real number 404s — which is exactly how a
+    // Querying the test carrier with a real number 404s, which is exactly how a
     // delivered package silently stayed "not delivered".
     expect(resolveCarrierToken('', 'NOTATRACKINGNUMBER')).toBeNull();
     expect(resolveCarrierToken('', '')).toBeNull();
@@ -126,7 +126,7 @@ describe('shipment tracking → delivery → escrow release', () => {
     provider.set('TRK1', 'delivered');
     await new ShipmentTracker(provider, prisma, clock).tick();
 
-    // No clock advance — release right away (as the admin test control does).
+    // No clock advance: release right away (as the admin test control does).
     expect(await releaseOrdersForShipment(shipment.id, escrow, clock, prisma)).toContain(order.id);
     expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.RELEASED);
     const sellerAcct = (await prisma.account.findUniqueOrThrow({ where: { userId: sellerId } })).id;

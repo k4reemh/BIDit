@@ -62,7 +62,7 @@ export interface AuctionClosed {
   winnerAvatar?: string | null;
   amount: string | null;
   wheel?: boolean;
-  /** Catch-up replay for a client that missed the live close — sync the result
+  /** Catch-up replay for a client that missed the live close: sync the result
    *  quietly (no full-screen celebration). */
   replay?: boolean;
   serverNow: number;
@@ -168,7 +168,7 @@ export function openSocket(h: Handlers): () => void {
     if (closed) return;
     const ticket = await mintWsTicket();
     if (!ticket || closed) {
-      if (!closed) retry = setTimeout(open, 2500); // no ticket yet (signed out / offline) — retry
+      if (!closed) retry = setTimeout(open, 2500); // no ticket yet (signed out / offline): retry
       return;
     }
     ws = new WebSocket(`${wsBase}/ws?ticket=${encodeURIComponent(ticket)}`);
@@ -267,13 +267,13 @@ export interface RoomController {
   /** Seller-only: delete a message / block a user in their own room. */
   deleteChat: (messageId: string) => void;
   blockUser: (userId: string) => void;
-  /** Force a re-subscribe to pull fresh state — used to recover a frozen timer
+  /** Force a re-subscribe to pull fresh state: used to recover a frozen timer
    *  if a close broadcast was missed. */
   resync: () => void;
 }
 
 /**
- * Like openSocket but for a specific seller's room, and it can SEND — place bids
+ * Like openSocket but for a specific seller's room, and it can SEND: place bids
  * (BID_INTENT) and enter giveaways (GIVEAWAY_ENTER). Powers the in-site watch page
  * so a viewer can bid without the extension. Requires the viewer to be signed in
  * (the server gates the socket on a token); returns a controller.

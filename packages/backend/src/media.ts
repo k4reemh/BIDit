@@ -4,7 +4,7 @@
  * Avatars and seller cover art are stored as base64 data URLs (no object
  * storage yet). Inlining those in list payloads is what made `/live` grow to
  * megabytes: 100 sellers × a ~150KB cover is a ~15MB response, re-fetched by
- * every viewer every 30s. The images themselves are fine — putting them in the
+ * every viewer every 30s. The images themselves are fine: putting them in the
  * JSON was the mistake.
  *
  * So list endpoints emit a URL here, and this module serves the bytes once, with
@@ -48,7 +48,7 @@ export function decodeDataUrl(value: string | null | undefined): DecodedImage | 
  * - An `https://` value (pump.fun art) is passed through untouched.
  * - Anything else becomes null rather than shipping junk to the client.
  *
- * `v` is a short content hash so an updated image gets a NEW url — that is what
+ * `v` is a short content hash so an updated image gets a NEW url: that is what
  * lets the response itself be cached hard without ever serving a stale picture.
  */
 export function mediaUrl(

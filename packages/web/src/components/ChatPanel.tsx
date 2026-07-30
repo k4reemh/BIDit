@@ -7,11 +7,11 @@ import { Chat, ArrowRight, Trash, Shield } from '../icons';
 const DEFAULT_COOLDOWN_MS = 5000; // fallback until CHAT_HISTORY delivers the room's value
 
 /**
- * Live room chat — a Twitch-style feed for the live coin page. Viewers post short
+ * Live room chat: a Twitch-style feed for the live coin page. Viewers post short
  * messages the seller reads on stream. Opens its own room socket (token-gated, so
  * signed-out viewers get a sign-in CTA). The seller (room owner) sees inline
  * delete + block controls. Text is rendered as plain React children, so it's
- * escaped by construction — no HTML injection.
+ * escaped by construction, no HTML injection.
  */
 export default function ChatPanel({
   room,
@@ -38,7 +38,7 @@ export default function ChatPanel({
   const canModerate = isOwner || canMod;
 
   useEffect(() => {
-    if (!session) return; // socket is token-gated — signed-out shows the CTA below
+    if (!session) return; // socket is token-gated: signed-out shows the CTA below
     const c = openRoom(room, {
       onChatHistory: (list, cd, mod) => { setMsgs(list); setCooldownMs(cd); setCanMod(mod); },
       onChat: (m) => setMsgs((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m].slice(-200))),
@@ -54,7 +54,7 @@ export default function ChatPanel({
     return () => c.close();
   }, [room, session?.userId]);
 
-  // Keep the newest message in view by scrolling the feed itself — never
+  // Keep the newest message in view by scrolling the feed itself, never
   // scrollIntoView, which scrolls every ancestor and yanks the whole page.
   useEffect(() => {
     const el = feedRef.current;

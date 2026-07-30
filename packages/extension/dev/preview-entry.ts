@@ -23,7 +23,7 @@ panel.setBalance('87', '100');
 
 // Simulate a snipe war in the final seconds: each bid re-arms the deadline just
 // inside the 5s window (so the panel stays red + heartbeating + glowing) and
-// fires the EXTENDED flash — exactly the anti-snipe drama we're verifying.
+// fires the EXTENDED flash: exactly the anti-snipe drama we're verifying.
 const HANDLES = ['degen_max', 'cryptochad', 'luna_degen', 'apex_whale', 'mintking'];
 let bid = 12;
 let i = 0;
@@ -36,7 +36,7 @@ const snipe = (): void => {
     room: 'demo',
     auctionId: 'demo-auction',
     listingId: 'demo-listing',
-    title: 'Charizard — Base Set Holo',
+    title: 'Charizard, Base Set Holo',
     imageUrl: IMG,
     status: 'RUNNING',
     currentBid: String(bid),
@@ -68,7 +68,7 @@ mkBtn('flash', 'Flash EXTENDED', 20, '#ff7a45', () => panel.flashExtended());
 mkBtn('pause', 'Pause snipes', 168, '#ffb020', () => window.clearInterval(loop));
 mkBtn('replay', 'Replay win', 300, '#22e0a1', () =>
   showWinner(
-    { winnerHandle: 'nadimnah', amount: '42', title: 'Charizard — Base Set Holo', imageUrl: IMG, isMe: true },
+    { winnerHandle: 'nadimnah', amount: '42', title: 'Charizard, Base Set Holo', imageUrl: IMG, isMe: true },
     600_000, // hold open for the screenshot
   ),
 );
@@ -77,9 +77,9 @@ mkBtn('replay', 'Replay win', 300, '#22e0a1', () =>
 const WHEEL: WheelEntry[] = [
   { label: 'Destined Rivals ETB', tier: 'Box' },
   { label: 'Sealed Booster Box', tier: 'Box' },
-  { label: 'Charizard ex — Alt Art', tier: 'Chase' },
-  { label: 'Pikachu ex — SIR', tier: 'SIR' },
-  { label: 'Umbreon ex — SIR', tier: 'SIR' },
+  { label: 'Charizard ex, Alt Art', tier: 'Chase' },
+  { label: 'Pikachu ex, SIR', tier: 'SIR' },
+  { label: 'Umbreon ex, SIR', tier: 'SIR' },
   { label: 'Sleeved Booster ×4', tier: 'Pack' },
   { label: 'Single Booster Pack', tier: 'Pack' },
   { label: 'Mystery Slab', tier: 'Slab' },
@@ -105,13 +105,13 @@ function spinWheel(prizeIndex: number, elapsedMs = -400, durationMs = 5200): voi
 mkBtn('wheel', 'Spin wheel', 432, '#9b6bff', () => spinWheel(Math.floor(Math.random() * WHEEL.length)));
 (window as unknown as { __spin: typeof spinWheel }).__spin = spinWheel; // dev/test hook
 
-// Giveaway demo: entry card with entrants trickling in, then the winner reveal —
+// Giveaway demo: entry card with entrants trickling in, then the winner reveal:
 // the same GIVEAWAY_OPEN / GIVEAWAY_ENTRIES / GIVEAWAY_WINNER the server broadcasts.
 const GA_HANDLES = [
   'degen_max', 'cryptochad', 'luna_degen', 'apex_whale', 'mintking',
   'pack_ripper', 'holo_hunter', 'slabgod', 'chase_queen', 'mint_maxi',
 ];
-const GA_PRIZE = 'Charizard ex — Alt Art Slab';
+const GA_PRIZE = 'Charizard ex: Alt Art Slab';
 let ga: GiveawayHandle | null = null;
 let gaFill: number | undefined;
 

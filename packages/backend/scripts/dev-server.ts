@@ -195,7 +195,7 @@ class RequestBodyError extends Error {
   }
 }
 
-// 4 MB — comfortably fits the app's largest legitimate body (a listing with a few
+// 4 MB: comfortably fits the app's largest legitimate body (a listing with a few
 // downscaled JPEG data-URL photos) while bounding memory per request. Override
 // with BIDIT_MAX_BODY_BYTES.
 const MAX_BODY_BYTES = (() => {
@@ -241,7 +241,7 @@ async function main() {
   await loadSessionRevocations(prisma).catch((e) => console.error('[auth] load revocations failed:', e));
 
   // Direct-payout mode (BIDIT_PAYOUT_MODE=direct): on a sale, pay the seller 100%
-  // immediately — no escrow, no 5% fee. Used for the real-money friends test.
+  // immediately, no escrow, no 5% fee. Used for the real-money friends test.
   const directPayout = process.env.BIDIT_PAYOUT_MODE === 'direct';
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
   // Seller coin auto-create ("<handle>'s BIDit Livestream"): PumpPortal on
@@ -255,7 +255,7 @@ async function main() {
   // AUTH_SECRET, a mock chain in prod, force-enabled dev endpoints, missing
   // custody secrets). Throws → main().catch → process.exit(1).
   const { isProd } = assertStartupConfig(chain.cluster);
-  // Escrow mode moves real USDC between segregated wallets — refuse to boot if any
+  // Escrow mode moves real USDC between segregated wallets: refuse to boot if any
   // of escrow/buyback/fee collapses onto treasury (a missing *_SECRET falls back to
   // treasury), which would silently commingle held funds and fees.
   if (!directPayout && isProd) {
@@ -263,7 +263,7 @@ async function main() {
     const dupes = (['escrow', 'buyback', 'fee'] as const).filter((w) => addr[w] === addr.treasury);
     if (dupes.length > 0) {
       throw new Error(
-        `Refusing to run escrow mode: wallet(s) ${dupes.join(', ')} fall back to treasury — set ESCROW_SECRET/BUYBACK_SECRET/FEE_SECRET to distinct keypairs.`,
+        `Refusing to run escrow mode: wallet(s) ${dupes.join(', ')} fall back to treasury, set ESCROW_SECRET/BUYBACK_SECRET/FEE_SECRET to distinct keypairs.`,
       );
     }
     if (new Set(Object.values(addr)).size !== 4) {
@@ -271,22 +271,22 @@ async function main() {
     }
   }
   if (usingDefaultAuthSecret() && chain.cluster !== 'mock') {
-    console.warn('[config] ⚠️  AUTH_SECRET is the insecure default on a real chain — set a strong value before exposing this deploy.');
+    console.warn('[config] ⚠️  AUTH_SECRET is the insecure default on a real chain: set a strong value before exposing this deploy.');
   }
   if (isProd && corsAllowlist().length === 0) {
-    console.warn('[config] ⚠️  BIDIT_ALLOWED_ORIGINS is empty in production — CORS is failing open (any origin). Set it to your web origin to lock this down.');
+    console.warn('[config] ⚠️  BIDIT_ALLOWED_ORIGINS is empty in production: CORS is failing open (any origin). Set it to your web origin to lock this down.');
   }
   if (isProd && !piiEncryptionEnabled()) {
-    console.warn('[config] ⚠️  BIDIT_PII_KEY is not set — shipping addresses are stored unencrypted. Set a strong key to encrypt PII at rest.');
+    console.warn('[config] ⚠️  BIDIT_PII_KEY is not set: shipping addresses are stored unencrypted. Set a strong key to encrypt PII at rest.');
   }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
   // Accounts that predate email verification are trusted (see the function's
-  // note) — without this, everyone who already signed up would be locked out.
+  // note), without this, everyone who already signed up would be locked out.
   await backfillLegacyVerified(prisma)
     .then((n) => n > 0 && console.log(`[verify] backfilled ${n} pre-existing account(s) as verified`))
     .catch((e) => console.error('[verify] backfill', e));
-  // The web's category list renamed "Clothes" — move saved profiles with it so
+  // The web's category list renamed "Clothes": move saved profiles with it so
   // their streams keep matching the browse filter.
   await backfillRenamedCategories(prisma)
     .then((n) => n > 0 && console.log(`[sellers] renamed stream category on ${n} profile(s)`))
@@ -302,7 +302,7 @@ async function main() {
   // Watch the chain for inbound USDC and credit the ledger (deposit detection).
   // On each credit, push a live BALANCE_UPDATE so the depositor's balance updates
   // on-screen without a refresh. Poll fast on the mock chain (no real RPC), but
-  // gently on a real chain — a per-address balance read every few seconds across
+  // gently on a real chain: a per-address balance read every few seconds across
   // all users otherwise hammers the RPC into 429s (BIDIT_DEPOSIT_POLL_MS overrides).
   const depositPollMs = Number(process.env.BIDIT_DEPOSIT_POLL_MS) || (chain.cluster === 'mock' ? 5000 : 20000);
   const depositWatcher = new DepositWatcher(chain, prisma, depositPollMs, (userId) =>
@@ -329,7 +329,7 @@ async function main() {
   withdrawalReconciler.start();
   // Track in-flight shipments via Shippo; on delivery, open the 2-day dispute
   // window on the order(s) (processOrderTimers then auto-releases). Only runs when
-  // SHIPPO_API_KEY is set — otherwise delivery comes from buyer-confirm / admin.
+  // SHIPPO_API_KEY is set: otherwise delivery comes from buyer-confirm / admin.
   const trackingProvider = getTrackingProvider();
   if (trackingProvider) {
     const tracker = new ShipmentTracker(trackingProvider, prisma, systemClock, 120_000, (buyerId) => {
@@ -342,7 +342,7 @@ async function main() {
     tracker.start();
     console.log('[tracking] Shippo shipment tracking enabled');
   } else {
-    console.log('[tracking] SHIPPO_API_KEY not set — automatic delivery tracking off');
+    console.log('[tracking] SHIPPO_API_KEY not set: automatic delivery tracking off');
   }
   // Drive the durable escrow/shipping on-chain outbox (ChainTransfer) to the chain:
   // broadcast, confirm, and safely retry each internal wallet→wallet leg. Recover
@@ -367,7 +367,7 @@ async function main() {
   orderTimer.unref?.();
 
   // Dev endpoints (password-less login, balance minting, seeders) are ON only for
-  // the local mock chain, OFF on any real chain unless explicitly forced — and
+  // the local mock chain, OFF on any real chain unless explicitly forced, and
   // ALWAYS off in production (assertStartupConfig already rejected the force flag,
   // but this is defence-in-depth on the money-endpoint gate).
   const devEndpoints = !isProd && (chain.cluster === 'mock' || process.env.BIDIT_ENABLE_DEV_ENDPOINTS === 'yes');
@@ -379,10 +379,10 @@ async function main() {
   if (emailEnabled()) {
     console.log(`[email] delivery ON · from=${emailFrom()}`);
   } else {
-    console.warn('[email] ⚠️  RESEND_API_KEY not set — verification and reset codes are LOGGED, not delivered.');
+    console.warn('[email] ⚠️  RESEND_API_KEY not set: verification and reset codes are LOGGED, not delivered.');
   }
   if (chain.cluster === 'mainnet-beta') {
-    console.log('[chain] ⚠️  MAINNET — REAL USDC WILL MOVE. treasury:', chain.walletAddress('treasury'));
+    console.log('[chain] ⚠️  MAINNET: REAL USDC WILL MOVE. treasury:', chain.walletAddress('treasury'));
   }
 
   async function sessionPayload(userId: string) {
@@ -436,7 +436,7 @@ async function main() {
         privateShipping: profile?.privateShipping ?? false,
       },
       depositAddress: await ensureDepositAddress(userId, chain, prisma),
-      cluster: chain.cluster, // 'mock' | 'devnet' | 'mainnet-beta' — drives the deposit UI
+      cluster: chain.cluster, // 'mock' | 'devnet' | 'mainnet-beta', drives the deposit UI
       available: account ? formatUsdc(await getAvailableBalance(account.id, prisma)) : '0',
       settled: account ? formatUsdc(await getSettledBalance(account.id, prisma)) : '0',
     };
@@ -454,7 +454,7 @@ async function main() {
     /**
      * User-uploaded images, served as files rather than inlined in JSON.
      * Public by design: avatars and stream cover art are already shown to every
-     * visitor. Cached hard — the URL carries a content hash, so an edited image
+     * visitor. Cached hard: the URL carries a content hash, so an edited image
      * gets a different URL and can never be served stale.
      */
     if (req.method === 'GET' && (p === '/media/avatar' || p === '/media/cover' || p === '/media/listing')) {
@@ -491,7 +491,7 @@ async function main() {
         mainnet: chain.cluster === 'mainnet-beta',
         payout: directPayout ? 'direct' : 'escrow',
         devEndpoints,
-        // Whether transactional email can actually be delivered. Boolean only —
+        // Whether transactional email can actually be delivered. Boolean only,
         // never the key or the From address.
         email: emailEnabled(),
         production: isProd,
@@ -537,7 +537,7 @@ async function main() {
           );
           // Mail the code now; the account exists but stays unverified until it
           // comes back. A mail failure must not strand a created account, so a
-          // throw here only means "no code yet" — they can resend.
+          // throw here only means "no code yet": they can resend.
           await sendVerificationCode(user.id, { force: true }, prisma).catch((e) =>
             console.error('[verify] send on register failed', (e as Error)?.message ?? e),
           );
@@ -551,7 +551,7 @@ async function main() {
       // signed in, it just can't do anything that matters until this passes.
       /**
        * Start a password reset. Always answers 200 with the same body, whether
-       * or not the address is registered — a differing response here would let
+       * or not the address is registered: a differing response here would let
        * anyone test which emails have BIDit accounts.
        */
       if (req.method === 'POST' && p === '/auth/forgot-password') {
@@ -723,7 +723,7 @@ async function main() {
           await realtime.notifyBalance(userId);
           const accountId = await getOrCreateUserAccount(userId, prisma);
           // A FAILED row means the transfer never went out and the debit was
-          // reversed — surface it as an error (funds are back) rather than success.
+          // reversed: surface it as an error (funds are back) rather than success.
           if (w.status === 'FAILED') {
             return send(res, 502, {
               error: 'The on-chain transfer could not be sent. Your balance was not charged. Try again.',
@@ -933,7 +933,7 @@ async function main() {
         const b = await readJson(req);
         // Coin linking goes through the guarded setter FIRST (first-claim-wins):
         // hijacking another seller's coin 409s here, before anything is marked
-        // onboarded. An absent/empty coinAddress never touches the link — an
+        // onboarded. An absent/empty coinAddress never touches the link: an
         // auto-created coin from the create flow must survive finishing the wizard.
         if (typeof b.coinAddress === 'string' && b.coinAddress.trim()) {
           await setSellerCoin(userId, b.coinAddress.trim(), prisma);
@@ -1010,10 +1010,10 @@ async function main() {
           mode: pumpCreate.mode,
           signMode,
           // The full mint-signed tx (base64): Phantom's object-form signTransaction
-          // needs it — the b58 message lane can't represent versioned (v0) txs.
+          // needs it: the b58 message lane can't represent versioned (v0) txs.
           txB64: attempt.txB64,
           message: messageB58,
-          // Plain text for signMode 'message' — shown verbatim in the wallet.
+          // Plain text for signMode 'message': shown verbatim in the wallet.
           loginMessage,
           name: attempt.name,
           symbol: attempt.symbol,
@@ -1105,7 +1105,7 @@ async function main() {
         await removeRoomModerator(userId, String(b.userId ?? ''), prisma);
         return send(res, 200, { ok: true });
       }
-      /** Set a room's chat cooldown. Open to the seller AND their moderators —
+      /** Set a room's chat cooldown. Open to the seller AND their moderators:
        *  slowing a spammy chat is a moderation action, not a shop setting. */
       if (req.method === 'POST' && p === '/room/chat-cooldown') {
         const userId = authUser(req);
@@ -1215,7 +1215,7 @@ async function main() {
       }
       // NOTE: sellers do NOT mark a package shipped. Once they drop the BIDit label
       // at the carrier, the carrier's first scan flips it to SHIPPED (ShipmentTracker),
-      // and delivery is detected the same way — with an admin override under /admin.
+      // and delivery is detected the same way, with an admin override under /admin.
       if (req.method === 'GET' && p === '/seller/listings') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1325,7 +1325,7 @@ async function main() {
         });
       }
       // NOTE: no seller-facing order ship/deliver endpoints. Sellers never mark an
-      // order shipped/delivered or enter a tracking number — the admin creates the
+      // order shipped/delivered or enter a tracking number: the admin creates the
       // label + tracking and the carrier tracker (or admin override) drives status.
 
       // ---- admin ----
@@ -1358,7 +1358,7 @@ async function main() {
         return send(res, 200, { ok: true });
       }
       // Admin: force-move a pump.fun coin to a seller. The ONLY way a claimed coin
-      // changes hands — sellers self-serve is first-claim-wins (see setSellerCoin).
+      // changes hands: sellers self-serve is first-claim-wins (see setSellerCoin).
       if (req.method === 'POST' && p === '/admin/seller-coin') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1387,12 +1387,12 @@ async function main() {
         });
       }
       // Operator-only: Private Secure Shipping reship queue. Exposes each buyer's
-      // REAL address (privateLeg2) — never shown to sellers — so the operator can
+      // REAL address (privateLeg2) (never shown to sellers) so the operator can
       // ship the hub→buyer leg.
       if (req.method === 'GET' && p === '/admin/private-shipments') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
-        // isAdmin() (role OR BIDIT_ADMIN_EMAILS) — consistent with every other admin
+        // isAdmin() (role OR BIDIT_ADMIN_EMAILS): consistent with every other admin
         // route; a direct role check locked allowlist operators out of this PII view.
         if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         const shipments = await listPrivateShipments(prisma);
@@ -1421,7 +1421,7 @@ async function main() {
       }
       // Operator label queue: every package a seller has confirmed that needs a
       // label made. Includes items, package size, both parties' addresses, and the
-      // shipping the buyer paid — everything needed to buy the carrier label.
+      // shipping the buyer paid: everything needed to buy the carrier label.
       if (req.method === 'GET' && p === '/admin/label-queue') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
@@ -1477,7 +1477,7 @@ async function main() {
           throw err;
         }
       }
-      // Operator TEST controls — drive the pipeline by hand (Shippo normally does
+      // Operator TEST controls: drive the pipeline by hand (Shippo normally does
       // this). List in-flight packages + step them shipped → delivered → released.
       if (req.method === 'GET' && p === '/admin/shipments/inflight') {
         const userId = authUser(req);
@@ -1516,7 +1516,7 @@ async function main() {
         if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
         const b = await readJson(req);
         try {
-          // Admin override for the manual case — same path the carrier tracker uses.
+          // Admin override for the manual case, same path the carrier tracker uses.
           const shipped = await markShipmentShipped(String(b.shipmentId ?? ''), systemClock, prisma);
           await advanceOrdersForShipment(shipped.id, 'SHIPPED', systemClock, prisma);
           return send(res, 200, { ok: true });
@@ -1611,7 +1611,7 @@ async function main() {
         if (!resolved) return send(res, 404, { error: 'no seller linked to this coin' });
         return send(res, 200, resolved);
       }
-      // Coins a seller has linked — powers the site's "Live right now" section.
+      // Coins a seller has linked: powers the site's "Live right now" section.
       // "live" here = a BIDit auction or giveaway is currently running on it.
       if (req.method === 'GET' && p === '/live') {
         return send(res, 200, await liveCoinsCached((room) => realtime.roomViewerCount(room)));
@@ -1709,7 +1709,7 @@ async function main() {
       const status = (err as { status?: number }).status ?? 500;
       // Our typed domain errors (e.g. PumpCreateError) set BOTH status and a
       // machine-readable code the client branches on (TX_EXPIRED → re-prepare).
-      // Only those get the code passed through — untyped errors default to 500
+      // Only those get the code passed through: untyped errors default to 500
       // above, so Node/Prisma internals (ECONNREFUSED, P2002…) never leak.
       const code = (err as { code?: unknown }).code;
       const typedCode = status !== 500 && typeof code === 'string' ? { code } : {};
@@ -1731,7 +1731,7 @@ const pumpCache = new Map<string, { at: number; data: unknown }>();
  *  requests/second forever. A live badge a minute stale is a fair trade. */
 const PUMP_CACHE_MS = 60_000;
 // Pump.fun runs streams on LiveKit. `/livestream/join` mints a fresh watch-only
-// viewer token per call (unique identity) — never cache it, or viewers collide.
+// viewer token per call (unique identity), never cache it, or viewers collide.
 const PUMP_LIVEKIT_HOST = process.env.BIDIT_PUMP_LIVEKIT_HOST ?? 'wss://pump-prod-tg2x8veh.livekit.cloud';
 // pump.fun's APIs sit behind Cloudflare, which 403s Node's default fetch UA
 // ("Just a moment…"). A real browser UA passes the bot check; origin/referer
@@ -1755,7 +1755,7 @@ async function pumpStreamInfo(mint: string) {
     const info = (infoRes && infoRes.ok ? await infoRes.json() : null) as Record<string, unknown> | null;
     const title = (info?.title as string) ?? null;
     const thumbnail = (info?.thumbnail as string) ?? null;
-    const streaming = info?.isLive === true; // pump's own (laggy) flag — debug signal only
+    const streaming = info?.isLive === true; // pump's own (laggy) flag: debug signal only
     // The join POST is uncached; a returned viewer token is the authoritative
     // "live / joinable" signal (it comes back empty when nobody's streaming).
     const joinRes = await fetch('https://livestream-api.pump.fun/livestream/join', {
@@ -1767,10 +1767,10 @@ async function pumpStreamInfo(mint: string) {
     const join = (joinRes.ok ? await joinRes.json() : null) as { token?: string } | null;
     if (!join?.token) {
       // Loud when it matters: the stream says live but pump won't hand us a
-      // viewer token (blocked/changed API) — this is the "badge says LIVE but
+      // viewer token (blocked/changed API): this is the "badge says LIVE but
       // the player says offline" case, so leave a trail in the server logs.
       if (!joinRes.ok || streaming) {
-        console.warn(`[pump] livestream/join HTTP ${joinRes.status} for ${m}${streaming ? ' — stream reports LIVE but no viewer token' : ''}`);
+        console.warn(`[pump] livestream/join HTTP ${joinRes.status} for ${m}${streaming ? ': stream reports LIVE but no viewer token' : ''}`);
       }
       return { live: false as const, streaming, title, thumbnail };
     }
@@ -1856,7 +1856,7 @@ async function liveCoinsCached(viewerCount: (room: string) => number): Promise<u
  *     tens of megabytes. Those are URLs now (see media.ts) and the browser
  *     caches each image once instead of re-downloading it inside every payload.
  *
- * The result is cached briefly on top of that — see liveCoinsCached.
+ * The result is cached briefly on top of that: see liveCoinsCached.
  */
 async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
@@ -1987,7 +1987,7 @@ async function buyerFulfillmentDto(buyerId: string) {
   };
 }
 
-/** The buyer's Purchases overview — every won/bought item across the lifecycle,
+/** The buyer's Purchases overview, every won/bought item across the lifecycle,
  *  bucketed into a `stage` the UI groups by (to_ship / in_transit / delivered). */
 async function buyerPurchasesDto(buyerId: string) {
   const rows = await getBuyerPurchases(buyerId, prisma);
@@ -2013,7 +2013,7 @@ async function buyerPurchasesDto(buyerId: string) {
 }
 
 /** Shipment DTO. Deliberately omits `privateLeg2` (the buyer's real address on a
- *  Private shipment) — only the operator sees that, never the seller. */
+ *  Private shipment), only the operator sees that, never the seller. */
 async function shipmentDto(shipmentId: string, opts: { forSeller?: boolean } = {}) {
   const s = await prisma.shipment.findUnique({ where: { id: shipmentId } });
   if (!s) return null;

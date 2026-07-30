@@ -1,11 +1,11 @@
 /**
- * The giveaway spotlight — a full-viewport centred overlay (its own shadow root,
+ * The giveaway spotlight: a full-viewport centred overlay (its own shadow root,
  * doesn't touch the page or the panel) for Whatnot-style giveaways.
  *
  * Two phases share one card:
- *   1. ENTRY   — prize + a live countdown + a growing pile of entrant avatars +
+ *   1. ENTRY: prize + a live countdown + a growing pile of entrant avatars +
  *                a glowing ENTER button (the viewer taps once to enter).
- *   2. REVEAL  — a horizontal avatar strip hops through the entrants and settles
+ *   2. REVEAL: a horizontal avatar strip hops through the entrants and settles
  *                on the winner, gold burst + confetti. Like the wheel, the hop is
  *                a pure function of the server's GIVEAWAY_WINNER (roll, target,
  *                duration, startsAt corrected for clock skew) so the seller and
@@ -215,7 +215,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
   // --- enter button ---
   const enterBtn = document.createElement('button');
   enterBtn.className = opts.eligible ? 'enter' : 'enter blocked';
-  enterBtn.textContent = opts.eligible ? 'Enter giveaway' : 'Buyers only — purchase to enter';
+  enterBtn.textContent = opts.eligible ? 'Enter giveaway' : 'Buyers only, purchase to enter';
   let entered_ = false;
   enterBtn.onclick = () => {
     if (entered_ || !opts.eligible) return;
@@ -330,7 +330,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
       const whead = el('div', 'whead');
       whead.textContent = r.isMe ? 'YOU WON!' : `@${r.winnerHandle}`;
       const wprize = el('div', 'wprize');
-      // textContent, NOT innerHTML — r.prize is seller-controlled and broadcast
+      // textContent, NOT innerHTML: r.prize is seller-controlled and broadcast
       // verbatim; as raw HTML it's a stored-XSS sink running in every viewer's
       // extension (token theft). Mirrors the safe entry-phase render above.
       const wprizeName = el('b');
@@ -373,7 +373,7 @@ export function showGiveaway(opts: GiveawayOpenOpts): GiveawayHandle {
     markRejected: (reason) => {
       enterBtn.className = 'enter blocked';
       enterBtn.textContent =
-        reason === 'NOT_ELIGIBLE' ? 'Buyers only — purchase to enter' : 'Entry closed';
+        reason === 'NOT_ELIGIBLE' ? 'Buyers only: purchase to enter' : 'Entry closed';
     },
     reveal,
     close: () => {

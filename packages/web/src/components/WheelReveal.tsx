@@ -5,14 +5,14 @@ import { runConfetti, CONFETTI } from '../lib/confetti';
 import type { RandomizerSpin, ReelSlot } from '../realtime';
 
 /**
- * The randomizer wheel reveal (portaled to body) — a vertical slot reel that
+ * The randomizer wheel reveal (portaled to body): a vertical slot reel that
  * decelerates onto the prize. A pure replay of the server's RANDOMIZER_SPIN
  * (reel / targetIndex / durationMs / startsAt), so it matches the on-stream
  * overlay. On settle it calls onLand with the prize, then onDone.
  *
  * Polish over the plain reel: velocity-mapped motion blur while it's flying, a
  * small overshoot that springs back so it *clicks* onto the prize, a winning-row
- * pop + band flare, and a confetti burst on land — all transform/opacity driven
+ * pop + band flare, and a confetti burst on land, all transform/opacity driven
  * to stay smooth (the blur is deduped to coarse steps so it never thrashes).
  */
 const ROW_H = 62;
@@ -42,7 +42,7 @@ export default function WheelReveal({
     const strip = stripRef.current;
     const startY = CENTER_SLOT * ROW_H;
     const endY = (CENTER_SLOT - spin.targetIndex) * ROW_H;
-    // Re-attach the art from the unique entry list — reel slots don't carry it,
+    // Re-attach the art from the unique entry list: reel slots don't carry it,
     // and the win celebration that follows shows the prize image.
     const idx = spin.reel[spin.targetIndex] ? spin.targetIndex : spin.reel.length - 1;
     const base = spin.reel[idx]!;

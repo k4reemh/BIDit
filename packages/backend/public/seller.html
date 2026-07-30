@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BIDit — Seller</title>
+    <title>BIDit: Seller</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -83,9 +83,9 @@
         <div class="card hidden" id="liveCard">
           <h2>Live auction</h2>
           <div class="row" style="justify-content:space-between">
-            <div><div class="muted" id="liveTitle">—</div><div class="big" id="liveBid">—</div></div>
-            <div style="text-align:right"><div class="muted">Leader</div><div id="liveLeader">—</div></div>
-            <div class="timer" id="liveTimer">—</div>
+            <div><div class="muted" id="liveTitle">-</div><div class="big" id="liveBid">-</div></div>
+            <div style="text-align:right"><div class="muted">Leader</div><div id="liveLeader">-</div></div>
+            <div class="timer" id="liveTimer">-</div>
           </div>
           <div class="muted" id="liveMsg" style="margin-top:8px"></div>
         </div>
@@ -134,7 +134,7 @@
         $('verBadge').textContent = verified ? 'yes' : 'no';
         $('verHint').innerHTML = verified
           ? 'You can create listings and run auctions.'
-          : 'Pending verification — an admin verifies you at <a href="/admin" target="_blank">/admin</a> (dev: sign in there as <b>admin</b>).';
+          : 'Pending verification, an admin verifies you at <a href="/admin" target="_blank">/admin</a> (dev: sign in there as <b>admin</b>).';
       }
 
       $('loginBtn').onclick = async () => {
@@ -165,10 +165,10 @@
           row.innerHTML = `<img src="${l.imageUrl || ''}" alt=""><div class="grow"><b>${l.title}</b><div class="muted">start $${l.startingBid} · <span class="pill">${l.status}</span>${wheelPill}</div></div>`;
           if (l.status === 'QUEUED') {
             const ed = document.createElement('div'); ed.className = 'wheelEditor hidden';
-            ed.innerHTML = `<label>Wheel prizes — bidders bid to win a roll; on close the wheel spins to assign the prize.<br>One per line: <b>Label | Tier | Weight</b> (tier &amp; weight optional). Leave empty for a normal auction.</label>`;
+            ed.innerHTML = `<label>Wheel prizes: bidders bid to win a roll; on close the wheel spins to assign the prize.<br>One per line: <b>Label | Tier | Weight</b> (tier &amp; weight optional). Leave empty for a normal auction.</label>`;
             const ta = document.createElement('textarea');
             ta.value = wheelToText(l.wheel);
-            ta.placeholder = 'Charizard ex — Alt Art | Chase | 1\nSealed Booster Box | Box\nSingle Booster Pack | Pack | 3';
+            ta.placeholder = 'Charizard ex: Alt Art | Chase | 1\nSealed Booster Box | Box\nSingle Booster Pack | Pack | 3';
             const saveWheel = document.createElement('button');
             saveWheel.textContent = 'Save wheel';
             saveWheel.style.marginTop = '8px';
@@ -208,7 +208,7 @@
           $('liveCard').classList.remove('hidden');
           $('liveTitle').textContent = m.title;
           $('liveBid').textContent = m.currentBid ? '$' + m.currentBid : 'no bids';
-          $('liveLeader').textContent = m.leaderHandle || '—';
+          $('liveLeader').textContent = m.leaderHandle || '-';
           endsAt = m.endsAt;
           if (m.status !== 'RUNNING') $('liveMsg').textContent = `status: ${m.status}`;
         } else if (m.type === 'BID_ACCEPTED') {

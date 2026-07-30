@@ -6,7 +6,7 @@ import { runConfetti } from '../lib/confetti';
 import type { GiveawayWinner } from '../realtime';
 
 /**
- * The giveaway winner reveal — a full-screen celebratory overlay, rendered via a
+ * The giveaway winner reveal: a full-screen celebratory overlay, rendered via a
  * portal to <body> so it's never trapped behind a page's stacking/overflow
  * context. A horizontal avatar strip hops through the entrants and settles on the
  * winner (pure function of the server's GIVEAWAY_WINNER), then a gold winner card

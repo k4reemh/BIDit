@@ -14,19 +14,19 @@ import { Check } from '../../icons';
 type Stage = 'idle' | 'working' | 'done';
 
 /**
- * "Create my livestream coin" — one click creates "<handle>'s BIDit Livestream"
+ * "Create my livestream coin", one click creates "<handle>'s BIDit Livestream"
  * on pump.fun under the SELLER's own pump.fun account (that's what makes
  * pump.fun show THEM the Start-livestream button) and auto-links it as their
  * saved coin.
  *
- * The seller signs pump.fun's sign-in message — a plain text signature, so it
+ * The seller signs pump.fun's sign-in message: a plain text signature, so it
  * costs nothing, moves nothing, and raises none of the wallet's scary
  * transaction warnings. If pump.fun won't play along we say so plainly and
  * point at the manual route; we never quietly fall back to a path that charges
  * a fee. In mock/dev mode the whole flow runs with no wallet at all.
  * Mounted in seller onboarding (step 2) and in Settings. Once a coin exists it
- * becomes the linked panel — address, copy button, and a link straight to the
- * coin page — so both screens show the same thing and neither has to rebuild it.
+ * becomes the linked panel: address, copy button, and a link straight to the
+ * coin page, so both screens show the same thing and neither has to rebuild it.
  */
 export default function CreateCoinCard({
   session,
@@ -167,8 +167,8 @@ export default function CreateCoinCard({
     }
   };
 
-  // One panel owns "this seller has a coin" — whether it was just created here or
-  // linked long ago — so the coin page is always one click away and the address
+  // One panel owns "this seller has a coin": whether it was just created here or
+  // linked long ago, so the coin page is always one click away and the address
   // is always in reach. Parents mount this card unconditionally.
   const linkedMint = mint || session.pumpCoinAddress || '';
   if (linkedMint) {

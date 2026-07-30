@@ -52,7 +52,7 @@ export default function Settings() {
         <p className="muted acct-note">Link the coin you stream on. Buyers who open its page see your live BIDit auctions. Give your stream a title and category so it stands out on the live grid.</p>
         {/* Renders the create button, or the linked panel (address + coin-page
             link) once there is a coin. onLinked keeps the field below in step
-            with a coin created right here — it was seeded on mount, so without
+            with a coin created right here: it was seeded on mount, so without
             this it would sit empty and look unsaved. */}
         <CreateCoinCard session={session} setSession={setSession} onLinked={setCoin} />
         <div className="fld">

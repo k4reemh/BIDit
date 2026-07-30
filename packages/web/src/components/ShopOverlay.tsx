@@ -5,7 +5,7 @@ import { Bag, Check, X, Verified } from '../icons';
 
 /**
  * The seller's shop, opened from the watch page: fixed-price items viewers can
- * buy outright — no bidding. A buy is two taps (Buy → Confirm), charged from the
+ * buy outright, no bidding. A buy is two taps (Buy → Confirm), charged from the
  * buyer's available USDC balance, and ships exactly like an auction win.
  */
 export default function ShopOverlay({

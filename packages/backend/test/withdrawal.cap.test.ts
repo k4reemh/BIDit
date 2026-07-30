@@ -26,12 +26,12 @@ describe('withdrawal daily cap + address validation', () => {
   it('rejects a withdrawal into an operator wallet or a deposit address (M1)', async () => {
     const u = await makeFundedUser('100');
     const chain = new MockChain();
-    // Each operator wallet — an on-chain self-transfer that still debits the user.
+    // Each operator wallet: an on-chain self-transfer that still debits the user.
     for (const w of ['treasury', 'escrow', 'buyback', 'fee'] as const) {
       await expect(requestWithdrawal(u.userId, chain.walletAddress(w), usdc('10'), chain, prisma))
         .rejects.toThrow(/valid withdrawal destination/);
     }
-    // A user deposit address is internal too — it would just round-trip via the sweep.
+    // A user deposit address is internal too: it would just round-trip via the sweep.
     const dep = await ensureDepositAddress(u.userId, chain, prisma);
     await expect(requestWithdrawal(u.userId, dep, usdc('10'), chain, prisma))
       .rejects.toThrow(/valid withdrawal destination/);
@@ -51,7 +51,7 @@ describe('withdrawal daily cap + address validation', () => {
     expect(await withdrawnLast24h(u.userId, prisma)).toBe(usdc('1000'));
   });
 
-  it('holds the daily cap under CONCURRENT withdrawals (M4 — atomic)', async () => {
+  it('holds the daily cap under CONCURRENT withdrawals (M4: atomic)', async () => {
     const u = await makeFundedUser('5000'); // funds well over the cap, so only the cap can block
     const chain = new MockChain();
     // Fire 15 concurrent $100 withdrawals against the $1,000/day cap. Without the

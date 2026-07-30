@@ -35,7 +35,7 @@ export const FEATURED_CATEGORIES = CATEGORIES.filter(
   (c): c is Required<Category> => Boolean(c.image),
 );
 
-/** Interest options shown during onboarding (labels only — no emoji). */
+/** Interest options shown during onboarding (labels only, no emoji). */
 export const INTERESTS = [
   { id: 'pokemon', label: 'Pokémon' },
   { id: 'one-piece', label: 'One Piece' },

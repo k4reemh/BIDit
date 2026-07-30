@@ -1,9 +1,9 @@
 /**
- * Real Solana (devnet) implementation of ChainClient — moves actual SPL USDC.
+ * Real Solana (devnet) implementation of ChainClient: moves actual SPL USDC.
  *
  * SAFETY: keypairs are loaded from env (never hardcoded/committed); the cluster
  * defaults to devnet and mainnet is refused unless BIDIT_ALLOW_MAINNET=yes. USDC
- * has 6 decimals, so micro-units map 1:1 to token base units — no floats.
+ * has 6 decimals, so micro-units map 1:1 to token base units, no floats.
  *
  * NOTE: this file is wired against @solana/web3.js but is exercised on real
  * devnet via the runbook (docs/DEVNET.md), not the in-process test suite. The
@@ -68,7 +68,7 @@ export class SolanaChain implements ChainClient {
       if (process.env.BIDIT_ALLOW_MAINNET !== 'yes') {
         throw new Error('Refusing mainnet-beta without BIDIT_ALLOW_MAINNET=yes');
       }
-      // On mainnet the deposit master seed controls real user funds — refuse the
+      // On mainnet the deposit master seed controls real user funds: refuse the
       // insecure default so real money is never derived from a known seed.
       const seed = process.env.BIDIT_WALLET_SEED;
       if (!seed || seed === 'dev-insecure-wallet-seed-change-me' || seed.length < 24) {
@@ -80,7 +80,7 @@ export class SolanaChain implements ChainClient {
     const treasury = loadKeypair('TREASURY_SECRET');
     // In direct-payout mode escrow/buyback/fee are unused, so each falls back to
     // treasury when its secret is unset (single-wallet live test). For escrow mode
-    // these MUST be distinct wallets or the on-chain legs become self-transfers —
+    // these MUST be distinct wallets or the on-chain legs become self-transfers:
     // the escrow launch checklist verifies they're set (see docs/ESCROW-DESIGN.md).
     const escrow = process.env.ESCROW_SECRET ? loadKeypair('ESCROW_SECRET') : treasury;
     const buyback = process.env.BUYBACK_SECRET ? loadKeypair('BUYBACK_SECRET') : treasury;
@@ -138,8 +138,8 @@ export class SolanaChain implements ChainClient {
   /**
    * Broadcast a transfer WITHOUT waiting for confirmation (withdrawal rail).
    *
-   * All fallible pre-broadcast work — ensuring the ATAs, fetching the blockhash,
-   * building and signing — happens first; if any of it throws, the value transfer
+   * All fallible pre-broadcast work: ensuring the ATAs, fetching the blockhash,
+   * building and signing: happens first; if any of it throws, the value transfer
    * never went out and the caller can safely reverse. Once we've signed, the
    * signature is fixed (a property of the signed bytes), so we return it even if
    * the `sendRawTransaction` ack is lost to a timeout: the tx may still land, and
@@ -169,16 +169,16 @@ export class SolanaChain implements ChainClient {
     const { value } = await this.conn.getSignatureStatuses([sig], { searchTransactionHistory: true });
     const st = value[0];
     if (st) {
-      if (st.err) return 'failed'; // processed but reverted — the transfer did not move funds
+      if (st.err) return 'failed'; // processed but reverted: the transfer did not move funds
       if (st.confirmationStatus === 'confirmed' || st.confirmationStatus === 'finalized') return 'confirmed';
-      return 'unknown'; // 'processed' only — not yet safely confirmed
+      return 'unknown'; // 'processed' only, not yet safely confirmed
     }
     // Not found on-chain. If its blockhash has expired, it can never land → dead.
     if (lastValidBlockHeight != null) {
       const height = await this.conn.getBlockHeight('confirmed');
       if (BigInt(height) > lastValidBlockHeight) return 'failed';
     }
-    return 'unknown'; // still within the validity window (or unknown expiry) — keep waiting
+    return 'unknown'; // still within the validity window (or unknown expiry): keep waiting
   }
 
   isValidAddress(address: string): boolean {
@@ -247,7 +247,7 @@ export class SolanaChain implements ChainClient {
     for (const { userId, depositKp } of funded) {
       // Each address is swept in its own try/catch. A failure here (treasury out
       // of SOL for fees, an RPC hiccup, an ATA-creation race) must NEVER abort the
-      // poll or crash the process — the user's USDC stays safe at their deposit
+      // poll or crash the process: the user's USDC stays safe at their deposit
       // address and the sweep is retried on the next poll once the cause clears.
       try {
         const amount = await this.balance(depositKp.publicKey.toBase58());

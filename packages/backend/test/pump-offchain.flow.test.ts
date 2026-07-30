@@ -1,11 +1,11 @@
 /**
- * Off-chain coin create — the path that actually ships on mainnet.
+ * Off-chain coin create: the path that actually ships on mainnet.
  *
  * The seller proves wallet ownership by signing pump.fun's sign-in text; we
  * verify that signature ourselves before it is worth anything to anyone, then
  * create the coin through pump.fun in one call. These tests drive the real
  * domain flow with a mock provider (no network), and sign with a throwaway
- * keypair generated per test — no wallet, no chain, no secrets.
+ * keypair generated per test, no wallet, no chain, no secrets.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import nacl from 'tweetnacl';
@@ -63,7 +63,7 @@ describe('off-chain coin create', () => {
     expect(result.txSig).toBeNull();
   });
 
-  it('never stores the sign-in signature — it is a session credential', async () => {
+  it('never stores the sign-in signature: it is a session credential', async () => {
     const s = await makeUser('seller');
     const w = wallet();
     const prep = await prepareCoinCreate(s.userId, w.address, provider, prisma);
@@ -147,7 +147,7 @@ describe('off-chain coin create', () => {
     const s = await makeUser('seller');
     const w = wallet();
     const prep = await prepareCoinCreate(s.userId, w.address, provider, prisma);
-    provider.failNextComplete('pump.fun is rate-limiting new coins right now — try again in a few minutes.');
+    provider.failNextComplete('pump.fun is rate-limiting new coins right now: try again in a few minutes.');
 
     await expect(
       submitCoinCreate(
@@ -164,7 +164,7 @@ describe('off-chain coin create', () => {
     expect(dead.status).toBe('FAILED');
     expect(dead.lastError).toContain('rate-limiting');
 
-    // A fresh attempt works — the failure superseded nothing permanent.
+    // A fresh attempt works: the failure superseded nothing permanent.
     const retry = await prepareCoinCreate(s.userId, w.address, provider, prisma);
     const ok = await submitCoinCreate(
       s.userId,

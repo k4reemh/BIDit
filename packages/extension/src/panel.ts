@@ -1,5 +1,5 @@
 /**
- * The injected auction panel — pure DOM, no chrome.* APIs, so the content script
+ * The injected auction panel: pure DOM, no chrome.* APIs, so the content script
  * and the dev preview harness share it. Renders authoritative server state and
  * surfaces user intent via callbacks; computes nothing financial. The only local
  * work is ticking the countdown (synced to server time) and the micro-animations.
@@ -24,9 +24,9 @@ export interface PanelHandle {
   applyClosed(c: AuctionClosedMessage): void;
   applyRejected(r: BidRejectedMessage): void;
   pushBid(handle: string, amount: string): void;
-  /** Your bid was accepted — throw a short +$X burst off the button. */
+  /** Your bid was accepted: throw a short +$X burst off the button. */
   showBidBurst(amount: string): void;
-  /** Anti-snipe: a late bid pushed the deadline — flash the "EXTENDED!" badge. */
+  /** Anti-snipe: a late bid pushed the deadline, flash the "EXTENDED!" badge. */
   flashExtended(): void;
   setStatus(text: string, kind?: StatusKind): void;
   setNoAuction(linked: boolean): void;
@@ -36,12 +36,12 @@ export interface PanelHandle {
 type StatusKind = 'info' | 'error' | 'outbid' | 'leading';
 
 const REJECT_TEXT: Record<RealtimeRejectReason, [string, StatusKind]> = {
-  INSUFFICIENT_BALANCE: ['Not enough balance — add funds', 'error'],
-  BID_TOO_LOW: ['Too low — try the suggested bid', 'error'],
+  INSUFFICIENT_BALANCE: ['Not enough balance, add funds', 'error'],
+  BID_TOO_LOW: ['Too low, try the suggested bid', 'error'],
   ALREADY_LEADING: ["You're already winning", 'leading'],
   AUCTION_ENDED: ['Auction has ended', 'info'],
   AUCTION_NOT_FOUND: ['Auction not found', 'error'],
-  RATE_LIMITED: ['Slow down — too many bids', 'error'],
+  RATE_LIMITED: ['Slow down, too many bids', 'error'],
   EMAIL_UNVERIFIED: ['Confirm your email on BIDit first', 'error'],
 };
 
@@ -76,7 +76,7 @@ function countUp(node: HTMLElement, from: number, to: number, finalText: string)
   const t0 = performance.now();
   const step = (t: number): void => {
     const p = Math.min(1, (t - t0) / dur);
-    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic — fast then settles
+    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic: fast then settles
     node.textContent = `$${(from + (to - from) * eased).toFixed(decimals)}`;
     if (p < 1) {
       n._cuRaf = requestAnimationFrame(step);
@@ -118,7 +118,7 @@ interface Sparks {
 
 /**
  * A tiny additive-blend spark emitter that burns at the timer bar's leading edge
- * during the final 10s — like a lit fuse racing the clock. Particles spawn only
+ * during the final 10s: like a lit fuse racing the clock. Particles spawn only
  * while `running`; the loop sleeps once everything has burned out (no idle cost).
  */
 function makeSparks(canvas: HTMLCanvasElement): Sparks {
@@ -216,7 +216,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
   const dot = el('i', 'dot');
   const connText = el('span', 'conn-text', 'connecting…');
   conn.append(dot, connText);
-  const grip = el('div', 'grip', '⠿'); // drag affordance — header is the grab handle
+  const grip = el('div', 'grip', '⠿'); // drag affordance: header is the grab handle
 
   // Theme toggle: light "White Clean" ⇄ dark "Navy Immersive". Themed via a
   // data-theme attribute on the shadow host; the choice persists per browser.
@@ -265,10 +265,10 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
 
   const clockrow = el('div', 'clockrow');
   const bidBlock = el('div', 'block');
-  const currentBidEl = el('div', 'bid', '—');
+  const currentBidEl = el('div', 'bid', '-');
   bidBlock.append(el('div', 'label', 'Current bid'), currentBidEl);
   const timerBlock = el('div', 'block right');
-  const timerEl = el('div', 'timer', '—');
+  const timerEl = el('div', 'timer', '-');
   const timerLabel = el('div', 'label', 'remaining');
   timerBlock.append(timerEl, timerLabel);
   clockrow.append(bidBlock, timerBlock);
@@ -281,10 +281,10 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
   progressWrap.append(progress, sparkCanvas);
   const sparks = makeSparks(sparkCanvas);
 
-  // Anti-snipe flash — a transient badge that pops over the timer on extension.
+  // Anti-snipe flash: a transient badge that pops over the timer on extension.
   const ext = el('div', 'ext', '⏱ EXTENDED!');
 
-  // Randomizer prize pool — a collapsible "what's on the wheel" list.
+  // Randomizer prize pool: a collapsible "what's on the wheel" list.
   const prizes = el('div', 'prizes hidden');
   const prizesToggle = el('button', 'prizestoggle');
   const prizesList = el('div', 'prizeslist hidden');
@@ -318,7 +318,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
 
   // Footer
   const footer = el('div', 'footer');
-  const availEl = el('b', 'avail', '—');
+  const availEl = el('b', 'avail', '-');
   footer.append(el('span', 'flabel', 'Balance'), availEl);
 
   root.append(head, body, empty, footer);
@@ -349,7 +349,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
     timerEl.classList.toggle('beat', red);
     bar.classList.toggle('red', red);
     root.classList.toggle('final', final);
-    // Sparks ride the bar's leading edge — lit only in the final 10s.
+    // Sparks ride the bar's leading edge: lit only in the final 10s.
     sparks.setFill(pct / 100);
     if (red) sparks.start();
     else sparks.stop();
@@ -443,7 +443,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       connText.textContent = connected ? (handle ?? 'connected') : 'connecting…';
     },
     setBalance(available) {
-      availEl.textContent = available !== null ? `$${available}` : '—';
+      availEl.textContent = available !== null ? `$${available}` : '-';
     },
     applyState(s) {
       // After a win the server echoes a final SETTLING state; ignore it so the
@@ -497,7 +497,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
         }
         lastBidNum = toNum;
       } else {
-        currentBidEl.textContent = '—';
+        currentBidEl.textContent = '-';
         lastBidNum = 0;
       }
       lastBid = s.currentBid;
@@ -512,7 +512,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
         ? "You're winning"
         : s.leaderHandle
           ? `${s.leaderHandle} is winning`
-          : 'No bids yet — take the lead';
+          : 'No bids yet, take the lead';
 
       if (leadingMe) {
         setStatus("You're winning", 'leading');
@@ -560,7 +560,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
       amount.disabled = true;
       const won = c.winnerHandle === myHandle && myHandle !== null;
       setStatus(
-        c.winnerHandle ? (won ? `You won for $${c.amount}!` : `Sold to ${c.winnerHandle} · $${c.amount}`) : 'Ended — no sale',
+        c.winnerHandle ? (won ? `You won for $${c.amount}!` : `Sold to ${c.winnerHandle} · $${c.amount}`) : 'Ended, no sale',
         won ? 'leading' : 'info',
       );
     },

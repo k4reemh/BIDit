@@ -5,7 +5,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { requireSeller } from './authz.js';
 
-// Bounds on seller-controlled listing input — a listing is broadcast to every
+// Bounds on seller-controlled listing input: a listing is broadcast to every
 // viewer, so uncapped strings/arrays are a realtime-DoS + storage risk.
 const MAX_TITLE_LEN = 140;
 const MAX_DESC_LEN = 2000;
@@ -33,7 +33,7 @@ export interface CreateListingInput {
   description?: string;
   photos?: string[];
   startingBid: Micros;
-  /** Optional store "buy now" price — puts the item in the seller's shop. */
+  /** Optional store "buy now" price: puts the item in the seller's shop. */
   buyNowPrice?: Micros;
   quantity?: number;
   weightGrams?: number;
@@ -80,7 +80,7 @@ export function listSellerListings(
 /**
  * Attach (or clear) a wheel-spin prize pool on one of the seller's listings.
  * Verified-seller + ownership gated, and only allowed while the listing is still
- * QUEUED — the wheel must be set up BEFORE the auction runs, never mid-flight.
+ * QUEUED: the wheel must be set up BEFORE the auction runs, never mid-flight.
  * Passing an empty list clears the wheel (back to a normal auction).
  */
 export async function setListingWheel(
@@ -114,7 +114,7 @@ export async function setListingWheel(
 
 /**
  * Set (or clear, with null) the store "buy now" price on one of the seller's
- * listings. Ownership gated; allowed any time before the listing is SOLD — the
+ * listings. Ownership gated; allowed any time before the listing is SOLD: the
  * store only ever *shows* QUEUED listings, so pricing a LIVE one just takes
  * effect after its auction closes.
  */

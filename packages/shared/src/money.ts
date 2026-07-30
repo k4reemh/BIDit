@@ -3,7 +3,7 @@
  *
  * Everything financial in BIDit is an integer number of USDC micro-units
  * (6 decimals), represented as a `bigint`. Never use floats for money. The
- * `Micros` brand is just `bigint` — kept as an alias for readability.
+ * `Micros` brand is just `bigint`: kept as an alias for readability.
  */
 
 export type Micros = bigint;
@@ -77,7 +77,7 @@ export function formatUsdc(micros: Micros): string {
  * Split a winning bid into platform fee + seller proceeds.
  *
  * Integer math with floor on the fee, then proceeds = amount - fee. Because
- * proceeds is computed as the remainder, fee + proceeds === amount exactly —
+ * proceeds is computed as the remainder, fee + proceeds === amount exactly,
  * no rounding leak, money is conserved to the micro-unit.
  */
 export function splitAmount(

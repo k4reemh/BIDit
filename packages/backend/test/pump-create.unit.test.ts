@@ -77,7 +77,7 @@ describe('getPumpCreateProvider', () => {
     delete process.env.BIDIT_PUMP_PROVIDER;
     expect(getPumpCreateProvider('mock')).toBeInstanceOf(MockOffchainProvider);
     expect(getPumpCreateProvider('devnet')).toBeInstanceOf(MockOffchainProvider);
-    // Mainnet sellers get the free, warning-free path — never PumpPortal, which
+    // Mainnet sellers get the free, warning-free path, never PumpPortal, which
     // costs network fees and makes the wallet flash a scary-tx warning.
     expect(getPumpCreateProvider('mainnet-beta')).toBeInstanceOf(PumpOffchainProvider);
   });

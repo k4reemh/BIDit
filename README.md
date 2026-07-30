@@ -1,30 +1,30 @@
 # BIDit
 
-**Live trading-card auctions on Pump.fun livestreams — bid in real time, settle in USDC.**
+**Live auctions on Pump.fun livestreams: bid in real time, settle in USDC.**
 
 BIDit turns a Pump.fun stream into a live auction house. Sellers run rapid-fire
-auctions and randomizer wheels on their coin's stream; viewers bid in real time
-from the web app or a browser overlay; every sale settles in USDC on Solana, with
-a slice of each sale routed to a $BID buyback.
+auctions and randomizer wheels on their coin's stream; viewers watch and bid on
+the BIDit web app; every sale settles in USDC on Solana, with a slice of each
+sale routed to a $BID buyback.
 
-- **Real-time and fair** — server-authoritative bidding with anti-snipe: a
+- **Real-time and fair.** Server-authoritative bidding with anti-snipe: a
   late bid extends the clock, so there are no last-second snipes.
-- **USDC-settled on Solana** — deposits, bids, and payouts all run on real USDC.
-- **Money that can't drift** — every balance is derived from an append-only,
+- **USDC-settled on Solana.** Deposits, bids, and payouts all run on real USDC.
+- **Money that can't drift.** Every balance is derived from an append-only,
   double-entry ledger. The total across all accounts is invariantly zero, so a
   bug can't create or destroy funds.
-- **Runs where the audience already is** — a browser overlay injects the auction
-  panel onto a live Pump.fun coin page, and the same auctions play on the web app.
+- **Nothing to install.** The seller's stream plays inside the BIDit watch page
+  with the auction panel beside it, on desktop and mobile alike.
 
 ---
 
 ## How it works
 
-**Buyers** — deposit USDC, join a live stream, and bid. Funds are only reserved
+**Buyers.** Deposit USDC, join a live stream, and bid. Funds are only reserved
 while you're the high bidder and charged when you win. Win it, pay shipping, and
 it ships to you.
 
-**Sellers** — link your Pump.fun coin, queue your cards, and fire auctions one at
+**Sellers.** Link your Pump.fun coin, queue your items, and fire auctions one at
 a time while you stream. Get paid in USDC. Fulfill ten orders to earn a Verified
 Seller badge.
 
@@ -34,16 +34,16 @@ A TypeScript monorepo with two layers over a shared domain package:
 
 | Package | What it is |
 | --- | --- |
-| `@bidit/backend` | The engine — auctions, timers, the ledger, escrow, the real-time WebSocket server, and the Solana USDC rails. Node + Prisma (PostgreSQL). |
-| `@bidit/web` | The consumer web app — homepage, live watch/bid page, buyer and seller dashboards, admin. React + Vite. |
-| `@bidit/shared` | Domain enums, the money type, and the wire protocol — one source of truth so the layers can't drift. |
+| `@bidit/backend` | The engine: auctions, timers, the ledger, escrow, the real-time WebSocket server, and the Solana USDC rails. Node + Prisma (PostgreSQL). |
+| `@bidit/web` | The consumer web app: homepage, live watch/bid page, buyer and seller dashboards, admin. React + Vite. |
+| `@bidit/shared` | Domain enums, the money type, and the wire protocol: one source of truth so the layers can't drift. |
 
 **The server is authoritative.** Clients render state and send intents; they
 never decide balances, timers, or bid validity. A single server clock drives
 every deadline, so anti-snipe and auction close are deterministic and tested
 against a manual clock with zero sleeping.
 
-**The ledger.** `Account` has no balance column — balance is always derived:
+**The ledger.** `Account` has no balance column: balance is always derived:
 
 ```
 available = settled − active_holds
@@ -52,7 +52,7 @@ settled   = SUM(ledger.amount for the account)
 
 Every operation is double-entry (legs sum to zero), amounts are `bigint`
 micro-units rather than floats, and balance-changing writes take a row lock and
-re-check funds inside the transaction — so overdrafts and double-spends are
+re-check funds inside the transaction, so overdrafts and double-spends are
 impossible by construction.
 
 **Money rails.** USDC deposits, withdrawals, and payouts run through a
@@ -72,7 +72,7 @@ packages/
 
 ## Run it locally
 
-No Docker or system Postgres required — an embedded PostgreSQL runs inside the
+No Docker or system Postgres required: an embedded PostgreSQL runs inside the
 project.
 
 ```bash
@@ -83,7 +83,7 @@ npm run dev        # dev server at http://localhost:8787  ( / · /seller · /adm
 
 ## Testing
 
-The backend ships with 160+ tests, including a **property test** that checks the
+The backend ships with 370+ tests, including a **property test** that checks the
 ledger against a reference model for conservation and non-negativity, a
 **concurrency test** proving no double-spend under parallel bids, and an
 **enum-drift test** that keeps the shared types and the database schema in
@@ -100,11 +100,13 @@ managed Postgres; the web app deploys to Vercel.
 
 ## Status
 
-BIDit is in early access. The auction engine, real-time layer, web app,
-seller flow, and USDC settlement rails are built and tested. The
-current release pays sellers directly on a sale; the delivery-gated escrow flow
-and the non-custodial on-chain program are the next milestones.
+BIDit is live on Solana mainnet with real USDC. The auction engine, real-time
+layer, web app, seller flow, delivery-gated escrow, and USDC settlement rails are
+built and tested. Custody is currently operator-held: BIDit runs the treasury and
+escrow wallets, so the trust model is that of a custodial marketplace. Moving
+escrow into a non-custodial on-chain program, and a third-party audit, are the
+next milestones.
 
 ## License
 
-© 2026 BIDit — all rights reserved. See [`LICENSE`](LICENSE).
+© 2026 BIDit, all rights reserved. See [`LICENSE`](LICENSE).

@@ -23,7 +23,7 @@ async function makeAdmin(): Promise<string> {
   return user.id;
 }
 
-/** A seller who has applied (active, but UNVERIFIED — no badge). */
+/** A seller who has applied (active, but UNVERIFIED, no badge). */
 async function activeSeller(): Promise<string> {
   const seller = await makeUser('buyer');
   await applyAsSeller(seller.userId, prisma);

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "BIDit Manifest V3 extension — injects the auction panel onto Pump.fun streams.",
+  "description": "BIDit Manifest V3 extension, injects the auction panel onto Pump.fun streams.",
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"

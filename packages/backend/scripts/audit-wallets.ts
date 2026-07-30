@@ -2,7 +2,7 @@
  * Wallet ↔ ledger reconciliation CLI. Reads DATABASE_URL + SOLANA_RPC (+ wallet
  * secrets) from the environment, so run it against PRODUCTION (or on the Render
  * shell) to verify every wallet matches its ledger account before flipping
- * BIDIT_PAYOUT_MODE to escrow — and as an ongoing health check afterward.
+ * BIDIT_PAYOUT_MODE to escrow, and as an ongoing health check afterward.
  *
  *   DATABASE_URL=<prod> SOLANA_RPC=<rpc> ESCROW_SECRET=… BUYBACK_SECRET=… FEE_SECRET=… \
  *   npm -w @bidit/backend run audit:wallets
@@ -25,11 +25,11 @@ async function main() {
   }
   console.log(`\npending on-chain legs (settler outbox): ${recon.pendingLegs}`);
   if (recon.reconciled) {
-    console.log('\n✅ Reconciled — every wallet matches its ledger account.\n');
+    console.log('\n✅ Reconciled, every wallet matches its ledger account.\n');
   } else if (recon.pendingLegs > 0) {
-    console.log(`\n⏳ Not reconciled yet, but ${recon.pendingLegs} leg(s) are still settling — re-run once the settler drains.\n`);
+    console.log(`\n⏳ Not reconciled yet, but ${recon.pendingLegs} leg(s) are still settling: re-run once the settler drains.\n`);
   } else {
-    console.log('\n⚠️  MISMATCH with no pending legs — investigate before flipping to escrow.\n');
+    console.log('\n⚠️  MISMATCH with no pending legs: investigate before flipping to escrow.\n');
   }
   await prisma.$disconnect();
 }

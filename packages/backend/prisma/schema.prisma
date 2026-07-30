@@ -1,10 +1,10 @@
-// BIDit data model — Chunk 1.
+// BIDit data model: Chunk 1.
 //
 // Enum member names MUST stay identical to packages/shared/src/enums.ts.
 // test/enums.drift.test.ts fails the build if they drift.
 //
 // All money is BigInt micro-units (USDC, 6 decimals). Account holds NO balance
-// column — balance is always derived from append-only LedgerEntry rows.
+// column: balance is always derived from append-only LedgerEntry rows.
 
 generator client {
   provider = "prisma-client-js"
@@ -103,7 +103,7 @@ model User {
   // Email ownership. New email signups start false and must enter the code we
   // mail them; wallet logins are true (they proved key ownership) and accounts
   // that predate this feature are backfilled true on boot (see bootstrap.ts).
-  // The code itself is never stored — only an HMAC of it.
+  // The code itself is never stored, only an HMAC of it.
   emailVerified Boolean  @default(false)
   verifyCodeHash String?
   verifyCodeExpiresAt DateTime?
@@ -129,10 +129,10 @@ model User {
   onboarded     Boolean  @default(false)
   walletAddress String?  @unique
   role          Role     @default(buyer)
-  // BIDit Points — activity rewards redeemed against future community airdrops.
+  // BIDit Points: activity rewards redeemed against future community airdrops.
   // Denormalized sum of PointsEvents, kept in step for fast leaderboard reads.
   points        BigInt   @default(0)
-  // Sessions (bearer tokens) issued before this instant are revoked — set on
+  // Sessions (bearer tokens) issued before this instant are revoked: set on
   // logout / password change. null = never revoked. Mirrored in-memory for O(1) auth.
   sessionsValidFrom DateTime?
   createdAt     DateTime @default(now())
@@ -206,13 +206,13 @@ model SellerProfile {
 /// Audit + idempotency for auto-creating a seller's pump.fun coin ("<handle>'s
 /// BIDit Livestream"). The seller's own wallet signs the create tx (they must be
 /// the on-chain creator for pump.fun to let them livestream); the backend only
-/// prepares, vets, and broadcasts. The ephemeral mint keypair is never stored —
+/// prepares, vets, and broadcasts. The ephemeral mint keypair is never stored:
 /// txB64 carries the mint-signed transaction, which contains no secrets.
-///   PREPARED   — tx built + mint-signed; awaiting the seller's creator signature.
-///   SUBMITTED  — broadcast; txSig known; awaiting on-chain confirmation.
-///   CONFIRMED  — landed; mint linked as the seller's coin (terminal).
-///   FAILED     — provably dead (on-chain error / blockhash expired); retry allowed (terminal).
-///   SUPERSEDED — replaced by a newer prepare before submit (terminal).
+///   PREPARED: tx built + mint-signed; awaiting the seller's creator signature.
+///   SUBMITTED: broadcast; txSig known; awaiting on-chain confirmation.
+///   CONFIRMED: landed; mint linked as the seller's coin (terminal).
+///   FAILED: provably dead (on-chain error / blockhash expired); retry allowed (terminal).
+///   SUPERSEDED: replaced by a newer prepare before submit (terminal).
 model PumpCoinCreateAttempt {
   id                   String   @id @default(cuid())
   sellerId             String
@@ -224,12 +224,12 @@ model PumpCoinCreateAttempt {
   name                 String
   symbol               String
   metadataUri          String?
-  txB64                String?  // partially-signed create tx (mint sig only — no secrets)
+  txB64                String?  // partially-signed create tx (mint sig only, no secrets)
   txSig                String?
   lastValidBlockHeight BigInt?
   // Off-chain creates only: the ms timestamp baked into the pump.fun sign-in
   // message. Lets the server rebuild the exact signed text and bound its age.
-  // The signature itself is never stored — it is a session-granting credential.
+  // The signature itself is never stored: it is a session-granting credential.
   loginTimestamp       BigInt?
   status               String   @default("PREPARED") // PREPARED | SUBMITTED | CONFIRMED | FAILED | SUPERSEDED
   lastError            String?
@@ -259,14 +259,14 @@ model Account {
 ///
 /// Durable settlement state machine (see withdrawals.ts). The ledger debit is
 /// posted once, up front; the row then tracks the on-chain transfer's fate so we
-/// only ever reverse the debit when the chain *proves* the transfer is dead —
+/// only ever reverse the debit when the chain *proves* the transfer is dead:
 /// never on an ambiguous send timeout (which could otherwise double-credit a user
 /// whose USDC actually left the treasury).
-///   PENDING      — created + debited, not yet broadcast.
-///   SUBMITTED    — broadcast; signature known; awaiting confirmation.
-///   CONFIRMED    — transfer finalized on-chain (terminal).
-///   FAILED       — transfer permanently dead; debit reversed exactly once (terminal).
-///   NEEDS_REVIEW — fate still indeterminate after a long time (RPC outage); debit
+///   PENDING: created + debited, not yet broadcast.
+///   SUBMITTED: broadcast; signature known; awaiting confirmation.
+///   CONFIRMED: transfer finalized on-chain (terminal).
+///   FAILED: transfer permanently dead; debit reversed exactly once (terminal).
+///   NEEDS_REVIEW: fate still indeterminate after a long time (RPC outage); debit
 ///                  retained (NOT reversed) and surfaced for an operator.
 model Withdrawal {
   id        String   @id @default(cuid())
@@ -299,12 +299,12 @@ model Withdrawal {
 /// refund, shipping→fee). Each row is enqueued ATOMICALLY with its ledger move
 /// (same DB transaction, keyed for idempotency), and a ChainSettler drives it to
 /// CONFIRMED. Because every wallet here is operator-controlled, a failed/expired
-/// send is simply retried with a fresh blockhash — funds never leave our control,
+/// send is simply retried with a fresh blockhash: funds never leave our control,
 /// so a crash can neither lose money nor double-move it. This is what makes the
 /// DB↔chain boundary safe (see chain-settle.ts).
 model ChainTransfer {
   id                   String    @id @default(cuid())
-  /// One row per logical leg — e.g. `lock:<orderId>`, `release-seller:<orderId>`,
+  /// One row per logical leg: e.g. `lock:<orderId>`, `release-seller:<orderId>`,
   /// `shipping:<shipmentId>`. Unique, so enqueuing is idempotent.
   key                  String    @unique
   fromWallet           String    // treasury | escrow | buyback | fee
@@ -357,7 +357,7 @@ model Listing {
   photos      String[]
   startingBid BigInt
   /** Store "buy now" price (micro-USDC). When set, the listing also appears in
-   *  the seller's shop and can be bought outright — no auction needed. */
+   *  the seller's shop and can be bought outright, no auction needed. */
   buyNowPrice BigInt?
   /** Units the seller has of this item. Each sale decrements it; while > 0 the
    *  listing can be auctioned again. */
@@ -368,7 +368,7 @@ model Listing {
   createdAt   DateTime      @default(now())
 
   /** Optional wheel-spin prize pool (WheelEntry[]). When set, the auction is a
-   *  "bid to win a roll" — on close the server spins to assign the prize. */
+   *  "bid to win a roll": on close the server spins to assign the prize. */
   wheel       Json?
 
   auctions Auction[]
@@ -441,7 +441,7 @@ model Hold {
 
 model Order {
   id             String      @id @default(cuid())
-  /** The auction this order settles — null for store ("buy now") purchases. */
+  /** The auction this order settles: null for store ("buy now") purchases. */
   auctionId      String?     @unique
   auction        Auction?    @relation(fields: [auctionId], references: [id])
   /** Direct listing link for store purchases (auction orders reach the listing
@@ -491,7 +491,7 @@ model FulfillmentItem {
   title       String
   photo       String?
   weightGrams Int?
-  amount      BigInt    // item price paid — for display + forfeit accounting
+  amount      BigInt    // item price paid, for display + forfeit accounting
   status      String    @default("READY_TO_SHIP") // READY_TO_SHIP | IN_SHIPMENT | SHIPPED | DELIVERED | DISCARDED
   heldUntil   DateTime? // seller physically holds the item until this (ship-later 7d cap)
   shipmentId  String?
@@ -543,7 +543,7 @@ model Shipment {
 
 /// Weekly bundling: while a buyer has an open pass with a seller, that week's
 /// wins ride the same Shipment for free (shipping charged once, at the first win
-/// of the week — see decision log). Closed when the seller ships the bundle.
+/// of the week: see decision log). Closed when the seller ships the bundle.
 model WeeklyShippingPass {
   id         String    @id @default(cuid())
   buyerId    String
@@ -576,7 +576,7 @@ model Notification {
 // Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid
 // coupling to shared/enums.ts via the drift test; values are validated in code.
 // The server commits seedHash at open and reveals seed at the draw, so the
-// winner is verifiable. No formal User relation — entrant handles are fetched
+// winner is verifiable. No formal User relation: entrant handles are fetched
 // by id when the roll is built.
 model Giveaway {
   id           String    @id @default(cuid())
@@ -609,7 +609,7 @@ model GiveawayEntry {
   @@index([giveawayId])
 }
 
-/// One points grant — the append-only audit trail behind User.points. `kind` is
+/// One points grant: the append-only audit trail behind User.points. `kind` is
 /// 'buy'/'sell' for automatic accrual (ref = orderId) or 'mission:<id>' for a
 /// claimed one-time bonus (ref = ''). The unique key makes every award idempotent.
 model PointsEvent {
@@ -648,7 +648,7 @@ model DepositReceipt {
 /**
  * A user the seller has trusted to moderate their room's live chat: same powers
  * as the seller over messages (delete, block) and the chat cooldown, and
- * nothing else — moderators never touch listings, orders or money.
+ * nothing else: moderators never touch listings, orders or money.
  */
 model ChatModerator {
   id        String   @id @default(cuid())

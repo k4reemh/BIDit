@@ -1,5 +1,5 @@
 /**
- * Background service worker — the ONLY thing that talks to the backend.
+ * Background service worker: the ONLY thing that talks to the backend.
  * Owns the WebSocket + REST calls (so they aren't subject to Pump.fun's page
  * CSP) and relays authoritative server messages to every connected UI port
  * (content scripts + popup). It validates nothing and does no money math.
@@ -154,7 +154,7 @@ async function handleHello(coin: string): Promise<void> {
   ensureSubscribed(resolved.room);
 }
 
-/** Real email/password login — same account as the BIDit website, so the
+/** Real email/password login, same account as the BIDit website, so the
  *  extension bids from the same deposited balance. */
 async function handleEmailLogin(email: string, password: string): Promise<void> {
   const data = await postJson('/auth/login', { email, password });

@@ -2,7 +2,7 @@
  * Email ownership check: we mail a short numeric code and the account stays
  * unverified until it comes back.
  *
- * The code is never stored — only an HMAC of it under AUTH_SECRET — so a leaked
+ * The code is never stored (only an HMAC of it under AUTH_SECRET) so a leaked
  * database row can't be replayed into someone's account. Three limits bound the
  * obvious attacks: the code expires, wrong guesses are capped (a 6-digit code is
  * only 10^6 wide, so unlimited guessing would fall in hours), and resends have a
@@ -82,7 +82,7 @@ export async function verifyEmailCode(
 ): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AuthError('Account not found.');
-  if (user.emailVerified) return; // already done — treat as success, not an error
+  if (user.emailVerified) return; // already done: treat as success, not an error
   if (!user.verifyCodeHash || !user.verifyCodeExpiresAt) {
     throw new AuthError('No code is pending. Request a new one.');
   }
@@ -119,7 +119,7 @@ export async function verifyEmailCode(
 /**
  * One-time backfill for accounts created before email verification existed:
  * mark them verified so nobody who already signed up gets locked out. Safe to
- * run on every boot — a row with a pending code is a NEW signup mid-flow, and
+ * run on every boot: a row with a pending code is a NEW signup mid-flow, and
  * the `verifyCodeHash: null` guard leaves it alone.
  */
 export async function backfillLegacyVerified(prisma: PrismaClient = defaultPrisma): Promise<number> {

@@ -7,7 +7,7 @@ type Status = 'loading' | 'live' | 'offline' | 'error';
 const POLL_MS = 20_000; // while offline, re-check for the stream this often
 
 /**
- * Plays a pump.fun livestream directly on our page via LiveKit — no iframe, so it
+ * Plays a pump.fun livestream directly on our page via LiveKit, no iframe, so it
  * works past pump.fun frame-blocks and geo-blocks. Our backend hands us a
  * watch-only viewer token; the media flows LiveKit → viewer (costs us nothing).
  * While offline it keeps polling, so the stream appears (and re-appears after a
@@ -26,7 +26,7 @@ export default function PumpStream({ mint, offline }: { mint: string; offline: R
     let noVideo: ReturnType<typeof setTimeout> | undefined;
 
     // Detach the current room (if any) without letting its Disconnected event
-    // count as an unexpected drop — handlers check `room === r` first.
+    // count as an unexpected drop: handlers check `room === r` first.
     const drop = () => {
       const r = room;
       room = null;

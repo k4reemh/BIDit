@@ -220,7 +220,7 @@ describe('catch-up replay for a client that missed the live close', () => {
     await ca.waitFor('AUCTION_CLOSED');
     ca.close();
 
-    // A second client subscribes AFTER the close — as if it reconnected right as the
+    // A second client subscribes AFTER the close, as if it reconnected right as the
     // clock hit zero and missed the one-shot event. It must still learn who won,
     // flagged `replay` so the client syncs quietly (no full-screen celebration).
     const b = await makeFundedUser('50');
@@ -276,12 +276,12 @@ describe('catch-up replay for a client that missed the live close', () => {
 
 describe('wheel-spin randomizer (bid to win a roll)', () => {
   const WHEEL = [
-    { label: 'Charizard ex — Alt Art', tier: 'Chase' },
+    { label: 'Charizard ex, Alt Art', tier: 'Chase' },
     { label: 'Sealed Booster Box', tier: 'Box' },
     { label: 'Single Booster Pack', tier: 'Pack' },
   ];
 
-  it('spins the wheel after a win — and never before the auction closes', async () => {
+  it('spins the wheel after a win, and never before the auction closes', async () => {
     const clock = new ManualClock(T0);
     await startServer(clock);
     const auction = await makeRunningAuction({ startingBid: '5', clock, durationSeconds: 20 });

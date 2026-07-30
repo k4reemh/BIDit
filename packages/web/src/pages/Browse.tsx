@@ -36,7 +36,7 @@ const matchesQuery = (c: LiveCoin, q: string) =>
     .includes(q);
 
 /**
- * /browse — every linked stream, filterable. Category chips, ships-from and
+ * /browse, every linked stream, filterable. Category chips, ships-from and
  * sort menus, and a verified-first toggle, all mirrored into the URL so a
  * filtered view can be shared or opened straight from the nav dropdown.
  */
