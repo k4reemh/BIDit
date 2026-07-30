@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import LiveCoinCard from '../components/LiveCoinCard';
+import Hero from '../components/Hero';
 import { FEATURED_CATEGORIES } from '../data';
 import { getLive, getPromo, type LiveCoin, type PromoState } from '../api';
 import { ArrowRight, Gift, Radio } from '../icons';
@@ -37,26 +38,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
   return (
     <main>
       {/* ---- hero ---- */}
-      <section className="hero">
-        <div className="hero__inner risein">
-          <span className="hero__tag"><span className="dot" /> Live in beta</span>
-          <h1 className="display hero__title">Bid it. Win it. Ship it.</h1>
-          <p className="hero__sub">
-            BIDit turns pump.fun streams into live auctions. Pok&eacute;mon, One Piece, sports cards, tech,
-            anything. Bid in USDC, win at the buzzer, and it ships straight to your door with buyer
-            protection on every order.
-          </p>
-          <div className="hero__cta">
-            <button className="btn btn-primary btn-lg" onClick={onAuth}>Start bidding</button>
-            <Link className="btn btn-ghost btn-lg" to="/browse">Watch live auctions</Link>
-          </div>
-          <div className="hero__trust">
-            <span>Settles in USDC</span><span className="d" />
-            <span>Built on Solana</span><span className="d" />
-            <span>4% of sales buy back $BID</span>
-          </div>
-        </div>
-      </section>
+      <Hero onAuth={onAuth} />
 
       {/* ---- launch seller promo ---- */}
       {promo?.active && (
