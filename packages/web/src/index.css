@@ -2226,12 +2226,17 @@ img { display: block; max-width: 100%; }
 }
 
 .hz__barwrap { position: relative; margin-top: 10px; }
+/* The spark canvas overhangs the bar upward. It must not be clipped, and it must
+   never eat pointer events from anything underneath. */
+.hz__sparks { position: absolute; left: 0; bottom: -1px; width: 100%; height: 46px;
+  pointer-events: none; z-index: 2; }
 .hz__bar { height: 4px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
 .hz__fill { display: block; height: 100%; border-radius: 3px; transition: width 0.12s linear;
   background: linear-gradient(90deg, var(--accent), #ef3b4e); }
 .hz.is-low .hz__fill { box-shadow: 0 0 12px rgba(239, 59, 78, 0.75); }
-.hz__ext { position: absolute; right: 0; top: -22px; padding: 3px 9px; border-radius: 999px;
-  background: var(--accent-soft); color: var(--accent-strong); font-size: 11px; font-weight: 700;
+.hz__ext { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
+  background: rgba(239, 59, 78, 0.14); color: #ff6b7d; border: 1px solid rgba(239, 59, 78, 0.32);
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
   animation: hz-extpop 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes hz-extpop { 0% { opacity: 0; transform: translateY(6px) scale(0.9); } 100% { opacity: 1; transform: none; } }
 
@@ -2246,7 +2251,7 @@ img { display: block; max-width: 100%; }
 .hz__who { flex: 1; color: var(--ink-2); }
 .hz__row b { font-variant-numeric: tabular-nums; }
 
-.hz__status { min-height: 22px; margin-top: 8px; }
+.hz__status { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; margin-top: 10px; }
 .hz__lead { display: inline-flex; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft);
   color: var(--accent-strong); font-size: 11.5px; font-weight: 700;
   animation: hz-extpop 0.4s cubic-bezier(0.16, 1, 0.3, 1); }

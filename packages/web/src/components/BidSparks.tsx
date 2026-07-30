@@ -5,7 +5,17 @@ import { useEffect, useRef } from 'react';
  * during the final seconds: like a lit fuse racing the clock. Ported from the
  * extension overlay. Only mount it while the auction is in its low-time state.
  */
-export default function BidSparks({ fill, active }: { fill: number; active: boolean }) {
+export default function BidSparks({
+  fill,
+  active,
+  className = 'bp__sparks',
+}: {
+  fill: number;
+  active: boolean;
+  /** Lets another surface (the home hero's demo panel) position the canvas
+   *  itself without duplicating the emitter. */
+  className?: string;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const fillRef = useRef(fill);
   const activeRef = useRef(active);
@@ -76,5 +86,5 @@ export default function BidSparks({ fill, active }: { fill: number; active: bool
     return () => { stopped = true; cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
   }, []);
 
-  return <canvas ref={ref} className="bp__sparks" aria-hidden />;
+  return <canvas ref={ref} className={className} aria-hidden />;
 }

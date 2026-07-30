@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BidSparks from './BidSparks';
 import { Shield, Truck, Wallet } from '../icons';
 
 /**
@@ -110,7 +111,10 @@ function DemoAuction() {
 
       <div className="hz__barwrap">
         <div className="hz__bar"><span className="hz__fill" style={{ width: `${fill * 100}%` }} /></div>
-        {extending && <span className="hz__ext">+5s, clock extended</span>}
+        {/* The same emitter the real bid panel uses: a lit fuse burning at the
+            bar's leading edge through the final seconds. Only mounted while low,
+            so there is no canvas running the rest of the time. */}
+        {low && <BidSparks fill={fill} active className="hz__sparks" />}
       </div>
 
       <div className="hz__feed">
@@ -125,7 +129,11 @@ function DemoAuction() {
         ))}
       </div>
 
+      {/* Both pills live in normal flow on their own row. The extension pill used
+          to be absolutely positioned above the bar, where it collided with the
+          clock and got sliced off by the panel's overflow. */}
       <div className="hz__status">
+        {extending && <span className="hz__ext">+5s, clock extended</span>}
         {youLead && !sold && <span className="hz__lead">You&rsquo;re the top bid</span>}
       </div>
 
