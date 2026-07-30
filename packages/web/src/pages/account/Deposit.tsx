@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
-import { simulateDeposit, withdraw, refreshMe, money2, exportWalletKey } from '../../api';
+import { simulateDeposit, withdraw, refreshMe, money2 } from '../../api';
 import { Copy, Check, Wallet, Shield } from '../../icons';
 
 export default function Deposit() {
@@ -20,36 +20,6 @@ export default function Deposit() {
   const [wBusy, setWBusy] = useState(false);
   const [wErr, setWErr] = useState('');
   const [wOk, setWOk] = useState('');
-
-  // Private-key export. Held in component state only for as long as the card is
-  // open — never written to storage, and cleared when they hide it again.
-  const [keyOpen, setKeyOpen] = useState(false);
-  const [keyPw, setKeyPw] = useState('');
-  const [keyBusy, setKeyBusy] = useState(false);
-  const [keyErr, setKeyErr] = useState('');
-  const [secret, setSecret] = useState('');
-  const [keyCopied, setKeyCopied] = useState(false);
-
-  const revealKey = async () => {
-    setKeyBusy(true);
-    setKeyErr('');
-    try {
-      const r = await exportWalletKey(keyPw);
-      setSecret(r.secretKeyBase58);
-      setKeyPw('');
-    } catch (err) {
-      setKeyErr(err instanceof Error ? err.message : 'Could not export the key.');
-    } finally {
-      setKeyBusy(false);
-    }
-  };
-
-  const hideKey = () => {
-    setSecret('');
-    setKeyPw('');
-    setKeyErr('');
-    setKeyOpen(false);
-  };
 
   const refresh = async () => setSession(await refreshMe());
 
@@ -94,7 +64,7 @@ export default function Deposit() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Deposit &amp; withdraw</h1>
-        <p className="muted">Fund your balance with USDC or SOL. Cash out anytime.</p>
+        <p className="muted">Fund your balance with USDC. Cash out anytime.</p>
       </div>
 
       <div className="bal-grid bal-grid--one">
@@ -103,16 +73,25 @@ export default function Deposit() {
       <p className="muted acct-note" style={{ marginTop: -6, marginBottom: 18 }}>Your full balance. Placing a bid reserves funds, but they don’t leave your wallet. You’re only charged when you win.</p>
 
       <div className="card acct-card">
-        <h3 className="acct-sub">Your deposit wallet <span className={`soon-tag${cluster === 'mainnet-beta' ? ' soon-tag--mainnet' : ''}`}>{netLabel}</span></h3>
+        <h3 className="acct-sub">Your deposit address <span className={`soon-tag${cluster === 'mainnet-beta' ? ' soon-tag--mainnet' : ''}`}>{netLabel}</span></h3>
         <p className="muted acct-note">
-          Send <b>USDC (SPL)</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this address from any wallet (Phantom, etc.).
-          We detect it on-chain and credit your balance automatically once it confirms.
-          {cluster === 'mainnet-beta' && <> Send only USDC. Anything else may be lost.</>}
+          Send <b>USDC (SPL)</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this address from any wallet (Phantom, Solflare) or straight from an exchange.
+          You never need SOL for gas: BIDit covers the network fees on both deposits and withdrawals.
         </p>
+        <div className="dep-usdc">
+          <Shield width={16} height={16} />
+          <span><b>USDC only.</b> This address accepts USDC on Solana. Any other token or network sent here may be lost for good.</span>
+        </div>
         <div className="addr">
           <code>{addr}</code>
           <button className="addr__copy" onClick={copy}>{copied ? <Check width={16} height={16} /> : <Copy width={16} height={16} />}{copied ? 'Copied' : 'Copy'}</button>
         </div>
+        <p className="muted acct-note dep-sweep">
+          <b>What happens next.</b> Your deposit is detected on-chain, then swept into the BIDit treasury wallet and credited to
+          your account balance, usually within a minute. This address is a one-way inbox, not a wallet to hold funds in: it is
+          emptied every time something arrives. Your balance is yours, and you can <b>withdraw it to any Solana address at any
+          time</b> from the Withdraw section below.
+        </p>
 
         {!isReal && (
           <div className="dep-sim">
@@ -128,7 +107,7 @@ export default function Deposit() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Withdraw</h3>
-        <p className="muted acct-note">Send USDC from your wallet to any Solana address. Funds reserved by active bids stay put until those auctions end.</p>
+        <p className="muted acct-note">Cash out any time. We send USDC from the treasury to any Solana address you name, and BIDit pays the network fee. Funds reserved by active bids stay put until those auctions end.</p>
         <div className="beta-cap">
           <Shield width={16} height={16} />
           <span><b>Beta safety limit:</b> withdrawals are capped at <b>$1,000 per day</b> per account while we harden the payout system during BIDit beta. It’s temporary and will be lifted.</span>
@@ -143,69 +122,6 @@ export default function Deposit() {
           <button className="btn btn-primary" onClick={doWithdraw} disabled={wBusy || !wAmt || !wTo.trim()}>{wBusy ? 'Sending…' : 'Withdraw'}</button>
           <span className="muted" style={{ fontSize: 13 }}>Wallet: ${money2(session.settled)}</span>
         </div>
-      </div>
-
-      <div className="card acct-card">
-        <h3 className="acct-sub">Export your wallet key</h3>
-        <p className="muted acct-note">
-          Your deposit address is a real Solana wallet. Export its private key to import the same
-          wallet into Phantom or Solflare.
-        </p>
-        <div className="keyx__warn">
-          <Shield width={16} height={16} />
-          <span>
-            <b>Anyone with this key controls that wallet.</b> Never share it or paste it into a site
-            that asks for it. BIDit will never ask you for it. Note that USDC sent to this address is
-            still swept into your BIDit balance automatically, so don’t use it as a personal wallet.
-          </span>
-        </div>
-        {!keyOpen ? (
-          <div className="acct-actions">
-            <button className="btn btn-ghost" onClick={() => setKeyOpen(true)}>Export private key</button>
-          </div>
-        ) : secret ? (
-          <>
-            <div className="fld">
-              <label>Private key (base58)</label>
-              <code className="keyx__secret">{secret}</code>
-            </div>
-            <div className="acct-actions">
-              <button
-                className="btn btn-primary"
-                onClick={() =>
-                  navigator.clipboard?.writeText(secret).then(() => {
-                    setKeyCopied(true);
-                    setTimeout(() => setKeyCopied(false), 1800);
-                  })
-                }
-              >
-                {keyCopied ? 'Copied' : 'Copy key'}
-              </button>
-              <button className="btn btn-ghost" onClick={hideKey}>Hide</button>
-            </div>
-          </>
-        ) : (
-          <>
-            {keyErr && <div className="auth__error">{keyErr}</div>}
-            <div className="fld">
-              <label>Confirm your password</label>
-              <input
-                type="password"
-                value={keyPw}
-                onChange={(e) => setKeyPw(e.target.value)}
-                placeholder="Your BIDit password"
-                autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter' && keyPw) void revealKey(); }}
-              />
-            </div>
-            <div className="acct-actions">
-              <button className="btn btn-primary" onClick={() => void revealKey()} disabled={keyBusy || !keyPw}>
-                {keyBusy ? 'Checking…' : 'Reveal key'}
-              </button>
-              <button className="btn btn-ghost" onClick={hideKey}>Cancel</button>
-            </div>
-          </>
-        )}
       </div>
 
       <div className="card acct-card deposit-soon">

@@ -12,7 +12,7 @@ export const useAccount = () => useOutletContext<Ctx>();
 const NAV = [
   { to: '/profile', label: 'Profile', icon: Person },
   { to: '/shipping', label: 'Payments & Shipping', icon: Truck },
-  { to: '/deposit', label: 'Deposit', icon: Wallet },
+  { to: '/deposit', label: 'Deposit & Withdraw', icon: Wallet },
   { to: '/saved', label: 'Saved', icon: Bookmark },
   { to: '/purchases', label: 'Purchases', icon: Bag },
   { to: '/ship', label: 'Ready to ship', icon: Truck },

@@ -2043,15 +2043,14 @@ img { display: block; max-width: 100%; }
 /* onboarding points chip */
 .obx__howic--pts { width: auto; min-width: 40px; padding: 0 9px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
-/* ===== export wallet key ================================================= */
-.keyx__warn { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 16px; padding: 12px 14px;
+/* ===== deposit: USDC-only warning + what-happens-next note =============== */
+.dep-usdc { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 14px; padding: 12px 14px;
   border-radius: var(--r); font-size: 13px; line-height: 1.55;
   color: var(--red); background: rgba(239, 59, 78, 0.08); border: 1px solid rgba(239, 59, 78, 0.24); }
-.keyx__warn svg { flex: none; margin-top: 1px; }
-.keyx__warn b { font-weight: 700; }
-.keyx__secret { display: block; padding: 12px 14px; border-radius: var(--r); background: var(--surface-2);
-  border: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px; line-height: 1.5; word-break: break-all; user-select: all; }
+.dep-usdc svg { flex: none; margin-top: 1px; }
+.dep-usdc b { font-weight: 700; }
+.dep-sweep { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-2); line-height: 1.6; }
+.dep-sweep b { color: var(--ink); font-weight: 600; }
 
 /* ===== withdrawal beta cap notice ======================================== */
 .beta-cap { display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 14px; padding: 11px 13px; border-radius: 12px;

@@ -123,14 +123,6 @@ export async function login(email: string, password: string): Promise<Session> {
   return s;
 }
 
-/** Reveal the caller's own deposit-wallet private key. Requires their password
- *  (accounts that have one). The result is never cached or persisted. */
-export const exportWalletKey = (password: string) =>
-  req<{ address: string; secretKeyBase58: string }>('/wallet/export-key', {
-    method: 'POST',
-    body: JSON.stringify({ password }),
-  });
-
 /** Confirm the emailed code. Returns the refreshed session (emailVerified true). */
 export const verifyEmail = (code: string) =>
   req<Session>('/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });

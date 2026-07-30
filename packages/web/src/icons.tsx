@@ -69,6 +69,10 @@ export const Wallet = (p: SVGProps<SVGSVGElement>) => (
 export const Bag = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M6 8h12l-1 12H7L6 8Z" /><path d="M9 8a3 3 0 0 1 6 0" /></svg>
 );
+/** Withdraw: money leaving the account (an arrow lifting out of a tray). */
+export const Withdraw = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M12 15V4" /><path d="m8 8 4-4 4 4" /><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
+);
 export const UserCheck = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="10" cy="8" r="3.4" /><path d="M3.5 20a6.5 6.5 0 0 1 13 0" /><path d="m16 12 1.6 1.6L21 10" /></svg>
 );

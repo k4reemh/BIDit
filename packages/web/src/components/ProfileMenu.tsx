@@ -3,7 +3,7 @@ import Avatar from './Avatar';
 import type { User } from '../App';
 import {
   Gift, UserCheck, Truck, Bookmark, Book, Bag, Shield,
-  Wallet, Users, Settings, Info, Logout, Chevron,
+  Wallet, Withdraw, Users, Settings, Info, Logout, Chevron,
 } from '../icons';
 
 const TILES = [
@@ -50,9 +50,16 @@ export default function ProfileMenu({
               <span>{t.label}</span>
             </Link>
           ))}
+          {/* Two entry points, one page: /deposit holds both forms. Withdraw was
+              buried under "Deposit" before, so people couldn't find how to cash out. */}
           <Link to="/deposit" className="pm__tile pm__tile--accent" onClick={onClose}>
             <Wallet width={22} height={22} />
             <span>Deposit</span>
+            <em className="pm__soon">USDC</em>
+          </Link>
+          <Link to="/deposit" className="pm__tile pm__tile--accent" onClick={onClose}>
+            <Withdraw width={22} height={22} />
+            <span>Withdraw</span>
             <em className="pm__soon">USDC</em>
           </Link>
         </div>

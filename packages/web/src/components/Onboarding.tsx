@@ -218,14 +218,14 @@ export default function Onboarding({
 
           {step === 4 && (
             <>
-              <p className="obx__sub">We generated a Solana wallet just for you. Send it <b>USDC or SOL</b> to fund your bids. Every auction settles from this balance.</p>
+              <p className="obx__sub">We generated a Solana deposit address just for you. Send it <b>USDC</b> to fund your bids. Every auction settles from this balance, and you can withdraw it any time.</p>
               <div className="obx__wallet">
                 <span className="obx__wallet-label"><Wallet width={15} height={15} /> Your deposit address</span>
                 <div className="obx__wallet-addr">
                   <code>{session.depositAddress ?? 'generating…'}</code>
                   <button type="button" onClick={copy}>{copied ? <Check width={15} height={15} /> : <Copy width={15} height={15} />}{copied ? 'Copied' : 'Copy'}</button>
                 </div>
-                <div className="obx__wallet-note">Send only USDC or SOL on Solana to this address. Funds appear in your balance once the transfer confirms.</div>
+                <div className="obx__wallet-note"><b>Send only USDC on Solana.</b> It is swept into the BIDit treasury and credited to your account balance, usually within a minute.</div>
               </div>
             </>
           )}

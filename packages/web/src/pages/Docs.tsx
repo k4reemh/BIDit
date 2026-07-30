@@ -206,16 +206,27 @@ export default function Docs() {
             Solana <b>deposit address</b> just for you.
           </p>
           <div className="docs__deflow">
-            <div className="docs__deflow-step"><b>Deposit</b><p className="muted">Send USDC (or SOL) to your deposit address. Incoming funds are detected on-chain and credited to your <b>available</b> balance automatically.</p></div>
+            <div className="docs__deflow-step"><b>Deposit</b><p className="muted">Send <b>USDC only</b> to your deposit address. BIDit detects it on-chain, sweeps it into the BIDit treasury wallet, and credits your balance.</p></div>
             <ArrowRight className="docs__deflow-arrow" width={18} height={18} />
             <div className="docs__deflow-step"><b>Bid</b><p className="muted">A live bid <b>holds</b> that amount. Held funds sit in your balance but can’t be spent twice. Get outbid and they release.</p></div>
             <ArrowRight className="docs__deflow-arrow" width={18} height={18} />
-            <div className="docs__deflow-step"><b>Withdraw</b><p className="muted">Any available (un-held) balance can be withdrawn back to a Solana address anytime.</p></div>
+            <div className="docs__deflow-step"><b>Withdraw</b><p className="muted">Any available (un-held) balance can be withdrawn to a Solana address at any time. There is no lock-up.</p></div>
           </div>
           <p className="muted docs__afterflow">
-            Your dashboard splits this into two numbers: <b>Available</b> (free to bid or withdraw) and <b>Held in
-            active bids</b> (committed to auctions you’re currently leading). You’ll find your address, a live balance,
-            and the withdraw form under <Link to="/deposit">Account → Deposit</Link>.
+            Your deposit address is an inbox, not a wallet you keep funds in. Anything that lands there is swept into the
+            BIDit treasury within about a minute and shows up as balance on your account, so the address itself always
+            reads empty. Your balance is the record of what you own, and you can withdraw it whenever you like.
+          </p>
+          <div className="docs__note">
+            <Shield width={18} height={18} />
+            <p><b>Send USDC on Solana, nothing else.</b> Your deposit address takes USDC (SPL) on Solana. Any other token
+            or another network sent to it can’t be credited and may be lost. You never need SOL for gas: BIDit pays the
+            network fees on deposits and withdrawals.</p>
+          </div>
+          <p className="muted docs__afterflow">
+            The dashboard splits your balance into <b>Available</b> (free to bid or withdraw) and <b>Held in active
+            bids</b> (committed to auctions you’re currently leading). Your address, live balance and the withdraw form
+            are all under <Link to="/deposit">Account → Deposit &amp; Withdraw</Link>.
           </p>
           <div className="docs__note">
             <Shield width={18} height={18} />
