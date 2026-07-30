@@ -19,7 +19,6 @@ import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
 import type { EscrowProvider } from './escrow.js';
-import { NO_SHIP_TIMEOUT_MS } from './orders.js';
 
 /** Raised when the item can't be bought right now (sold out, mid-auction, no store price…). */
 export class ItemUnavailableError extends Error {
@@ -128,7 +127,14 @@ export async function purchaseListing(
           status: OrderStatus.LOCKED,
           escrowRef: ref,
           lockedAt: now,
-          noShipDeadline: new Date(now.getTime() + NO_SHIP_TIMEOUT_MS),
+          // NO deadline yet. The seller's ship-clock starts when the buyer PAYS
+          // SHIPPING (advanceOrdersForShipment), exactly like an auction win.
+          // Starting it at purchase used to auto-refund the buyer after 7 idle
+          // days while their Ready-to-ship item stayed live, so they could then
+          // pay shipping and keep a card they had been refunded for. A purchase
+          // the buyer never ships is instead forfeited to the seller when the
+          // 14-day hold expires (processOrderTimers).
+          noShipDeadline: null,
         },
       });
     }

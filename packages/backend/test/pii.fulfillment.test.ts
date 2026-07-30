@@ -4,8 +4,23 @@ import { ManualClock } from '../src/clock.js';
 import { updateProfile, eraseUserData } from '../src/authz.js';
 import { estimateShipment, createAndPayShipment, purgeDeliveredShipmentPii } from '../src/fulfillment.js';
 import { decryptPii } from '../src/pii.js';
-import { usdc } from '@bidit/shared';
+import { usdc, OrderStatus } from '@bidit/shared';
 import { resetDb, makeUser, makeFundedUser } from './setup.js';
+
+/** A real LOCKED order behind a fulfillment item. createAndPayShipment refuses to
+ *  ship an item whose order is missing or finished, so these fixtures need one. */
+async function lockedOrder(buyerId: string, sellerId: string) {
+  const listing = await prisma.listing.create({
+    data: { sellerId, title: 'Card', photos: [], startingBid: usdc('1'), weightGrams: 57 },
+  });
+  return prisma.order.create({
+    data: {
+      auctionId: null, listingId: listing.id, buyerId, sellerId,
+      amount: usdc('20'), platformFee: usdc('1'), sellerProceeds: usdc('19'),
+      status: OrderStatus.LOCKED, lockedAt: new Date(),
+    },
+  });
+}
 
 const KEY = 'a-strong-pii-key-for-tests-1234567890';
 const ADDR = { name: 'Kareem', line1: '1 Yonge', city: 'Toronto', region: 'ON', postal: 'M5V 1J1', country: 'Canada' };
@@ -35,7 +50,7 @@ describe('PII encryption across the shipping flow', () => {
     expect(decryptPii(urow.shippingAddress)).toMatchObject({ city: 'Toronto' });
 
     const item = await prisma.fulfillmentItem.create({
-      data: { orderId: 'o1', buyerId: buyer.userId, sellerId: seller.userId, listingId: 'l', title: 'Card', weightGrams: 57, amount: usdc('20'), status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
+      data: { orderId: (await lockedOrder(buyer.userId, seller.userId)).id, buyerId: buyer.userId, sellerId: seller.userId, listingId: 'l', title: 'Card', weightGrams: 57, amount: usdc('20'), status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
     });
 
     // Estimate must decrypt the address (real quote, not the no-address fallback).
@@ -73,7 +88,7 @@ describe('PII encryption across the shipping flow', () => {
     const buyer = await makeFundedUser('100');
     await updateProfile(buyer.userId, { shippingAddress: ADDR }, prisma);
     const item = await prisma.fulfillmentItem.create({
-      data: { orderId: `o_${buyer.userId}`, buyerId: buyer.userId, sellerId: seller.userId, listingId: 'l', title: 'Card', weightGrams: 57, amount: usdc('20'), status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
+      data: { orderId: (await lockedOrder(buyer.userId, seller.userId)).id, buyerId: buyer.userId, sellerId: seller.userId, listingId: 'l', title: 'Card', weightGrams: 57, amount: usdc('20'), status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
     });
     const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, new ManualClock(Date.now()), prisma);
     if (deliveredAt) await prisma.shipment.update({ where: { id: shipment.id }, data: { status: 'DELIVERED', deliveredAt } });

@@ -4,13 +4,15 @@ import { ManualClock } from '../src/clock.js';
 import { placeBid } from '../src/auction.js';
 import { DevWalletEscrow } from '../src/escrow.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
-import { getBuyerPurchases } from '../src/fulfillment.js';
+import { processOrderTimers } from '../src/orders.js';
+import { getBuyerPurchases, createAndPayShipment, ShippingError } from '../src/fulfillment.js';
 import { getSettledBalance, getAvailableBalance, getSystemTotal } from '../src/ledger.js';
 import { InsufficientFundsError } from '../src/errors.js';
 import { usdc, OrderStatus, ListingStatus, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
 import { resetDb, makeFundedUser, makeUser, makeRunningAuction } from './setup.js';
 
 const T0 = new Date('2026-01-01T00:00:00.000Z').getTime();
+const ADDRESS = { name: 'Kareem', line1: '1 Main St', city: 'Calgary', region: 'AB', postal: 'T2P', country: 'CA' };
 const escrow = new DevWalletEscrow(prisma);
 const direct = { directPayout: true, escrow };
 const escrowed = { directPayout: false, escrow };
@@ -154,7 +156,7 @@ describe('store buy-now (direct payout)', () => {
 });
 
 describe('store buy-now (escrow payout)', () => {
-  it('locks funds in escrow with the 95/5 split and a no-ship deadline', async () => {
+  it('locks funds in escrow with the 95/5 split and NO ship deadline yet', async () => {
     const clock = new ManualClock(T0);
     const { seller, listing } = await makeStoreListing({ price: '20' });
     const buyer = await makeFundedUser('100');
@@ -165,7 +167,11 @@ describe('store buy-now (escrow payout)', () => {
     expect(order.auctionId).toBeNull();
     expect(order.platformFee + order.sellerProceeds).toBe(usdc('20'));
     expect(order.platformFee).toBeGreaterThan(0n);
-    expect(order.noShipDeadline).not.toBeNull();
+    // The seller's ship-clock must NOT start at purchase. Starting it here meant a
+    // buyer who simply waited 7 days got refunded while their item stayed
+    // shippable, so they could pay $5 shipping and keep a card they were refunded
+    // for. It starts when the buyer pays shipping, exactly like an auction win.
+    expect(order.noShipDeadline).toBeNull();
 
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('80'));
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(usdc('20'));
@@ -184,6 +190,82 @@ describe('store buy-now (escrow payout)', () => {
     expect(purchases).toHaveLength(1);
     expect(purchases[0]!.status).toBe('READY_TO_SHIP');
     expect(purchases[0]!.title).toBe('OP-09 Booster Pack');
+  });
+});
+
+describe('a refunded escrow store buy cannot also be shipped', () => {
+  /**
+   * The exploit this closes: buy a card in escrow mode, sit on it for 8 days, get
+   * auto-refunded 100%, then pay $5 shipping on the still-live Ready-to-ship item
+   * and receive the card anyway. The seller was never paid, so they ate the loss.
+   */
+  it('refunds nothing on an idle purchase, and forfeits to the seller instead', async () => {
+    const clock = new ManualClock(T0);
+    const { seller, listing } = await makeStoreListing({ price: '500' });
+    const buyer = await makeFundedUser('600');
+    const order = await purchaseListing(buyer.userId, listing.id, { ...escrowed, clock }, prisma);
+
+    // 8 days of doing nothing: the old code refunded here. Now nothing fires,
+    // because the ship-clock never started.
+    clock.advance(8 * 24 * 60 * 60 * 1000);
+    const day8 = await processOrderTimers(escrow, clock, prisma);
+    expect(day8.refunded).toEqual([]);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.LOCKED);
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('100')); // still charged
+
+    // Past the 14-day hold it forfeits to the SELLER (buyer abandoned it), which
+    // is the same treatment an unpaid auction win gets.
+    clock.advance(7 * 24 * 60 * 60 * 1000);
+    const later = await processOrderTimers(escrow, clock, prisma);
+    expect(later.forfeited).toEqual([order.id]);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.RELEASED);
+    expect((await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } })).status).toBe('DISCARDED');
+    expect(await getSettledBalance(seller.accountId, prisma)).toBe(usdc('475')); // 95% of 500
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+
+  it('discards the item when a paid-for order refunds, and refuses to ship it', async () => {
+    const clock = new ManualClock(T0);
+    const { listing } = await makeStoreListing({ price: '500' });
+    const buyer = await makeFundedUser('600');
+    const order = await purchaseListing(buyer.userId, listing.id, { ...escrowed, clock }, prisma);
+    const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } });
+
+    // Buyer pays shipping, which is what actually starts the seller's clock.
+    await prisma.user.update({ where: { id: buyer.userId }, data: { shippingAddress: ADDRESS as object } });
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { noShipDeadline: new Date(clock.now().getTime() + 1000) },
+    });
+
+    // Seller misses the deadline: buyer is refunded in full...
+    clock.advance(2000);
+    expect((await processOrderTimers(escrow, clock, prisma)).refunded).toEqual([order.id]);
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('600')); // whole again
+
+    // ...and the goods claim dies with the money claim.
+    expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
+    await expect(
+      createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma),
+    ).rejects.toThrow(ShippingError);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+
+  it('refuses to ship an item whose order was refunded even if the item is still live', async () => {
+    const clock = new ManualClock(T0);
+    const { listing } = await makeStoreListing({ price: '500' });
+    const buyer = await makeFundedUser('600');
+    const order = await purchaseListing(buyer.userId, listing.id, { ...escrowed, clock }, prisma);
+    const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } });
+    await prisma.user.update({ where: { id: buyer.userId }, data: { shippingAddress: ADDRESS as object } });
+
+    // Force the exact bad state the old code could reach: order refunded, item
+    // still READY_TO_SHIP. The order check must catch it on its own.
+    await prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.REFUNDED } });
+    await expect(
+      createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma),
+    ).rejects.toThrow(/no longer active/);
   });
 });
 

@@ -617,6 +617,13 @@ export async function processOrderTimers(
     if (!(await claimTransition(prisma, id, [OrderStatus.LOCKED], { status: OrderStatus.CANCELED, canceledAt: now }))) continue;
     await escrow.refund(id);
     await prisma.order.update({ where: { id }, data: { status: OrderStatus.REFUNDED, refundedAt: now } });
+    // The buyer has their money back, so the claim on the goods dies with it.
+    // Leaving the item shippable let a refunded buyer pay shipping afterwards and
+    // receive a card the seller was never paid for.
+    await prisma.fulfillmentItem.updateMany({
+      where: { orderId: id, status: 'READY_TO_SHIP' },
+      data: { status: 'DISCARDED', discardedAt: now },
+    });
     refunded.push(id);
   }
 

@@ -7,6 +7,7 @@
  * Standard + the shared plumbing every mode reuses.
  */
 import { Prisma } from '@prisma/client';
+import { OrderStatus } from '@bidit/shared';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
@@ -358,6 +359,20 @@ export async function createAndPayShipment(
   for (const it of items) {
     if (it.buyerId !== params.buyerId) throw new ShippingError('Those items aren’t yours.');
     if (it.status !== 'READY_TO_SHIP') throw new ShippingError('An item is no longer ready to ship.');
+  }
+  // The ORDER, not just the item, has to still be live. A canceled/refunded order
+  // means the buyer already has their money back, and a released one is done; in
+  // either case shipping it would hand over goods nobody is paying for. The item
+  // status alone does not catch this, so check the orders behind the items.
+  const liveOrders = await prisma.order.findMany({
+    where: { id: { in: items.map((it) => it.orderId) } },
+    select: { id: true, status: true },
+  });
+  const notLive = liveOrders.find(
+    (o) => o.status !== OrderStatus.LOCKED && o.status !== OrderStatus.RELEASED,
+  );
+  if (notLive || liveOrders.length !== new Set(items.map((it) => it.orderId)).size) {
+    throw new ShippingError('That order is no longer active, so it can’t be shipped.');
   }
   const sellerId = items[0]!.sellerId;
   if (items.some((it) => it.sellerId !== sellerId)) {
