@@ -62,6 +62,7 @@ export async function sendVerificationCode(
 
   await sendEmail({
     to: user.email,
+    sensitive: true, // the code is in the subject: keep it out of the logs
     subject: `${code} is your BIDit verification code`,
     html: emailShell(
       'Confirm your email',
@@ -86,19 +87,24 @@ export async function verifyEmailCode(
   if (!user.verifyCodeHash || !user.verifyCodeExpiresAt) {
     throw new AuthError('No code is pending. Request a new one.');
   }
-  if (user.verifyAttempts >= MAX_ATTEMPTS) {
-    throw new AuthError('Too many wrong codes. Request a new one.');
-  }
   if (now > user.verifyCodeExpiresAt) {
     throw new AuthError('That code expired. Request a new one.');
   }
 
+  // Spend one attempt BEFORE checking the code, in a single conditional write.
+  // The old read-then-write was a lost update: concurrent guesses all read the
+  // same count, so the cap never tripped on a 6-digit code. See password-reset.ts.
+  const claimed = await prisma.user.updateMany({
+    where: { id: userId, verifyAttempts: { lt: MAX_ATTEMPTS } },
+    data: { verifyAttempts: { increment: 1 } },
+  });
+  if (claimed.count === 0) throw new AuthError('Too many wrong codes. Request a new one.');
+
   const submitted = String(code ?? '').replace(/\D/g, '');
   if (submitted.length !== 6 || !codeMatches(submitted, user.verifyCodeHash)) {
-    const attempts = user.verifyAttempts + 1;
-    await prisma.user.update({ where: { id: userId }, data: { verifyAttempts: attempts } });
+    const spent = await prisma.user.findUnique({ where: { id: userId }, select: { verifyAttempts: true } });
     throw new AuthError(
-      attempts >= MAX_ATTEMPTS
+      (spent?.verifyAttempts ?? MAX_ATTEMPTS) >= MAX_ATTEMPTS
         ? 'That code is wrong, and it was the last try. Request a new one.'
         : 'That code is wrong. Check the email and try again.',
     );

@@ -88,6 +88,13 @@ export function assertStartupConfig(cluster: string, env: NodeJS.ProcessEnv = pr
     if (!piiKey || piiKey.trim().length < MIN_PII_KEY_LEN) {
       problems.push(`BIDIT_PII_KEY is missing or too short (≥${MIN_PII_KEY_LEN} chars): shipping addresses would be stored as plaintext.`);
     }
+
+    // 6. Without a mail provider, sendEmail no-ops. Verification and reset codes
+    //    would then exist only in the server log, which means signup is broken
+    //    AND the only copy of every code sits somewhere log access can reach.
+    if (!env.RESEND_API_KEY || env.RESEND_API_KEY.trim() === '') {
+      problems.push('RESEND_API_KEY is missing: verification and password-reset codes could not be delivered, so nobody could complete signup.');
+    }
   }
 
   if (problems.length > 0) {

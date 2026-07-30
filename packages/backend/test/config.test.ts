@@ -4,6 +4,7 @@ import { assertStartupConfig, usingDefaultAuthSecret, StartupConfigError, AUTH_S
 const STRONG = 'x'.repeat(48); // a stand-in strong secret (≥32 chars)
 const SEED = 's'.repeat(32);
 const PII = 'p'.repeat(24); // a stand-in PII key (≥16 chars)
+const RESEND = 're_test_key'; // a stand-in mail-provider key
 
 describe('assertStartupConfig', () => {
   it('allows a local mock boot with no secrets', () => {
@@ -66,13 +67,20 @@ describe('assertStartupConfig', () => {
   });
 
   it('passes a fully-configured mainnet boot', () => {
-    const r = assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED, BIDIT_PII_KEY: PII });
+    const r = assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED, BIDIT_PII_KEY: PII, RESEND_API_KEY: RESEND });
     expect(r.isProd).toBe(true);
   });
 
   it('passes an explicit-production devnet boot with a strong secret + PII key', () => {
-    const r = assertStartupConfig('devnet', { BIDIT_ENV: 'production', AUTH_SECRET: STRONG, BIDIT_PII_KEY: PII });
+    const r = assertStartupConfig('devnet', { BIDIT_ENV: 'production', AUTH_SECRET: STRONG, BIDIT_PII_KEY: PII, RESEND_API_KEY: RESEND });
     expect(r.isProd).toBe(true);
+  });
+
+  // Without a provider sendEmail no-ops: signup can't complete, and the only
+  // copy of every verification/reset code would be the server log.
+  it('hard-fails a production boot with no RESEND_API_KEY', () => {
+    expect(() => assertStartupConfig('mainnet-beta', { AUTH_SECRET: STRONG, TREASURY_SECRET: 'k', BIDIT_WALLET_SEED: SEED, BIDIT_PII_KEY: PII }))
+      .toThrow(/RESEND_API_KEY/);
   });
 
   it('collects every problem into one error, not just the first', () => {

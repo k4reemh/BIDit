@@ -68,6 +68,7 @@ export async function requestPasswordReset(
 
   await sendEmail({
     to: email,
+    sensitive: true, // the code is in the subject: keep it out of the logs
     subject: `${code} is your BIDit password reset code`,
     html: emailShell(
       'Reset your password',
@@ -103,17 +104,21 @@ export async function resetPassword(
   // attempt says nothing about whether the address is registered.
   const generic = 'That code is wrong or has expired. Request a new one.';
   if (!user || !user.resetCodeHash || !user.resetCodeExpiresAt) throw new AuthError(generic);
-  if (user.resetAttempts >= MAX_RESET_ATTEMPTS) {
-    throw new AuthError('Too many wrong codes. Request a new one.');
-  }
   if (now > user.resetCodeExpiresAt) throw new AuthError(generic);
+
+  // Spend one attempt BEFORE looking at the code, in a single conditional write.
+  // Read-then-write was a lost update: fire the guesses concurrently and they all
+  // read the same count, so the cap never tripped and six digits fell in seconds.
+  // updateMany's WHERE re-evaluates per row under the row lock, so exactly
+  // MAX_RESET_ATTEMPTS of them can ever succeed however they interleave.
+  const claimed = await prisma.user.updateMany({
+    where: { id: user.id, resetAttempts: { lt: MAX_RESET_ATTEMPTS } },
+    data: { resetAttempts: { increment: 1 } },
+  });
+  if (claimed.count === 0) throw new AuthError('Too many wrong codes. Request a new one.');
 
   const submitted = String(input.code ?? '').replace(/\D/g, '');
   if (submitted.length !== 6 || !codeMatches(submitted, user.resetCodeHash)) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { resetAttempts: user.resetAttempts + 1 },
-    });
     throw new AuthError(generic);
   }
 

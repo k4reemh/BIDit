@@ -7,6 +7,14 @@ export interface EmailMessage {
   to: string;
   subject: string;
   html: string;
+  /**
+   * True for mail whose SUBJECT carries a secret. Verification and reset codes
+   * live in the subject line ("482913 is your BIDit password reset code"), so
+   * logging it verbatim handed anyone with log access a working takeover: request
+   * a reset for any address, read the code out of the log. Sensitive mail logs a
+   * category instead, and the code never leaves the HMAC in the database.
+   */
+  sensitive?: boolean;
 }
 
 const escapeHtml = (s: string) =>
@@ -61,8 +69,10 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   const from = emailFrom();
   const subject = cleanSubject(msg.subject);
+  // Never let a code reach the logs. See EmailMessage.sensitive.
+  const logSubject = msg.sensitive ? '(redacted: one-time code)' : JSON.stringify(subject);
   if (!key) {
-    console.log(`[email:noop] to=${msg.to} subject=${JSON.stringify(subject)} (set RESEND_API_KEY to send)`);
+    console.log(`[email:noop] to=${msg.to} subject=${logSubject} (set RESEND_API_KEY to send)`);
     return { ok: false, error: 'RESEND_API_KEY is not set, so nothing was sent.' };
   }
   try {
@@ -78,7 +88,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
       console.error(`[email] send FAILED ${res.status} from=${from} to=${msg.to} :: ${body}`);
       return { ok: false, error: `Resend responded ${res.status}: ${body || '(empty body)'}` };
     }
-    console.log(`[email] sent to=${msg.to} from=${from} subject=${JSON.stringify(subject)}`);
+    console.log(`[email] sent to=${msg.to} from=${from} subject=${logSubject}`);
     return { ok: true };
   } catch (err) {
     const error = (err as Error)?.message ?? String(err);

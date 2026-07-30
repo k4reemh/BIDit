@@ -121,4 +121,35 @@ describe('forgot password', () => {
     await expect(resetPassword({ email, code, password: 'thirdpassword1' })).rejects.toThrow();
     expect(await loginWithEmail({ email, password: 'brandnewpass1' })).toBeTruthy();
   });
+
+  /**
+   * The cap was read-then-write across two queries, so concurrent guesses all
+   * read the same count and none of them saw the limit. Six digits fall fast when
+   * the only brake is missing, and a successful reset also flips emailVerified,
+   * which is the gate in front of /withdraw.
+   */
+  it('holds the attempt cap under concurrent guesses (lost-update race)', async () => {
+    const email = 'race@example.com';
+    await registerWithEmail({ email, password: 'oldpassword1' });
+    await requestPasswordReset(email);
+    const real = await codeFor(email);
+
+    // 40 wrong guesses at once, none of them the real code.
+    const wrong = Array.from({ length: 40 }, (_, i) => String(100000 + i).padStart(6, '0'))
+      .filter((c) => c !== real);
+    const results = await Promise.allSettled(
+      wrong.map((code) => resetPassword({ email, code, password: 'attackerpass1' })),
+    );
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+
+    // At most MAX_RESET_ATTEMPTS were ever spendable, so the counter is pinned
+    // at the cap rather than having let all 40 through.
+    const row = await prisma.user.findUniqueOrThrow({ where: { email } });
+    expect(row.resetAttempts).toBe(MAX_RESET_ATTEMPTS);
+
+    // And the code is now dead even for whoever holds the RIGHT one.
+    await expect(resetPassword({ email, code: real, password: 'attackerpass1' }))
+      .rejects.toThrow(/Too many wrong codes/);
+    expect(await loginWithEmail({ email, password: 'oldpassword1' })).toBeTruthy();
+  });
 });
