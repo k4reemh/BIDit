@@ -95,6 +95,15 @@ export async function setListingWheel(
   if (listing.status !== ListingStatus.QUEUED) {
     throw new Error(`wheel can only be set while the listing is QUEUED (${listing.status})`);
   }
+  // Writing the wheel REWRITES quantity from the pool total, which makes this the
+  // one absolute stock write after creation. Re-POSTing the original pool on a
+  // part-sold listing therefore restocked it out of thin air. Once a unit has
+  // sold, the pool is fixed: consumeWheelPrize is the only thing allowed to
+  // change it from then on.
+  const sold = await prisma.order.count({ where: { listingId } });
+  if (sold > 0) {
+    throw new Error('this randomizer has already sold: its prize pool can no longer be edited');
+  }
   const entries = normalizeWheelEntries(rawEntries);
   // A prize's weight is how many copies are in the pool, so the pool's total is
   // how many times this wheel can be auctioned. Setting the listing's quantity
@@ -128,6 +137,12 @@ export async function setListingStorePrice(
   const listing = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
   if (listing.sellerId !== sellerId) throw new Error('not your listing');
   if (buyNowPrice !== null && buyNowPrice <= 0n) throw new Error('store price must be positive');
+  // A randomizer is a roll, not an item: there is no prize until the wheel is
+  // spun on auction close, so a fixed-price sale has nothing to hand over. It
+  // also double-counted stock (see purchaseListing).
+  if (buyNowPrice !== null && listing.wheel !== null) {
+    throw new Error('a randomizer cannot be sold at a fixed price: it is won by bidding');
+  }
   return prisma.listing.update({
     where: { id: listingId },
     data: { buyNowPrice },

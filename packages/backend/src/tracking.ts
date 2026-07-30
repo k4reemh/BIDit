@@ -53,13 +53,18 @@ const CARRIER_TOKENS: Record<string, string> = {
  *  can never be tracked. Only guesses when the pattern is distinctive. */
 export function guessCarrier(tracking: string): string | null {
   const t = tracking.replace(/\s+/g, '').toUpperCase();
+  // ONLY structurally distinctive formats. A wrong guess is not a harmless miss:
+  // querying the wrong carrier can match a DIFFERENT, genuinely delivered parcel
+  // with the same digits, which marks this order delivered and releases escrow
+  // two days later with nothing shipped. Returning null just means "ask the
+  // operator for the carrier", so ambiguity must fail to null.
   if (/^1Z[0-9A-Z]{16}$/.test(t)) return 'ups';
   if (/^(94|93|92|95|82)\d{18,20}$/.test(t)) return 'usps';
   if (/^[A-Z]{2}\d{9}US$/.test(t)) return 'usps'; // USPS international
   if (/^[A-Z]{2}\d{9}CA$/.test(t)) return 'canada_post';
-  if (/^\d{16}$/.test(t)) return 'canada_post';
-  if (/^\d{12}$/.test(t) || /^\d{15}$/.test(t) || /^\d{20}$/.test(t) || /^\d{22}$/.test(t)) return 'fedex';
-  if (/^\d{10}$/.test(t)) return 'dhl_express';
+  // Bare digit runs (10/12/15/16/20/22) are NOT distinctive: FedEx, Canada Post,
+  // DHL, USPS and regional carriers all issue numbers in those lengths, so the
+  // old guesses here were coin flips on whether escrow released correctly.
   return null;
 }
 
@@ -73,8 +78,14 @@ export function resolveCarrierToken(carrier: string | null | undefined, tracking
     if (mapped) return mapped;
     // Already an exact Shippo-style token (lowercase, underscores): pass through.
     const asToken = raw.replace(/\s+/g, '_');
+    // ...except Shippo's TEST carrier, where the magic tracking number
+    // SHIPPO_DELIVERED returns "delivered" instantly. On a real deployment that
+    // is a one-request escrow release for a package that does not exist.
+    if (asToken === 'shippo') return null;
     if (/^[a-z][a-z0-9_]{1,}$/.test(asToken)) return asToken;
   }
+  // Same for the magic test tracking numbers, whatever carrier is claimed.
+  if (/^SHIPPO_/i.test(tracking.trim())) return null;
   return guessCarrier(tracking);
 }
 

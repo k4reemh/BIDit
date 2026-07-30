@@ -133,3 +133,34 @@ describe('shipment tracking → delivery → escrow release', () => {
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19')); // 95%
   });
 });
+
+/**
+ * A wrong carrier guess is not a harmless miss. Querying the wrong carrier can
+ * match a DIFFERENT, genuinely delivered parcel that happens to share the digits,
+ * which marks the order delivered and releases escrow two days later with nothing
+ * actually shipped. Ambiguous shapes must therefore resolve to null.
+ */
+describe('carrier guessing fails safe (SEC-11)', () => {
+  it('refuses to guess from bare digit runs, which every carrier issues', () => {
+    for (const t of ['1234567890', '123456789012', '123456789012345', '1234567890123456',
+                     '12345678901234567890', '1234567890123456789012']) {
+      expect(guessCarrier(t)).toBeNull();
+    }
+  });
+
+  it('still recognises the genuinely distinctive formats', () => {
+    expect(guessCarrier('1Z999AA10123456784')).toBe('ups');
+    expect(guessCarrier('9400111899223197428490')).toBe('usps');
+    expect(guessCarrier('LZ123456789US')).toBe('usps');
+    expect(guessCarrier('LZ123456789CA')).toBe('canada_post');
+  });
+
+  it('never resolves to Shippo test mode, where a magic number returns delivered', () => {
+    // 'shippo' + SHIPPO_DELIVERED is an instant "delivered" in Shippo's sandbox:
+    // on a real deployment that is a one-request escrow release.
+    expect(resolveCarrierToken('shippo', 'SHIPPO_DELIVERED')).toBeNull();
+    expect(resolveCarrierToken('Shippo', 'anything')).toBeNull();
+    expect(resolveCarrierToken(null, 'SHIPPO_DELIVERED')).toBeNull();
+    expect(resolveCarrierToken('', 'SHIPPO_TRANSIT')).toBeNull();
+  });
+});

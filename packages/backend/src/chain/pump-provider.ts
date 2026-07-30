@@ -313,6 +313,11 @@ const ALLOWED_PROGRAMS = new Set<string>([
   'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s', // Metaplex token metadata
 ]);
 
+/** Ceiling on SOL a create may move out of the seller's wallet: mint rent plus
+ *  fees, with headroom. A zero-buy create is dust, so anything near this is a
+ *  smuggled buy or a drain. 0.05 SOL. */
+const MAX_CREATE_LAMPORTS = 50_000_000n;
+
 const PUMP_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const PUMP_WEB_HEADERS = { 'user-agent': PUMP_UA, origin: 'https://pump.fun', referer: 'https://pump.fun/' };
@@ -331,13 +336,42 @@ export function vetCreateTx(bytes: Uint8Array, creatorWallet: string): Versioned
   const keys = tx.message.staticAccountKeys.map((k) => k.toBase58());
   const problems: string[] = [];
   if (keys[0] !== creatorWallet) problems.push(`fee payer is ${keys[0] ?? '(none)'}, expected creator ${creatorWallet}`);
+
+  // Address lookup tables would make the program allowlist meaningless: a
+  // programIdIndex can point INTO a table rather than staticAccountKeys, so the
+  // loop below would never see the real program. A create needs no tables, so
+  // any is a red flag rather than something to resolve and re-check.
+  const lookups = tx.message.addressTableLookups ?? [];
+  if (lookups.length > 0) problems.push(`tx uses ${lookups.length} address table lookup(s); allowlist cannot be verified`);
+
   let pumpIx = 0;
+  let lamportsOut = 0n;
   for (const ix of tx.message.compiledInstructions) {
     const program = keys[ix.programIdIndex] ?? '(out of range)';
     if (!ALLOWED_PROGRAMS.has(program)) problems.push(`instruction touches non-allowlisted program ${program}`);
     if (program === PUMP_PROGRAM) pumpIx += 1;
+    const data = ix.data;
+    // System program: opcode is a u32 LE. 2 = Transfer. Sum what leaves the
+    // wallet so a "create" can't quietly carry a drain instruction alongside it.
+    if (program === '11111111111111111111111111111111' && data.length >= 12) {
+      const op = new DataView(data.buffer, data.byteOffset, data.byteLength).getUint32(0, true);
+      if (op === 2) {
+        lamportsOut += new DataView(data.buffer, data.byteOffset, data.byteLength).getBigUint64(4, true);
+      }
+    }
+    // SPL Token: opcode is a u8. 3 = Transfer, 12 = TransferChecked. Creating a
+    // coin never moves existing tokens, so either one means someone else's
+    // balance is being spent.
+    if (program === 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' && data.length >= 1) {
+      if (data[0] === 3 || data[0] === 12) problems.push('tx contains an SPL token transfer, which a create never needs');
+    }
   }
   if (pumpIx !== 1) problems.push(`expected exactly 1 pump instruction (create), got ${pumpIx}`);
+  // Rent for the mint plus fees is small; anything larger is a buy or a drain,
+  // and the UI promises the seller this costs them nothing but dust.
+  if (lamportsOut > MAX_CREATE_LAMPORTS) {
+    problems.push(`tx moves ${lamportsOut} lamports out of the creator, over the ${MAX_CREATE_LAMPORTS} ceiling`);
+  }
   if (problems.length > 0) {
     console.warn('[pump-create] vetting rejected provider tx:', problems.join('; '));
     throw new PumpCreateError(502, 'PROVIDER_UNAVAILABLE', 'Coin creation is temporarily unavailable. Try again in a minute.');

@@ -148,11 +148,44 @@ function applyCors(req: http.IncomingMessage, res: http.ServerResponse): void {
   res.setHeader('access-control-allow-headers', 'content-type, authorization');
 }
 
+/**
+ * The caller's real IP.
+ *
+ * Behind Render (and any other load balancer) the socket address is the PROXY,
+ * so keying limits on it put every user in ONE bucket: it could not isolate an
+ * attacker, and eleven requests a minute from anybody 429'd login, register and
+ * password reset for the entire site. X-Forwarded-For is a client-settable
+ * header, so it is only trusted when BIDIT_TRUST_PROXY says we are actually
+ * behind one; otherwise a spoofed header would defeat the limiter completely.
+ *
+ * XFF is "client, proxy1, proxy2...". We take the RIGHTMOST entry after dropping
+ * `trust` hops, because the leftmost values are the ones a client can forge.
+ */
+const TRUSTED_PROXY_HOPS = Math.max(0, Number(process.env.BIDIT_TRUST_PROXY ?? '0') || 0);
+export function clientIp(req: http.IncomingMessage): string {
+  const socketIp = req.socket.remoteAddress ?? 'unknown';
+  if (TRUSTED_PROXY_HOPS === 0) return socketIp;
+  const raw = req.headers['x-forwarded-for'];
+  const chain = (Array.isArray(raw) ? raw.join(',') : raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (chain.length === 0) return socketIp;
+  // Walk in from the right by the number of proxies we run behind.
+  const idx = Math.max(0, chain.length - TRUSTED_PROXY_HOPS);
+  return chain[idx] ?? chain[chain.length - 1] ?? socketIp;
+}
+
 // Throttle auth endpoints per-IP to blunt credential-stuffing / brute force.
 const authHits = new Map<string, number[]>();
 function authRateLimited(req: http.IncomingMessage): boolean {
-  const ip = req.socket.remoteAddress ?? 'unknown';
+  const ip = clientIp(req);
   const now = Date.now();
+  // Now that keys are real client IPs rather than one proxy address, the map
+  // would grow without bound. Sweep dead entries when it gets large.
+  if (authHits.size > 10_000) {
+    for (const [k, v] of authHits) if (!v.some((t) => now - t < 60_000)) authHits.delete(k);
+  }
   const recent = (authHits.get(ip) ?? []).filter((t) => now - t < 60_000);
   recent.push(now);
   authHits.set(ip, recent);

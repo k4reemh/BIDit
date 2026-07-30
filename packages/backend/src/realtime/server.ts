@@ -132,7 +132,11 @@ export class RealtimeServer {
     this.directPayout = opts.directPayout ?? false;
     this.ownsHttpServer = !opts.httpServer;
     this.httpServer = opts.httpServer ?? http.createServer();
-    this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws' });
+    // maxPayload: ws defaults to 100 MiB. Every client message here is a small
+    // JSON envelope (the longest is a 300-char chat line), so without a cap a
+    // single socket could make one Node process buffer and parse 100 MiB, and
+    // this process also runs the auctions and settlement.
+    this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws', maxPayload: 16 * 1024 });
     this.wss.on('connection', (ws, req) => void this.onConnection(ws, req));
     // When a user's sessions are revoked (logout / "log out everywhere" / erasure),
     // drop their live sockets: the connection authenticates once at connect time
@@ -357,6 +361,16 @@ export class RealtimeServer {
     const msg = parseClientMessage(data.toString());
     if (!msg) {
       this.sendToConn(conn, { type: 'ERROR', message: 'malformed message' });
+      return;
+    }
+    // Meter the frames that were NOT metered before. Chat's only brake was a
+    // read-then-write cooldown, which a burst races straight past, and
+    // SUBSCRIBE/UNSUBSCRIBE each cost several queries, so an unmetered loop could
+    // exhaust the connection pool and starve bidding and withdrawals.
+    // BID_INTENT and GIVEAWAY_ENTER already meter themselves and answer with a
+    // typed rejection, so they are left to do that rather than double-charged.
+    if (msg.type !== 'BID_INTENT' && msg.type !== 'GIVEAWAY_ENTER' && !this.allow(conn.userId)) {
+      this.sendToConn(conn, { type: 'ERROR', message: 'Slow down.' });
       return;
     }
     switch (msg.type) {
@@ -680,7 +694,7 @@ export class RealtimeServer {
       // a wheel listing.
       if (spin) {
         try {
-          await this.consumeWheelPrize(auction.listingId, entries!, spin.prizeIndex);
+          await this.consumeWheelPrize(auction.listingId, entries!, spin.prizeIndex, result.auctionId);
         } catch (err) {
           console.error('[wheel] failed to consume prize', err);
         }
@@ -745,7 +759,31 @@ export class RealtimeServer {
    * remain the listing returns to QUEUED and the seller can run it again; when
    * the last one goes it's SOLD.
    */
-  private async consumeWheelPrize(listingId: string, entries: WheelEntry[], prizeIndex: number): Promise<void> {
+  private async consumeWheelPrize(
+    listingId: string,
+    entries: WheelEntry[],
+    prizeIndex: number,
+    auctionId?: string,
+  ): Promise<void> {
+    // Record WHICH prize was won. The reel only ever existed in a WebSocket
+    // broadcast, so without this nothing durable says what the winner is owed and
+    // a "not as described" dispute has no record to resolve against.
+    const won = entries[prizeIndex];
+    if (auctionId && won?.label) {
+      // orderId on FulfillmentItem is a plain column, not a relation, so resolve
+      // the order first. Best-effort: never let bookkeeping break the spin.
+      try {
+        const order = await this.prisma.order.findFirst({ where: { auctionId }, select: { id: true } });
+        if (order) {
+          await this.prisma.fulfillmentItem.updateMany({
+            where: { orderId: order.id },
+            data: { prizeLabel: won.label.slice(0, 200) },
+          });
+        }
+      } catch (err) {
+        console.error('[wheel] failed to record won prize', err);
+      }
+    }
     const left: WheelEntry[] = [];
     entries.forEach((e, i) => {
       const stock = e.weight && e.weight > 0 ? e.weight : 1;

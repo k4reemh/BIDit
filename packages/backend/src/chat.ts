@@ -35,6 +35,11 @@ export class ChatError extends Error {
  *  Throws EMPTY (nothing left after trim) / TOO_LONG (before clamping, so a wall
  *  of text is rejected rather than silently truncated). */
 export function sanitizeChatText(raw: string): string {
+  // Size FIRST, before any regex touches it. Both passes scanned the whole
+  // string and only then discovered it was too long, so an oversized payload
+  // paid full scanning cost just to be rejected. The multiple of the limit is
+  // generous so trailing whitespace still collapses into a valid message.
+  if ((raw ?? '').length > CHAT_MAX_LEN * 4) throw new ChatError('TOO_LONG');
   const text = (raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!text) throw new ChatError('EMPTY');
   if (text.length > CHAT_MAX_LEN) throw new ChatError('TOO_LONG');

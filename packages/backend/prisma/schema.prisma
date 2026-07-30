@@ -496,6 +496,11 @@ model FulfillmentItem {
   photo       String?
   weightGrams Int?
   amount      BigInt    // item price paid, for display + forfeit accounting
+  /// For a randomizer win: which prize the server landed on. The reel is
+  /// broadcast over WebSocket and then gone, so without this nothing durable
+  /// records WHICH card the buyer is owed, and a "not as described" dispute has
+  /// no authoritative record to resolve against. Null for ordinary listings.
+  prizeLabel  String?
   status      String    @default("READY_TO_SHIP") // READY_TO_SHIP | IN_SHIPMENT | SHIPPED | DELIVERED | DISCARDED
   heldUntil   DateTime? // seller physically holds the item until this (ship-later 7d cap)
   shipmentId  String?

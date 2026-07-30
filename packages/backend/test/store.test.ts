@@ -287,3 +287,42 @@ describe('storefront listing', () => {
     expect(items.map((i) => i.id)).toEqual([listing.id]);
   });
 });
+
+/**
+ * A randomizer's prize pool and the listing's `quantity` are two records of the
+ * same stock. Buy-now decremented the counter without removing a prize, then the
+ * next auction close recomputed the counter FROM the pool, silently restoring the
+ * unit that had just been sold. That minted sellable units that do not exist, and
+ * a buyer of a phantom unit could have escrow released to the seller for a card
+ * with no prize behind it. Randomizers are auction-only now.
+ */
+describe('randomizers cannot be bought outright (SEC-10)', () => {
+  async function makeWheelListing() {
+    const seller = await makeUser('seller');
+    const listing = await prisma.listing.create({
+      data: {
+        sellerId: seller.userId,
+        title: 'Mystery wheel',
+        photos: [],
+        startingBid: usdc('1'),
+        buyNowPrice: usdc('30'), // priced BEFORE the wheel was attached
+        quantity: 3,
+        status: ListingStatus.QUEUED,
+        wheel: [{ label: 'Charizard', weight: 1 }, { label: 'Pack', weight: 2 }] as object,
+      },
+    });
+    return { seller, listing };
+  }
+
+  it('refuses a buy-now on a wheel listing, even if it already had a price', async () => {
+    const clock = new ManualClock(T0);
+    const { listing } = await makeWheelListing();
+    const buyer = await makeFundedUser('100');
+    await expect(purchaseListing(buyer.userId, listing.id, { ...direct, clock }, prisma))
+      .rejects.toThrow(ItemUnavailableError);
+    // Stock untouched and nothing charged: the oversell needed this sale to land.
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } })).quantity).toBe(3);
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('100'));
+    expect(await prisma.order.count()).toBe(0);
+  });
+});

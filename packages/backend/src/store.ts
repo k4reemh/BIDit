@@ -73,6 +73,15 @@ export async function purchaseListing(
   const listing = await prisma.listing.findUnique({ where: { id: listingId } });
   if (!listing || listing.buyNowPrice === null) throw new ItemUnavailableError();
   if (listing.sellerId === buyerId) throw new ItemUnavailableError('You can’t buy your own listing');
+  // Randomizers are auction-only. Buying one outright hands the buyer nothing
+  // (no spin happens, so no prize is assigned), and it decremented `quantity`
+  // without removing a prize from the wheel, so the next auction close recomputed
+  // quantity from the wheel and silently restored the unit that was just sold.
+  // Blocked here as well as in setListingStorePrice, to cover a listing that was
+  // priced BEFORE a wheel was added to it.
+  if (listing.wheel !== null) {
+    throw new ItemUnavailableError('This is a randomizer: bid on it to win a roll.');
+  }
 
   // Claim a unit. The WHERE doubles as the availability check: status must be
   // QUEUED (not LIVE mid-auction, not SOLD) and stock must remain.

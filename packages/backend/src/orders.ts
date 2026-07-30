@@ -509,16 +509,26 @@ async function forfeitAndDiscard(
     select: { status: true, noShipDeadline: true },
   });
   if (order.status === OrderStatus.LOCKED) {
-    // noShipDeadline set = the buyer already paid shipping and the seller owes a
-    // package; that order refunds via the no-ship timer, it can't be discarded.
-    // (Unreachable through the UI: paying shipping moves the item to IN_SHIPMENT.)
-    if (order.noShipDeadline !== null) throw new ShippingError('Shipping is already paid on this item.');
-    await forfeitOrder(item.orderId, escrow, clock, prisma);
+    // The "has shipping been paid?" test lives INSIDE the atomic claim. Read
+    // separately, a buyer's shipping payment could land between the check and
+    // the claim: paying shipping leaves the order LOCKED, so the claim still
+    // succeeded and escrow released to the seller for a package the buyer had
+    // just paid to send.
+    const claimed = await prisma.order.updateMany({
+      where: { id: item.orderId, status: OrderStatus.LOCKED, noShipDeadline: null },
+      data: { status: OrderStatus.RELEASED, releasedAt: clock.now() },
+    });
+    if (claimed.count !== 1) {
+      throw new ShippingError('Shipping was just paid on this item, so it can’t be discarded.');
+    }
+    await escrow.release(item.orderId);
   }
-  await prisma.fulfillmentItem.update({
-    where: { id: item.id },
+  // Same race on the item: only retire one that is still awaiting shipment.
+  const retired = await prisma.fulfillmentItem.updateMany({
+    where: { id: item.id, status: 'READY_TO_SHIP' },
     data: { status: 'DISCARDED', discardedAt: clock.now() },
   });
+  if (retired.count !== 1) throw new ShippingError('That item is no longer ready to ship.');
 }
 
 /** Buyer gives up an unshipped win/purchase (the "are you sure" lives in the web
