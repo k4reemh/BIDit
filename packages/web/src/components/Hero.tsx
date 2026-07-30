@@ -147,7 +147,7 @@ export default function Hero({ onAuth }: { onAuth: () => void }) {
       <div className="hero__aura" aria-hidden />
       <div className="hero__grid container">
         <div className="hero__copy">
-          <span className="hero__tag"><span className="dot" /> Live on Solana mainnet</span>
+          <span className="hero__tag"><span className="dot" /> Now Live in Beta</span>
           <h1 className="display hero__title hero__title--left">
             <Staged text="Every stream is an" />
             <span className="hero__em"><Staged text="auction house." /></span>
