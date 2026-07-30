@@ -107,7 +107,7 @@ export default function Deposit() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Withdraw</h3>
-        <p className="muted acct-note">Cash out any time. We send USDC from the treasury to any Solana address you name, and BIDit pays the network fee. Funds reserved by active bids stay put until those auctions end.</p>
+        <p className="muted acct-note">Cash out any time. We send USDC from the treasury to any Solana address you name, and BIDit pays the network fee. Minimum withdrawal is $5. Funds reserved by active bids stay put until those auctions end.</p>
         <div className="beta-cap">
           <Shield width={16} height={16} />
           <span><b>Beta safety limit:</b> withdrawals are capped at <b>$1,000 per day</b> per account while we harden the payout system during BIDit beta. It’s temporary and will be lifted.</span>

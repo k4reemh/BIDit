@@ -29,6 +29,9 @@ export class MockChain implements ChainClient {
   private readonly userAddr = new Map<string, string>();
   private queue: DepositEvent[] = [];
   private txN = 0;
+  /** Default false so existing tests aren't all charged against the ATA budget. */
+  private destsNeedFunding = false;
+  private readonly fundedDests = new Set<string>();
 
   // ---- withdrawal-path modelling ------------------------------------------
   private readonly transfers = new Map<string, PendingTransfer>();
@@ -88,7 +91,23 @@ export class MockChain implements ChainClient {
     return typeof address === 'string' && address.trim().length > 0;
   }
 
+  /** Mirrors Solana: a destination we have never paid is assumed to need its
+   *  token account opened at our expense, unless a test says otherwise. */
+  async destinationNeedsFunding(address: string): Promise<boolean> {
+    return this.fundedDests.has(address) ? false : this.destsNeedFunding;
+  }
+
   // ---- test helpers --------------------------------------------------------
+
+  /** Whether unknown destinations report as needing a (treasury-funded) account. */
+  setDestinationsNeedFunding(v: boolean): void {
+    this.destsNeedFunding = v;
+  }
+
+  /** Mark a destination as already holding USDC, so paying it is free for us. */
+  markDestinationFunded(address: string): void {
+    this.fundedDests.add(address);
+  }
 
   /** Make the next sendTransfer throw before broadcasting (funds never move). */
   failNextSend(): void {

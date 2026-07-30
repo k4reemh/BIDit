@@ -128,6 +128,19 @@ export class SolanaChain implements ChainClient {
     }
   }
 
+  /** Does this destination still need its USDC token account opened (at OUR
+   *  expense)? Treated as "yes" if the lookup fails, so an RPC blip spends the
+   *  caller's budget rather than silently handing out free rent. */
+  async destinationNeedsFunding(address: string): Promise<boolean> {
+    try {
+      const ata = await getAssociatedTokenAddress(this.usdcMint, new PublicKey(address));
+      await getAccount(this.conn, ata);
+      return false; // already exists, costs us nothing
+    } catch {
+      return true;
+    }
+  }
+
   async transfer(from: WalletName, to: string, amountMicros: bigint): Promise<string> {
     const owner = this.wallets[from];
     const fromAta = await getOrCreateAssociatedTokenAccount(this.conn, owner, this.usdcMint, owner.publicKey);

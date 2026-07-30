@@ -285,6 +285,10 @@ model Withdrawal {
   reversedAt DateTime?
   /// Last transition reason / error, for operator visibility on stuck rows.
   lastError String?
+  /// True when the destination had no USDC token account, so treasury paid its
+  /// ~0.00204 SOL rent to open one. Rent-farming this was a treasury drain, so
+  /// these are counted against a global daily budget (see withdrawals.ts).
+  fundedDestAccount Boolean @default(false)
   createdAt DateTime @default(now())
   // @default(now()) gives the column a DB-level default so `prisma db push` can
   // add it to a table that already has rows on deploy (no --accept-data-loss).

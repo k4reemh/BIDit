@@ -60,14 +60,56 @@ export class WithdrawalError extends Error {
   }
 }
 
-/** Temporary beta cap: max USDC a single user may withdraw per rolling 24h. */
-export function dailyWithdrawCapMicros(): bigint {
-  const raw = process.env.BIDIT_WITHDRAW_DAILY_CAP_USD;
+function envPositive(name: string, fallback: number): number {
+  const raw = process.env[name];
   if (raw != null && raw.trim() !== '') {
     const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return usdc(String(n));
+    if (Number.isFinite(n) && n > 0) return n;
   }
-  return usdc('1000');
+  return fallback;
+}
+
+/** Temporary beta cap: max USDC a single user may withdraw per rolling 24h. */
+export function dailyWithdrawCapMicros(): bigint {
+  return usdc(String(envPositive('BIDIT_WITHDRAW_DAILY_CAP_USD', 1000)));
+}
+
+/**
+ * Floor on a single withdrawal.
+ *
+ * Not UX polish: paying an address that has never held USDC makes TREASURY fund
+ * that address's token account (~0.00204 SOL of rent, well over $0.30). With no
+ * floor, dust withdrawals turned that into a rent faucet: send 0.000001 USDC to a
+ * fresh keypair, close the account afterwards, keep the rent. Every request was
+ * profitable, and draining treasury's SOL halts withdrawals, deposit sweeps and
+ * escrow legs alike. A floor makes the value you must move dwarf the rent.
+ */
+export function minWithdrawMicros(): bigint {
+  return usdc(String(envPositive('BIDIT_MIN_WITHDRAW_USD', 5)));
+}
+
+/** Max withdrawals one user may start per rolling 24h. Bounds request volume,
+ *  which the dollar cap alone does not: 28,800 dust withdrawals fit under it. */
+export function dailyWithdrawCountCap(): number {
+  return Math.floor(envPositive('BIDIT_WITHDRAW_DAILY_COUNT', 20));
+}
+
+/**
+ * Platform-wide ceiling on how many destination token accounts treasury will fund
+ * per rolling 24h. The per-user limits above are per-user, and accounts are free
+ * to create, so this is the backstop that bounds total SOL burn across every
+ * attacker account at once. It FAILS CLOSED: once spent, withdrawals to addresses
+ * that have never held USDC are refused until the window rolls.
+ */
+export function dailyNewDestinationBudget(): number {
+  // 0 is meaningful here (never fund a destination account), so unlike the other
+  // knobs this one accepts zero rather than falling back to the default.
+  const raw = process.env.BIDIT_NEW_DEST_DAILY_BUDGET;
+  if (raw != null && raw.trim() !== '') {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  }
+  return 50;
 }
 
 /** USDC a user has committed to withdrawing in the last 24h. Counts everything
@@ -96,6 +138,14 @@ export async function requestWithdrawal(
     throw new WithdrawalError('That doesn’t look like a valid Solana address.');
   }
 
+  // 1a. Floor the amount. See minWithdrawMicros: dust withdrawals to fresh
+  //     addresses were a profitable way to drain treasury's SOL through token-
+  //     account rent, which would have stopped every money rail at once.
+  const floor = minWithdrawMicros();
+  if (amountMicros < floor) {
+    throw new WithdrawalError(`The smallest withdrawal is $${formatUsdc(floor)}.`);
+  }
+
   // 1b. The destination must be EXTERNAL. Withdrawing into an operator wallet is an
   //     on-chain self-transfer (no funds leave) while the ledger still debits the
   //     user: silently corrupting the treasury↔Σbalances reconciliation. Withdrawing
@@ -115,8 +165,15 @@ export async function requestWithdrawal(
   //    prevented by the debit's account lock below: this only guards the cap.)
   const cap = dailyWithdrawCapMicros();
   const accountId = await getOrCreateUserAccount(userId, prisma);
+
+  // Does paying this address cost us token-account rent? Checked BEFORE the lock
+  // (it is a network read) and re-counted inside it. On a chain error this reports
+  // true, so an RPC blip spends budget instead of leaking free rent.
+  const needsFunding = await chain.destinationNeedsFunding(toAddress).catch(() => true);
+
   const withdrawal = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
+    const since = new Date(Date.now() - DAY_MS);
     const used = await withdrawnLast24h(userId, tx);
     if (used + amountMicros > cap) {
       const remaining = used >= cap ? 0n : cap - used;
@@ -125,7 +182,31 @@ export async function requestWithdrawal(
         `Beta withdrawals are limited to $${money(cap)} per day. You have $${money(remaining)} left in the next 24h.`,
       );
     }
-    return tx.withdrawal.create({ data: { userId, toAddress, amount: amountMicros, status: 'PENDING' } });
+    // Count, not just value. The dollar cap alone let tens of thousands of dust
+    // withdrawals through, which is what made the rent drain practical.
+    const countCap = dailyWithdrawCountCap();
+    const startedToday = await tx.withdrawal.count({
+      where: { userId, createdAt: { gte: since }, status: { in: [...INFLIGHT] } },
+    });
+    if (startedToday >= countCap) {
+      throw new WithdrawalError(`You can start ${countCap} withdrawals per day. Try again later.`);
+    }
+    if (needsFunding) {
+      // Platform-wide budget, so many cheap accounts can't add up to a big spend.
+      // Fails closed: no budget, no new-destination withdrawal.
+      const fundedToday = await tx.withdrawal.count({
+        where: { fundedDestAccount: true, createdAt: { gte: since }, status: { in: [...INFLIGHT] } },
+      });
+      if (fundedToday >= dailyNewDestinationBudget()) {
+        throw new WithdrawalError(
+          'That address has never held USDC, and today’s allowance for opening new token accounts is used up. ' +
+            'Withdraw to an address that already holds USDC, or try again tomorrow.',
+        );
+      }
+    }
+    return tx.withdrawal.create({
+      data: { userId, toAddress, amount: amountMicros, status: 'PENDING', fundedDestAccount: needsFunding },
+    });
   });
 
   // 3. Debit first (this enforces the no-overspend / holds-respected guarantee).

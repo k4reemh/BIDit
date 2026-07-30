@@ -70,4 +70,11 @@ export interface ChainClient {
   isValidAddress(address: string): boolean;
   /** USDC balance (micro-units) of a named wallet or a raw address. */
   balance(target: WalletName | string): Promise<bigint>;
+  /**
+   * True when paying `address` would require opening a USDC token account for it,
+   * which costs the SENDER a rent deposit (~0.00204 SOL on Solana) rather than the
+   * recipient. Withdrawals budget these, because farming the rent out of treasury
+   * was cheaper for an attacker than the value they had to move to trigger it.
+   */
+  destinationNeedsFunding(address: string): Promise<boolean>;
 }
