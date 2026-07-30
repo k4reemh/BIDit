@@ -95,21 +95,23 @@ export function dailyWithdrawCountCap(): number {
 }
 
 /**
- * Platform-wide ceiling on how many destination token accounts treasury will fund
- * per rolling 24h. The per-user limits above are per-user, and accounts are free
- * to create, so this is the backstop that bounds total SOL burn across every
- * attacker account at once. It FAILS CLOSED: once spent, withdrawals to addresses
- * that have never held USDC are refused until the window rolls.
+ * How many brand-new destination token accounts ONE user may have treasury fund
+ * per rolling 24h.
+ *
+ * Deliberately per-user rather than platform-wide. A shared budget would let one
+ * cheap attacker exhaust it and thereby block every honest user from withdrawing
+ * to a fresh wallet, turning an anti-drain control into a denial-of-service. A
+ * real user pays out to one or two addresses; three a day is already generous.
  */
-export function dailyNewDestinationBudget(): number {
+export function dailyNewDestinationCap(): number {
   // 0 is meaningful here (never fund a destination account), so unlike the other
   // knobs this one accepts zero rather than falling back to the default.
-  const raw = process.env.BIDIT_NEW_DEST_DAILY_BUDGET;
+  const raw = process.env.BIDIT_NEW_DEST_DAILY_CAP;
   if (raw != null && raw.trim() !== '') {
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 0) return Math.floor(n);
   }
-  return 50;
+  return 3;
 }
 
 /** USDC a user has committed to withdrawing in the last 24h. Counts everything
@@ -192,14 +194,15 @@ export async function requestWithdrawal(
       throw new WithdrawalError(`You can start ${countCap} withdrawals per day. Try again later.`);
     }
     if (needsFunding) {
-      // Platform-wide budget, so many cheap accounts can't add up to a big spend.
-      // Fails closed: no budget, no new-destination withdrawal.
+      // Paying a never-used address costs US rent, so cap how often one account
+      // can make us do it. Scoped per user on purpose: a shared budget would let
+      // an attacker exhaust it and block everyone else's withdrawals.
       const fundedToday = await tx.withdrawal.count({
-        where: { fundedDestAccount: true, createdAt: { gte: since }, status: { in: [...INFLIGHT] } },
+        where: { userId, fundedDestAccount: true, createdAt: { gte: since }, status: { in: [...INFLIGHT] } },
       });
-      if (fundedToday >= dailyNewDestinationBudget()) {
+      if (fundedToday >= dailyNewDestinationCap()) {
         throw new WithdrawalError(
-          'That address has never held USDC, and today’s allowance for opening new token accounts is used up. ' +
+          'That address has never held USDC, and you’ve already sent to the most new addresses allowed today. ' +
             'Withdraw to an address that already holds USDC, or try again tomorrow.',
         );
       }
