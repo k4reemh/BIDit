@@ -336,7 +336,7 @@ function SceneEscrow({ onFinish }: { onFinish: () => void }) {
       icon={<Shield width={26} height={26} />}
       kicker="Step 5 · buyer protection"
       title="Your money is protected"
-      sub="Funds stay locked in escrow until you confirm delivery, so you can enjoy risk free bidding. If it never arrives, you get your money back."
+      sub="Funds stay locked in escrow until you confirm delivery, so you can enjoy risk free bidding. If the seller never ships, you get a 100% refund."
     >
       <div className="tut-esc" aria-hidden>
         <div className="tut-esc__track">

@@ -15,7 +15,7 @@ import type { Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale, escrowSettleApplied, escrowLockApplied } from './ledger.js';
-import { createFulfillmentItem, applyWeeklyBundling } from './fulfillment.js';
+import { createFulfillmentItem, applyWeeklyBundling, ShippingError } from './fulfillment.js';
 import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
@@ -493,6 +493,67 @@ export async function forfeitOrder(
   if (!won) return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   await escrow.release(orderId);
   return prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+}
+
+/** Shared core of a manual discard: forfeit the escrow if the order still holds
+ *  it (escrow mode, shipping never paid), then retire the item. Direct-payout
+ *  orders are already RELEASED, so only the item flips. */
+async function forfeitAndDiscard(
+  item: { id: string; orderId: string },
+  escrow: EscrowProvider,
+  clock: Clock,
+  prisma: PrismaClient,
+): Promise<void> {
+  const order = await prisma.order.findUniqueOrThrow({
+    where: { id: item.orderId },
+    select: { status: true, noShipDeadline: true },
+  });
+  if (order.status === OrderStatus.LOCKED) {
+    // noShipDeadline set = the buyer already paid shipping and the seller owes a
+    // package; that order refunds via the no-ship timer, it can't be discarded.
+    // (Unreachable through the UI: paying shipping moves the item to IN_SHIPMENT.)
+    if (order.noShipDeadline !== null) throw new ShippingError('Shipping is already paid on this item.');
+    await forfeitOrder(item.orderId, escrow, clock, prisma);
+  }
+  await prisma.fulfillmentItem.update({
+    where: { id: item.id },
+    data: { status: 'DISCARDED', discardedAt: clock.now() },
+  });
+}
+
+/** Buyer gives up an unshipped win/purchase (the "are you sure" lives in the web
+ *  UI). This is a FORFEIT: the seller keeps the item, and if the price is still
+ *  locked in escrow it releases to the seller. There is no refund. */
+export async function buyerDiscardItem(
+  itemId: string,
+  buyerId: string,
+  escrow: EscrowProvider,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const it = await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: itemId } });
+  if (it.buyerId !== buyerId) throw new ShippingError('Not your item.');
+  if (it.status !== 'READY_TO_SHIP') throw new ShippingError('Only ready-to-ship items can be discarded.');
+  await forfeitAndDiscard(it, escrow, clock, prisma);
+}
+
+/** Seller clears out a win whose buyer never paid shipping within the 14-day
+ *  hold. Only allowed once the hold has expired; same forfeit semantics as the
+ *  automatic timer (seller keeps the item and is paid), just seller-initiated. */
+export async function sellerDiscardExpiredItem(
+  itemId: string,
+  sellerId: string,
+  escrow: EscrowProvider,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const it = await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: itemId } });
+  if (it.sellerId !== sellerId) throw new ShippingError('Not your item.');
+  if (it.status !== 'READY_TO_SHIP') throw new ShippingError('Only ready-to-ship items can be discarded.');
+  if (!it.heldUntil || it.heldUntil.getTime() > clock.now().getTime()) {
+    throw new ShippingError('The buyer still has time to pay shipping. You can discard once the 14-day hold expires.');
+  }
+  await forfeitAndDiscard(it, escrow, clock, prisma);
 }
 
 /**

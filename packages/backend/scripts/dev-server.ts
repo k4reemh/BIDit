@@ -98,6 +98,8 @@ import {
   advanceOrdersForShipment,
   disputeShipment,
   releaseOrdersForShipment,
+  buyerDiscardItem,
+  sellerDiscardExpiredItem,
   type DisputeOutcome,
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
@@ -118,7 +120,6 @@ import {
   createShipmentLabel,
   markShipmentShipped,
   markShipmentDelivered,
-  discardItem,
   processFulfillmentTimers,
   ShippingError,
   type ShipMode,
@@ -366,7 +367,7 @@ async function main() {
     (e) => console.error('[chain-settle] startup reconcile failed:', e),
   );
   chainSettler.start();
-  // Auto-discard Ready-to-Ship items past their 7-day seller hold (ship-later).
+  // Auto-discard Ready-to-Ship items past the 14-day ship-later hold.
   const fulfillmentTimer = setInterval(() => {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
   }, 10 * 60_000);
@@ -915,7 +916,8 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
         try {
-          await discardItem(String(b.itemId ?? ''), userId, systemClock, prisma);
+          // Forfeit: releases the escrow to the seller when the price is still locked.
+          await buyerDiscardItem(String(b.itemId ?? ''), userId, escrow, systemClock, prisma);
           return send(res, 200, await buyerFulfillmentDto(userId));
         } catch (err) {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
@@ -1211,6 +1213,20 @@ async function main() {
           buyerHandle: handles.get(it.buyerId) ?? null,
           heldUntil: it.heldUntil ? it.heldUntil.getTime() : null,
         })));
+      }
+      // Seller clears a held win whose 14-day hold expired with shipping unpaid.
+      // Forfeit: the seller keeps the item, and locked escrow releases to them.
+      if (req.method === 'POST' && p === '/seller/held/discard') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await sellerDiscardExpiredItem(String(b.itemId ?? ''), userId, escrow, systemClock, prisma);
+          return send(res, 200, { ok: true });
+        } catch (err) {
+          if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          throw err;
+        }
       }
       // Seller confirms the package size for a PAID shipment → BIDit makes the label.
       if (req.method === 'POST' && p === '/seller/shipment/confirm-label') {

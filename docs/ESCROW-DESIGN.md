@@ -130,6 +130,13 @@ immediately** (skip the 2-day window). These sit alongside the automatic path.
 - **No-ship timeout: 7 business days**, counted **from when the buyer pays
   shipping**. If the seller hasn't shipped by then: cancel the label, **refund the
   item price** (escrow → buyer), keep the shipping fee.
+- **Buyer pays shipping within 14 days of purchase** (the ship-later hold). The
+  hold expiring auto-forfeits the item to the seller (escrow → seller). Two manual
+  paths do the same thing early/explicitly: the **buyer may discard** an unshipped
+  item at any time (confirm dialog in the web UI), and the **seller may discard**
+  once the hold has expired (`buyerDiscardItem` / `sellerDiscardExpiredItem`).
+  All three routes are the identical forfeit: seller keeps the item, escrow
+  releases to the seller with the normal 95/4/1 split, no refund.
 
 ---
 

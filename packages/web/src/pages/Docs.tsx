@@ -281,6 +281,7 @@ export default function Docs() {
           </div>
           <ul className="docs__ul">
             <li><b>Buy now, ship later.</b> Let wins sit in Ready to ship (held up to 14 days), then pick which to send and pay shipping once. Don’t want one? Discard it.</li>
+            <li><b>The 14-day window.</b> Pay shipping within 14 days of the purchase. Discarding an item, or letting the window pass, forfeits it: the seller keeps the item and the sale still pays out to them.</li>
             <li><b>One package per seller.</b> Bundling and ship-later group a single seller’s items into one shipment with one shipping charge.</li>
             <li><b>Delivery.</b> The seller adds tracking and marks it shipped. When it arrives, tap <b>Confirm received</b>.</li>
             <li><b>Set your address first.</b> Add it under Payments &amp; Shipping so we can quote and label correctly.</li>

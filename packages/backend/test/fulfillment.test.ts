@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { placeBid, closeDueAuctions } from '../src/auction.js';
-import { settleAuctionDirect } from '../src/orders.js';
+import { settleAuctionDirect, buyerDiscardItem, sellerDiscardExpiredItem } from '../src/orders.js';
+import { DevWalletEscrow } from '../src/escrow.js';
 import {
   createAndPayShipment,
   confirmShipmentForLabel,
   createShipmentLabel,
   markShipmentShipped,
   markShipmentDelivered,
-  discardItem,
   processFulfillmentTimers,
   ShippingError,
   SHIP_LATER_HOLD_MS,
@@ -131,16 +131,35 @@ describe('fulfillment', () => {
     expect(shipped.trackingNumber).toBe('1Z-CONFIRM');
   });
 
-  it('discard forfeits the item and moves no money', async () => {
+  it('buyer discard forfeits the item and moves no money (direct payout)', async () => {
     const clock = new ManualClock(T0);
     const { item, buyer } = await wonAndSettled(clock);
     const buyerBefore = await getSettledBalance(buyer.accountId, prisma);
-    const discarded = await discardItem(item.id, buyer.userId, clock, prisma);
-    expect(discarded.status).toBe('DISCARDED');
+    await buyerDiscardItem(item.id, buyer.userId, new DevWalletEscrow(prisma), clock, prisma);
+    expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(buyerBefore); // no refund — forfeit
   });
 
-  it('auto-discards items past the 7-day hold', async () => {
+  it('seller discard needs the 14-day hold to expire first', async () => {
+    const clock = new ManualClock(T0);
+    const { item, sellerId } = await wonAndSettled(clock);
+    const escrow = new DevWalletEscrow(prisma);
+    await expect(sellerDiscardExpiredItem(item.id, sellerId, escrow, clock, prisma)).rejects.toThrow(/still has time/);
+    clock.advance(SHIP_LATER_HOLD_MS + 1000);
+    await sellerDiscardExpiredItem(item.id, sellerId, escrow, clock, prisma);
+    expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
+  });
+
+  it('discards are gated to the right user', async () => {
+    const clock = new ManualClock(T0);
+    const { item, sellerId, buyer } = await wonAndSettled(clock);
+    const escrow = new DevWalletEscrow(prisma);
+    await expect(buyerDiscardItem(item.id, sellerId, escrow, clock, prisma)).rejects.toThrow(/Not your item/);
+    clock.advance(SHIP_LATER_HOLD_MS + 1000);
+    await expect(sellerDiscardExpiredItem(item.id, buyer.userId, escrow, clock, prisma)).rejects.toThrow(/Not your item/);
+  });
+
+  it('auto-discards items past the 14-day hold', async () => {
     const clock = new ManualClock(T0);
     const { item } = await wonAndSettled(clock);
     clock.advance(SHIP_LATER_HOLD_MS + 22_000);

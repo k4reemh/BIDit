@@ -12,6 +12,8 @@ import {
   resolveDispute,
   releaseOrder,
   processOrderTimers,
+  buyerDiscardItem,
+  sellerDiscardExpiredItem,
   DISPUTE_WINDOW_MS,
 } from '../src/orders.js';
 import { SHIP_LATER_HOLD_MS } from '../src/fulfillment.js';
@@ -220,6 +222,51 @@ describe('refunds return the whole amount (fee only taken on release)', () => {
     expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('100'));
     expect(await getSettledBalance(sellerAcct, prisma)).toBe(0n);
     expect(await getBuybackPending(prisma)).toBe(0n);
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+  });
+
+  it('buyer discard on an escrow-locked order releases the money to the seller', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId, buyer } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    expect(order.status).toBe(OrderStatus.LOCKED);
+    const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } });
+
+    // Well inside the 14-day hold: the buyer can still walk away, but it's a forfeit.
+    await buyerDiscardItem(item.id, buyer.userId, escrow, clock, prisma);
+
+    const after = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    expect(after.status).toBe(OrderStatus.RELEASED);
+    expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
+    // Seller paid the full 95/4/1 split; nothing stranded in escrow; no refund.
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
+    expect(await getSettledBalance(buyer.accountId, prisma)).toBe(usdc('80'));
+    expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
+    expect(await getSystemTotal(prisma)).toBe(0n);
+
+    // The timers find nothing left to do for this order.
+    clock.advance(SHIP_LATER_HOLD_MS + 60_000);
+    const timers = await processOrderTimers(escrow, clock, prisma);
+    expect(timers.forfeited).toEqual([]);
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
+  });
+
+  it('seller discard: blocked during the hold, forfeits the escrow after it', async () => {
+    const clock = new ManualClock(T0);
+    const { auctionId, sellerId } = await won({ deposit: '100', startingBid: '5', bid: '20', clock });
+    const sellerAcct = await sellerAccountId(sellerId);
+    const order = (await settleAuction(auctionId, escrow, clock, prisma))!;
+    const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } });
+
+    await expect(sellerDiscardExpiredItem(item.id, sellerId, escrow, clock, prisma)).rejects.toThrow(/still has time/);
+
+    clock.advance(SHIP_LATER_HOLD_MS + 1000);
+    await sellerDiscardExpiredItem(item.id, sellerId, escrow, clock, prisma);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(OrderStatus.RELEASED);
+    expect((await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: item.id } })).status).toBe('DISCARDED');
+    expect(await getSettledBalance(sellerAcct, prisma)).toBe(usdc('19'));
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.ESCROW, prisma)).toBe(0n);
     expect(await getSystemTotal(prisma)).toBe(0n);
   });

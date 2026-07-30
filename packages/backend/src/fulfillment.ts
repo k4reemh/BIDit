@@ -640,25 +640,9 @@ export async function markShipmentDelivered(
   return prisma.shipment.update({ where: { id: s.id }, data: { status: 'DELIVERED', deliveredAt: now } });
 }
 
-/**
- * Buyer discards a Ready-to-Ship item they don't want to bother shipping. Per the
- * locked decision this is a FORFEIT — the item is already paid (direct payout), so
- * no money moves; the seller keeps it. READY_TO_SHIP -> DISCARDED.
- */
-export async function discardItem(
-  itemId: string,
-  buyerId: string,
-  clock: Clock = systemClock,
-  prisma: PrismaClient = defaultPrisma,
-) {
-  const it = await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: itemId } });
-  if (it.buyerId !== buyerId) throw new ShippingError('Not your item.');
-  if (it.status !== 'READY_TO_SHIP') throw new ShippingError('Only ready-to-ship items can be discarded.');
-  return prisma.fulfillmentItem.update({
-    where: { id: itemId },
-    data: { status: 'DISCARDED', discardedAt: clock.now() },
-  });
-}
+// NOTE: manual discards (buyer gives up an item, seller clears an expired hold)
+// live in orders.ts (buyerDiscardItem / sellerDiscardExpiredItem) — they may have
+// to release escrow, which this module can't reach without an import cycle.
 
 /** Auto-discard items whose ship-later hold expired with no buyer action. Escrow
  *  orders still LOCKED are left for the order timer, which forfeits them to the

@@ -647,6 +647,10 @@ export interface HeldItem {
   heldUntil: number | null;
 }
 export const getSellerHeld = () => req<HeldItem[]>('/seller/held');
+/** Seller clears a held win whose 14-day hold expired (buyer never paid shipping).
+ *  Forfeit: the seller keeps the item, and any escrowed payment releases to them. */
+export const discardHeldItem = (itemId: string) =>
+  req<{ ok: boolean }>('/seller/held/discard', { method: 'POST', body: JSON.stringify({ itemId }) });
 
 // ---- BIDit Points ----------------------------------------------------------
 export type MissionStatus = 'locked' | 'claimable' | 'claimed';

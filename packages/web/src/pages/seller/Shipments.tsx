@@ -4,6 +4,7 @@ import EmptyState from '../../components/EmptyState';
 import {
   getSellerShipments,
   getSellerHeld,
+  discardHeldItem,
   confirmShipmentLabel,
   type Shipment,
   type HeldItem,
@@ -100,19 +101,36 @@ export default function Shipments() {
       )}
 
       {held.length > 0 && (
-        <Section title="Waiting for buyer’s shipping order" hint="Hold these until the buyer pays for shipping. Then they’ll move up here, ready to ship.">
+        <Section title="Waiting for buyer’s shipping order" hint="Hold these until the buyer pays for shipping. If they don’t within 14 days of the purchase, you can discard: you keep the item and the sale still pays out.">
           <div className="card acct-card">
             <div className="ship-list">
-              {held.map((it) => (
-                <div key={it.id} className="ship-row">
-                  <Thumb src={it.image} />
-                  <div className="ship-meta">
-                    <b>{it.title}</b>
-                    <span className="muted">@{it.buyerHandle}{it.heldUntil ? ` · hold until ${fmtDate(it.heldUntil)}` : ''}</span>
+              {held.map((it) => {
+                const expired = it.heldUntil !== null && it.heldUntil <= Date.now();
+                return (
+                  <div key={it.id} className="ship-row">
+                    <Thumb src={it.image} />
+                    <div className="ship-meta">
+                      <b>{it.title}</b>
+                      <span className="muted">@{it.buyerHandle}{it.heldUntil ? ` · ${expired ? 'hold expired' : `hold until ${fmtDate(it.heldUntil)}`}` : ''}</span>
+                    </div>
+                    {expired ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={async () => {
+                          if (!window.confirm(`Discard “${it.title}”? The buyer never paid shipping, so they forfeit it. You keep the item and the sale stays paid. This can’t be undone.`)) return;
+                          try { await discardHeldItem(it.id); load(); }
+                          catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t discard the item.'); }
+                        }}
+                      >
+                        Discard
+                      </button>
+                    ) : (
+                      <span className="ship-pill is-wait">Awaiting buyer</span>
+                    )}
                   </div>
-                  <span className="ship-pill is-wait">Awaiting buyer</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </Section>

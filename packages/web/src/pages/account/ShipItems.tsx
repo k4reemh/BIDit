@@ -150,7 +150,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
   };
 
   const discard = async (id: string, title: string) => {
-    if (!window.confirm(`Discard “${title}”? You paid for it, so this forfeits the card. No refund. The seller keeps it.`)) return;
+    if (!window.confirm(`Are you sure you want to discard “${title}”? You forfeit the item: the seller keeps it and your payment goes to them. No refund. This can’t be undone.`)) return;
     setBusy(true); setErr('');
     try { await discardFulfillmentItem(id); onChanged(); }
     catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t discard the item.'); }
@@ -162,7 +162,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
     <div className="card acct-card">
       <div className="ship-grp__head">
         <h3 className="acct-sub" style={{ margin: 0 }}>{items.length} item{items.length > 1 ? 's' : ''} from one seller</h3>
-        {held && <span className="muted" style={{ fontSize: 12 }}>Held until {fmtDate(held)}</span>}
+        {held && <span className="muted" style={{ fontSize: 12 }}>Pay shipping by {fmtDate(held)} or these are forfeited</span>}
       </div>
       {err && <div className="auth__error">{err}</div>}
       {msg && <div className="dep-ok"><Check width={15} height={15} /> {msg}</div>}
