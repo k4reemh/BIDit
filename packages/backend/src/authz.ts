@@ -376,6 +376,12 @@ export async function isAdmin(userId: string, prisma: PrismaClient = defaultPris
   if (!user) return false;
   if (user.role === Role.admin) return true;
   const email = user.email?.toLowerCase();
+  // The allowlist matches on an address, so the account must have PROVEN it owns
+  // that address. Without this, an allowlisted address that has no account yet
+  // could simply be registered by anyone, handing them escrow release/refund and
+  // every buyer's home address. Registration's distinct "already registered"
+  // error makes finding an unclaimed one easy.
+  if (!user.emailVerified) return false;
   return !!email && adminEmails().includes(email);
 }
 

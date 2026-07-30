@@ -52,7 +52,7 @@ describe('coin create: happy path', () => {
 describe('coin create: guards', () => {
   it('refuses to prepare when a coin is already linked', async () => {
     const s = await makeUser('seller');
-    await setSellerCoin(s.userId, 'EXISTING_COIN', prisma);
+    await setSellerCoin(s.userId, '5fhDJYAaKyTZVXFRwajciVykEuxJETFo35J5BTuGFYxK', prisma);
     await expect(prepareCoinCreate(s.userId, null, provider, prisma)).rejects.toMatchObject({
       code: 'ALREADY_LINKED',
       status: 409,
@@ -189,14 +189,14 @@ describe('coin create: races and ambiguity', () => {
     const { attempt } = await prepareCoinCreate(s.userId, null, provider, prisma);
     await submitCoinCreate(s.userId, attempt.id, null, provider, prisma); // SUBMITTED
 
-    await setSellerCoin(s.userId, 'PASTED_COIN', prisma); // seller pastes in another tab
+    await setSellerCoin(s.userId, '6QHPd4DBYrp7B4HjTg9qDusXppCxcKpVrzVzwNP1RoDP', prisma); // seller pastes in another tab
 
     const row = await prisma.pumpCoinCreateAttempt.findUniqueOrThrow({ where: { id: attempt.id } });
     provider.resolve(row.txSig!, 'confirmed');
     const dto = await getCoinCreateStatus(s.userId, provider, prisma);
     expect(dto.status).toBe('CONFIRMED');
-    expect(dto.linkedCoin).toBe('PASTED_COIN'); // the paste stands
-    expect(await linkedCoinOf(s.userId)).toBe('PASTED_COIN');
+    expect(dto.linkedCoin).toBe('6QHPd4DBYrp7B4HjTg9qDusXppCxcKpVrzVzwNP1RoDP'); // the paste stands
+    expect(await linkedCoinOf(s.userId)).toBe('6QHPd4DBYrp7B4HjTg9qDusXppCxcKpVrzVzwNP1RoDP');
     expect(dto.error).toContain('another coin');
   });
 });
@@ -204,22 +204,22 @@ describe('coin create: races and ambiguity', () => {
 describe('onboarding no longer touches the coin link', () => {
   it('submitSellerOnboarding leaves pumpCoinAddress untouched', async () => {
     const s = await makeUser('seller');
-    await setSellerCoin(s.userId, 'MY_COIN', prisma);
+    await setSellerCoin(s.userId, '6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa', prisma);
     await submitSellerOnboarding(s.userId, { website: 'https://x.example', pitch: 'cards' }, prisma);
-    expect(await linkedCoinOf(s.userId)).toBe('MY_COIN');
+    expect(await linkedCoinOf(s.userId)).toBe('6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa');
   });
 
   it('the endpoint order (guarded setSellerCoin first) blocks hijack before onboarding completes', async () => {
     const a = await makeUser('seller');
     const b = await makeUser('seller');
-    await setSellerCoin(a.userId, 'SHARED_COIN', prisma);
+    await setSellerCoin(a.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma);
     await setSellerCoin(b.userId, '', prisma);
 
     // Mirror the /seller/onboarding handler: coin first (throws), onboarding never runs.
-    await expect(setSellerCoin(b.userId, 'SHARED_COIN', prisma)).rejects.toThrow();
+    await expect(setSellerCoin(b.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma)).rejects.toThrow();
     const profile = await prisma.sellerProfile.findUnique({ where: { userId: b.userId } });
     expect(profile?.onboardedSeller).toBe(false);
-    expect((await resolveRoomByCoin('SHARED_COIN', prisma))?.room).toBe(a.userId);
+    expect((await resolveRoomByCoin('6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma))?.room).toBe(a.userId);
   });
 });
 
@@ -227,10 +227,10 @@ describe('DB uniqueness backstop', () => {
   it('pumpCoinAddress is DB-unique: a raw duplicate write is rejected', async () => {
     const a = await makeUser('seller');
     const b = await makeUser('seller');
-    await setSellerCoin(a.userId, 'UNIQ_COIN', prisma);
+    await setSellerCoin(a.userId, '6jztgzCjztrYum9n6ScLFnv16JqQdBtYpMnvWWeLiqNG', prisma);
     await prisma.sellerProfile.create({ data: { userId: b.userId } });
     await expect(
-      prisma.sellerProfile.update({ where: { userId: b.userId }, data: { pumpCoinAddress: 'UNIQ_COIN' } }),
+      prisma.sellerProfile.update({ where: { userId: b.userId }, data: { pumpCoinAddress: '6jztgzCjztrYum9n6ScLFnv16JqQdBtYpMnvWWeLiqNG' } }),
     ).rejects.toThrow(); // P2002
   });
 });

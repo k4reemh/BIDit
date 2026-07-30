@@ -930,6 +930,9 @@ async function main() {
       if (req.method === 'POST' && p === '/seller/onboarding') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        // You must already BE a seller to fill in seller details. Without this the
+        // route was a second way to skip /seller/apply and its email verification.
+        await requireSeller(userId, prisma);
         const b = await readJson(req);
         // Coin linking goes through the guarded setter FIRST (first-claim-wins):
         // hijacking another seller's coin 409s here, before anything is marked
@@ -1118,11 +1121,15 @@ async function main() {
         const ALLOWED = [0, 3000, 5000, 10000, 30000];
         const cd = Number(b.chatCooldownMs);
         if (!ALLOWED.includes(cd)) return send(res, 400, { error: 'Pick one of the offered cooldowns.' });
-        await prisma.sellerProfile.upsert({
+        // UPDATE ONLY, never upsert. canModerateRoom is true for your own id, and
+        // "has a SellerProfile" IS what requireSeller means, so an upsert here let
+        // any account mint itself the seller role and skip /seller/apply's email
+        // verification, landing with appliedAt null so admin never saw it.
+        const touched = await prisma.sellerProfile.updateMany({
           where: { userId: room },
-          update: { chatCooldownMs: cd },
-          create: { userId: room, chatCooldownMs: cd },
+          data: { chatCooldownMs: cd },
         });
+        if (touched.count === 0) return send(res, 404, { error: 'That room has no seller profile.' });
         return send(res, 200, { ok: true, chatCooldownMs: cd });
       }
       if (req.method === 'POST' && p === '/seller/shipping-settings') {

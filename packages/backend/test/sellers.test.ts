@@ -27,61 +27,61 @@ describe('coin <-> seller resolution', () => {
   });
 
   it('relinking moves the coin and keeps a single profile', async () => {
-    const a = await linkCoinToSeller('COIN_1', 'seller_jane', prisma);
-    const b = await linkCoinToSeller('COIN_2', 'seller_jane', prisma);
+    const a = await linkCoinToSeller('5XkSM5HTsbpwtxscr76t4yWJG9Xv4VmndLYt1SJDunNm', 'seller_jane', prisma);
+    const b = await linkCoinToSeller('5XkSM5HU1UGg6WZrf3eGEvaz3h13bDVRyXoL2jAitGSN', 'seller_jane', prisma);
     expect(a.room).toBe(b.room);
-    expect(await resolveRoomByCoin('COIN_1', prisma)).toBeNull();
-    expect((await resolveRoomByCoin('COIN_2', prisma))?.room).toBe(b.room);
+    expect(await resolveRoomByCoin('5XkSM5HTsbpwtxscr76t4yWJG9Xv4VmndLYt1SJDunNm', prisma)).toBeNull();
+    expect((await resolveRoomByCoin('5XkSM5HU1UGg6WZrf3eGEvaz3h13bDVRyXoL2jAitGSN', prisma))?.room).toBe(b.room);
     expect(await prisma.sellerProfile.count({ where: { userId: b.room } })).toBe(1);
   });
 
   it('self-serve coin claim is FIRST-claim-wins: a second seller cannot hijack it', async () => {
-    // The hijack this blocks: whoever streams on SHARED_COIN owns the room buyers
+    // The hijack this blocks: whoever streams on 6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx owns the room buyers
     // route to, so silently repointing it steals their USDC. First-claim-wins means
     // only an admin can move a coin once a seller holds it.
     const a = await makeUser('seller');
     const b = await makeUser('seller');
-    await setSellerCoin(a.userId, 'SHARED_COIN', prisma); // a claims first
+    await setSellerCoin(a.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma); // a claims first
     await setSellerCoin(b.userId, '', prisma); // b is a seller but has no coin yet
 
     // b tries to take a's coin → rejected; a keeps it.
-    await expect(setSellerCoin(b.userId, 'SHARED_COIN', prisma)).rejects.toThrow(SellerError);
-    expect((await resolveRoomByCoin('SHARED_COIN', prisma))?.room).toBe(a.userId);
-    expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: 'SHARED_COIN' } })).toBe(1);
+    await expect(setSellerCoin(b.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma)).rejects.toThrow(SellerError);
+    expect((await resolveRoomByCoin('6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma))?.room).toBe(a.userId);
+    expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx' } })).toBe(1);
   });
 
   it('re-affirming your OWN coin is fine, and you can clear it', async () => {
     const a = await makeUser('seller');
-    await setSellerCoin(a.userId, 'MY_COIN', prisma);
-    await setSellerCoin(a.userId, 'MY_COIN', prisma); // idempotent, no throw
-    expect((await resolveRoomByCoin('MY_COIN', prisma))?.room).toBe(a.userId);
+    await setSellerCoin(a.userId, '6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa', prisma);
+    await setSellerCoin(a.userId, '6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa', prisma); // idempotent, no throw
+    expect((await resolveRoomByCoin('6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa', prisma))?.room).toBe(a.userId);
     await setSellerCoin(a.userId, '', prisma); // clear
-    expect(await resolveRoomByCoin('MY_COIN', prisma)).toBeNull();
+    expect(await resolveRoomByCoin('6CwSAb3Ep67j9EVV99uUrRcc95YEhKSNzHpUZbjYrLqa', prisma)).toBeNull();
   });
 
   it('admin reassign is the only way a claimed coin moves', async () => {
     const a = await makeUser('seller');
     const b = await makeUser('seller');
-    await setSellerCoin(a.userId, 'SHARED_COIN', prisma);
+    await setSellerCoin(a.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma);
     await setSellerCoin(b.userId, '', prisma); // b needs a SellerProfile for requireSeller
 
-    await reassignCoin(b.userId, 'SHARED_COIN', prisma); // admin force-move
-    expect((await resolveRoomByCoin('SHARED_COIN', prisma))?.room).toBe(b.userId);
+    await reassignCoin(b.userId, '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma); // admin force-move
+    expect((await resolveRoomByCoin('6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx', prisma))?.room).toBe(b.userId);
     expect((await prisma.sellerProfile.findUnique({ where: { userId: a.userId } }))?.pumpCoinAddress).toBeNull();
-    expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: 'SHARED_COIN' } })).toBe(1);
+    expect(await prisma.sellerProfile.count({ where: { pumpCoinAddress: '6c6k2ERkU2Qkk7PvjLuMyg3xrbEqabCAhJWAjasrsYKx' } })).toBe(1);
   });
 
   it('reassign requires the target to be a seller', async () => {
     const notSeller = await makeUser('buyer');
-    await expect(reassignCoin(notSeller.userId, 'ANY_COIN', prisma)).rejects.toThrow();
+    await expect(reassignCoin(notSeller.userId, '5Pvnyf9JHqUz3ULGitC2Mr5TXiua4Q7XFUzEm2JnaD7W', prisma)).rejects.toThrow();
   });
 
   it('resolve ignores blank/whitespace coins and trims lookups', async () => {
     const s = await makeUser('seller');
-    await setSellerCoin(s.userId, 'TRIMCOIN', prisma);
+    await setSellerCoin(s.userId, '6gA2Drpqh1C6D1fTF2nJsmShVUBTEqwpXS7NYMw5UgkP', prisma);
     expect(await resolveRoomByCoin('', prisma)).toBeNull();
     expect(await resolveRoomByCoin('   ', prisma)).toBeNull();
-    expect((await resolveRoomByCoin('  TRIMCOIN  ', prisma))?.room).toBe(s.userId);
+    expect((await resolveRoomByCoin('  6gA2Drpqh1C6D1fTF2nJsmShVUBTEqwpXS7NYMw5UgkP  ', prisma))?.room).toBe(s.userId);
   });
 
   it('seeds a running auction and reuses it on a second call', async () => {
@@ -91,5 +91,32 @@ describe('coin <-> seller resolution', () => {
     expect(id1).toBe(id2);
     const auction = await prisma.auction.findUnique({ where: { id: id1 } });
     expect(auction?.status).toBe(AuctionStatus.RUNNING);
+  });
+});
+
+describe('coin address validation (SEC-7)', () => {
+  /**
+   * pumpCoinAddress is echoed into the unauthenticated /live payload, which is
+   * cached and served to every viewer, so an unbounded string here degraded the
+   * homepage site-wide for the cost of one POST. streamTitle/streamCategory were
+   * already capped; this field was missed.
+   */
+  it('rejects junk and oversized coin addresses', async () => {
+    const s = await makeUser('seller');
+    await expect(setSellerCoin(s.userId, 'x'.repeat(4_000_000), prisma)).rejects.toThrow(SellerError);
+    await expect(setSellerCoin(s.userId, 'not a coin', prisma)).rejects.toThrow(SellerError);
+    await expect(setSellerCoin(s.userId, 'short', prisma)).rejects.toThrow(SellerError);
+    // Nothing was stored by any of the rejected attempts.
+    const row = await prisma.sellerProfile.findUnique({ where: { userId: s.userId } });
+    expect(row?.pumpCoinAddress ?? null).toBeNull();
+  });
+
+  it('still accepts a real Solana mint address, and clearing it', async () => {
+    const s = await makeUser('seller');
+    const mint = '5Pvnyf9JHqUz3ULGitC2Mr5TXiua4Q7XFUzEm2JnaD7W';
+    await setSellerCoin(s.userId, mint, prisma);
+    expect((await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: s.userId } })).pumpCoinAddress).toBe(mint);
+    await setSellerCoin(s.userId, '', prisma); // clearing stays allowed
+    expect((await prisma.sellerProfile.findUniqueOrThrow({ where: { userId: s.userId } })).pumpCoinAddress).toBeNull();
   });
 });

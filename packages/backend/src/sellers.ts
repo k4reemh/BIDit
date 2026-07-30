@@ -9,6 +9,7 @@ import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount } from './ledger.js';
 import { createAuction, startAuction } from './auction.js';
 import { requireSeller } from './authz.js';
+import { isValidWalletAddress } from './auth.js';
 import { systemClock, type Clock } from './clock.js';
 import { mediaUrl } from './media.js';
 
@@ -140,6 +141,13 @@ export async function setSellerCoin(
 ): Promise<void> {
   const coin = coinAddress.trim();
   if (coin) {
+    // Shape-check before storing. This value is echoed into the unauthenticated,
+    // shared-cache /live payload, so an unbounded string here was a cheap way to
+    // bloat the homepage for every viewer at once. A Solana mint is base58 and
+    // 32-44 characters; nothing else is worth storing.
+    if (coin.length > 64 || !isValidWalletAddress(coin)) {
+      throw new SellerError('That doesn’t look like a pump.fun coin address.');
+    }
     const owner = await prisma.sellerProfile.findFirst({
       where: { pumpCoinAddress: coin, NOT: { userId: sellerId } },
       select: { userId: true },

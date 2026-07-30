@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { prisma } from '../src/db.js';
-import { registerWithEmail, AuthError, findOrCreateByWallet } from '../src/authz.js';
+import { registerWithEmail, AuthError, findOrCreateByWallet, isAdmin } from '../src/authz.js';
 import {
   sendVerificationCode,
   verifyEmailCode,
@@ -136,5 +136,36 @@ describe('legacy backfill', () => {
 
     // Idempotent: running it again changes nothing.
     expect(await backfillLegacyVerified()).toBe(0);
+  });
+});
+
+/**
+ * The allowlist matches on an email ADDRESS, so the account has to have proven it
+ * owns that address. Otherwise an allowlisted address with no account yet could
+ * simply be registered by anyone, handing them escrow release/refund and every
+ * buyer's home address. Registration's distinct "already registered" error makes
+ * finding an unclaimed one easy.
+ */
+describe('admin requires a verified email (SEC-6)', () => {
+  const ADMIN = 'ops@bidit.test';
+  beforeEach(() => { process.env.BIDIT_ADMIN_EMAILS = ADMIN; });
+  afterEach(() => { delete process.env.BIDIT_ADMIN_EMAILS; });
+
+  it('does not grant admin to an unverified allowlisted address', async () => {
+    const attacker = await registerWithEmail({ email: ADMIN, password: 'hunter2pw' });
+    expect(await isAdmin(attacker.id)).toBe(false);
+  });
+
+  it('grants it once the address is actually confirmed', async () => {
+    const owner = await registerWithEmail({ email: ADMIN, password: 'hunter2pw' });
+    expect(await isAdmin(owner.id)).toBe(false);
+    await prisma.user.update({ where: { id: owner.id }, data: { emailVerified: true } });
+    expect(await isAdmin(owner.id)).toBe(true);
+  });
+
+  it('leaves a genuine role=admin account alone', async () => {
+    const u = await registerWithEmail({ email: 'staff@bidit.test', password: 'hunter2pw' });
+    await prisma.user.update({ where: { id: u.id }, data: { role: 'admin' } });
+    expect(await isAdmin(u.id)).toBe(true); // role, not the allowlist
   });
 });
