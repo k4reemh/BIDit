@@ -129,6 +129,12 @@ model User {
   onboarded     Boolean  @default(false)
   walletAddress String?  @unique
   role          Role     @default(buyer)
+  /// Admin ban. Set = every authenticated request is refused and live sockets
+  /// are dropped. Deliberately reversible and non-destructive: the account, its
+  /// ledger and its orders stay intact so in-flight escrow can still settle and
+  /// a mistaken ban can be undone. Erasure is the separate, permanent path.
+  bannedAt      DateTime?
+  bannedReason  String?
   // BIDit Points: activity rewards redeemed against future community airdrops.
   // Denormalized sum of PointsEvents, kept in step for fast leaderboard reads.
   points        BigInt   @default(0)

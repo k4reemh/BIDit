@@ -137,8 +137,14 @@ export default function Onboarding({
 
   return (
     // A centered popup over the site, one focused card, no split-screen.
-    <div className="obx" onClick={onDismiss}>
-      <main className="obx__panel" onClick={(e) => e.stopPropagation()}>
+    // NO click-to-dismiss on the backdrop. A `click` fires on the nearest common
+    // ancestor of its mousedown and mouseup, so pressing inside the panel and
+    // releasing outside it (selecting text, a slightly dragged button press)
+    // targeted the scrim and tore the flow down. That left people signed up with
+    // a generated username and no details, which is real data loss for a
+    // gesture they never intended. Closing is the × or Escape, both deliberate.
+    <div className="obx">
+      <main className="obx__panel">
         <button className="obx__close" onClick={onDismiss} aria-label="Close setup">×</button>
         <div className="obx__head">
           <Logo size={22} />

@@ -35,15 +35,12 @@ export const FEATURED_CATEGORIES = CATEGORIES.filter(
   (c): c is Required<Category> => Boolean(c.image),
 );
 
-/** Interest options shown during onboarding (labels only, no emoji). */
-export const INTERESTS = [
-  { id: 'pokemon', label: 'Pokémon' },
-  { id: 'one-piece', label: 'One Piece' },
-  { id: 'sports', label: 'Sports Cards' },
-  { id: 'sealed', label: 'Sealed & Boxes' },
-  { id: 'slabs', label: 'Graded Slabs' },
-  { id: 'breaks', label: 'Breaks & Rips' },
-  { id: 'vintage', label: 'Vintage' },
-  { id: 'modern', label: 'Modern Chase' },
-  { id: 'magic', label: 'Magic: The Gathering' },
-];
+/** Interest options shown during onboarding.
+ *
+ *  These are the CATEGORIES a seller can stream under, so the answers actually
+ *  line up with the live feed they get filtered against. Ids are stable slugs:
+ *  renaming a label here must not orphan the interests already saved on accounts. */
+export const INTERESTS = CATEGORIES.map((c) => ({
+  id: c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+  label: c.name,
+}));

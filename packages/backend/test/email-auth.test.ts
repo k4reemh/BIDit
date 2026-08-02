@@ -42,9 +42,14 @@ describe('email sign-up persists a real account', () => {
   });
 
   it('rejects duplicate email or handle and bad input', async () => {
-    await registerWithEmail({ email: 'dup@b.com', password: 'password1', handle: 'taken_one' });
-    await expect(registerWithEmail({ email: 'dup@b.com', password: 'password1', handle: 'other' })).rejects.toBeInstanceOf(AuthError);
-    await expect(registerWithEmail({ email: 'new@b.com', password: 'password1', handle: 'taken_one' })).rejects.toBeInstanceOf(AuthError);
+    const first = await registerWithEmail({ email: 'dup@b.com', password: 'password1', handle: 'taken_one' });
+    // Re-registering an UNVERIFIED address is allowed now and reuses the row: it
+    // is a half-finished signup, not an account, so it must not squat the email.
+    // (A verified duplicate is still refused; see account-lifecycle.test.ts.)
+    const again = await registerWithEmail({ email: 'dup@b.com', password: 'password1', handle: 'other' });
+    expect(again.id).toBe(first.id);
+    // A handle already held by a DIFFERENT account is still a hard no.
+    await expect(registerWithEmail({ email: 'new@b.com', password: 'password1', handle: 'other' })).rejects.toBeInstanceOf(AuthError);
     await expect(registerWithEmail({ email: 'bad-email', password: 'password1', handle: 'fine_handle' })).rejects.toThrow(/valid email/);
     await expect(registerWithEmail({ email: 'ok@b.com', password: 'short12', handle: 'fine_handle' })).rejects.toThrow(/8 characters/);
     await expect(registerWithEmail({ email: 'ok@b.com', password: 'password1', handle: 'no' })).rejects.toThrow(/Handle/);

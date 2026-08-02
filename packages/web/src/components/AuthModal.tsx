@@ -72,8 +72,10 @@ export default function AuthModal({
     : 'Sign in';
 
   return (
-    <div className="modal__scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    // No click-to-dismiss on the scrim: see Onboarding.tsx. Releasing a drag
+    // outside the box counted as a backdrop click and closed the form mid-signup.
+    <div className="modal__scrim">
+      <div className="modal">
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="modal__brand"><Logo size={30} /></div>
         <h2 className="display modal__title">{title}</h2>

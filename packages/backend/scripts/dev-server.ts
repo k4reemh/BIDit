@@ -41,6 +41,8 @@ import {
   applyAsSeller,
   submitSellerOnboarding,
   isAdmin,
+  banUser,
+  unbanUser,
   requireSeller,
   AuthError,
   revokeUserSessions,
@@ -1375,6 +1377,53 @@ async function main() {
         return send(res, 200, await listSellers(userId, prisma));
       }
       // Admin: enrolled sellers + $ fulfilled, so you know who to pay the $100.
+      // Admin: find an account to act on. Matches handle or email, so support
+      // can work from whatever the reporter gave them.
+      if (req.method === 'GET' && p === '/admin/users') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const q = String(url.searchParams.get('q') ?? '').trim().slice(0, 80);
+        const rows = await prisma.user.findMany({
+          where: q
+            ? { OR: [{ handle: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] }
+            : { bannedAt: { not: null } }, // no query: show who is currently banned
+          select: {
+            id: true, handle: true, email: true, role: true, emailVerified: true,
+            bannedAt: true, bannedReason: true, createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 25,
+        });
+        return send(res, 200, rows.map((u) => ({
+          ...u,
+          bannedAt: u.bannedAt ? u.bannedAt.getTime() : null,
+          createdAt: u.createdAt.getTime(),
+        })));
+      }
+      // Admin: suspend an account. Reversible and non-destructive (see banUser).
+      if (req.method === 'POST' && p === '/admin/ban') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        const target = String(b.userId ?? '');
+        if (target === userId) return send(res, 400, { error: 'You cannot ban yourself.' });
+        await banUser(target, b.reason == null ? null : String(b.reason), prisma);
+        // Cut their live sockets now rather than waiting for the next heartbeat.
+        realtime.closeUserSockets(target);
+        console.log(`[admin] ${userId} banned ${target}`);
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && p === '/admin/unban') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const b = await readJson(req);
+        await unbanUser(String(b.userId ?? ''), prisma);
+        console.log(`[admin] ${userId} unbanned ${String(b.userId ?? '')}`);
+        return send(res, 200, { ok: true });
+      }
       if (req.method === 'GET' && p === '/admin/promo') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });

@@ -199,6 +199,27 @@ export interface SellerOrder {
   createdAt: number;
 }
 
+export interface AdminUser {
+  id: string;
+  handle: string;
+  email: string | null;
+  role: string;
+  emailVerified: boolean;
+  bannedAt: number | null;
+  bannedReason: string | null;
+  createdAt: number;
+}
+
+/** Admin: search accounts by handle or email. Empty query lists the suspended. */
+export const adminFindUsers = (q: string) =>
+  req<AdminUser[]>(`/admin/users?q=${encodeURIComponent(q)}`);
+
+export const adminBanUser = (userId: string, reason: string | null) =>
+  req<{ ok: boolean }>('/admin/ban', { method: 'POST', body: JSON.stringify({ userId, reason }) });
+
+export const adminUnbanUser = (userId: string) =>
+  req<{ ok: boolean }>('/admin/unban', { method: 'POST', body: JSON.stringify({ userId }) });
+
 export const applySeller = () => req<Session>('/seller/apply', { method: 'POST', body: '{}' });
 
 export const submitSellerOnboarding = (payload: {

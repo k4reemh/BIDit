@@ -107,6 +107,54 @@ async function uniquePlaceholderHandle(prisma: PrismaClient): Promise<string> {
  * `handle` is optional, when omitted a placeholder is generated and the user
  * picks their real username during onboarding. New users start onboarded=false.
  */
+/** Has this account ever held money or traded? A pending signup never has, so
+ *  this is the belt-and-braces check before letting a re-registration reuse it. */
+async function hasValue(userId: string, prisma: PrismaClient): Promise<boolean> {
+  const [orders, ledger] = await Promise.all([
+    prisma.order.count({ where: { OR: [{ buyerId: userId }, { sellerId: userId }] } }),
+    prisma.ledgerEntry.count({ where: { account: { userId } } }),
+  ]);
+  return orders > 0 || ledger > 0;
+}
+
+/**
+ * Re-run a signup over an existing UNVERIFIED row rather than creating a second
+ * account for the same address. Everything from the abandoned attempt is
+ * replaced: new password, fresh placeholder handle if they never chose one, and
+ * any old sessions are revoked so a link left open on another device cannot ride
+ * along on the new registration.
+ */
+async function resetPendingSignup(
+  existing: User,
+  input: { email: string; password: string; handle?: string },
+  prisma: PrismaClient,
+): Promise<User> {
+  let handle = existing.handle;
+  if (input.handle && input.handle.trim()) {
+    const wanted = input.handle.trim().toLowerCase();
+    if (!HANDLE_RE.test(wanted)) throw new AuthError('Handle must be 3-20 chars: letters, numbers or underscores.');
+    const taken = await prisma.user.findUnique({ where: { handle: wanted } });
+    if (taken && taken.id !== existing.id) throw new AuthError('That handle is taken.');
+    handle = wanted;
+  }
+  const user = await prisma.user.update({
+    where: { id: existing.id },
+    data: {
+      handle,
+      passwordHash: await hashPassword(input.password),
+      // Wipe the abandoned attempt's verification state so a code mailed to the
+      // previous attempt cannot be replayed against this one.
+      verifyCodeHash: null,
+      verifyCodeExpiresAt: null,
+      verifyAttempts: 0,
+      onboarded: false,
+    },
+  });
+  await revokeUserSessions(user.id, prisma);
+  await getOrCreateUserAccount(user.id, prisma);
+  return user;
+}
+
 export async function registerWithEmail(
   input: { email: string; password: string; handle?: string },
   prisma: PrismaClient = defaultPrisma,
@@ -115,7 +163,21 @@ export async function registerWithEmail(
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new AuthError('Enter a valid email address.');
   if (input.password.length < 8) throw new AuthError('Password must be at least 8 characters.');
   if (input.password.length > MAX_PASSWORD_LEN) throw new AuthError(`Password must be at most ${MAX_PASSWORD_LEN} characters.`);
-  if (await prisma.user.findUnique({ where: { email } })) throw new AuthError('That email is already registered.');
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    // An UNVERIFIED row is a half-finished signup, not an account: nobody has
+    // proven they own that address, so it must not squat the email forever. It
+    // used to, which left people unable to sign up and unable to sign in
+    // (login just bounced them back to a verification screen).
+    //
+    // Safe to take over precisely because it is unverified: whoever registers
+    // now still has to read the code sent to that inbox, so this hands an
+    // attacker nothing the real owner does not already control. Verified
+    // accounts are never touched, and neither is one that somehow holds value.
+    if (existing.emailVerified) throw new AuthError('That email is already registered.');
+    if (await hasValue(existing.id, prisma)) throw new AuthError('That email is already registered.');
+    return resetPendingSignup(existing, input, prisma);
+  }
 
   let handle: string;
   if (input.handle && input.handle.trim()) {
@@ -201,7 +263,48 @@ export async function loginWithEmail(
 ): Promise<User | null> {
   const user = await prisma.user.findUnique({ where: { email: normEmail(input.email) } });
   if (!user || !(await verifyPassword(input.password, user.passwordHash))) return null;
+  assertNotBanned(user);
   return user;
+}
+
+/** Raised on any attempt to authenticate as a banned account. */
+export class BannedError extends Error {
+  readonly status = 403;
+  constructor(reason?: string | null) {
+    super(reason ? `This account is suspended: ${reason}` : 'This account is suspended.');
+    this.name = 'BannedError';
+  }
+}
+
+function assertNotBanned(user: User): void {
+  if (user.bannedAt) throw new BannedError(user.bannedReason);
+}
+
+/**
+ * Ban an account. Non-destructive on purpose: nothing is deleted, so in-flight
+ * escrow can still settle and a mistake can be undone. Existing sessions die
+ * immediately through the revocation epoch (which also drops their live
+ * WebSockets), and the login paths refuse to mint new ones.
+ */
+export async function banUser(
+  userId: string,
+  reason: string | null,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  if (!target) throw new AuthError('No such account.');
+  // Refusing to ban an admin stops one compromised admin locking every other
+  // one out of the tools they would need to respond.
+  if (target.role === Role.admin) throw new AuthError('Admins cannot be banned from here.');
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: new Date(), bannedReason: reason?.slice(0, 300) || null },
+  });
+  await revokeUserSessions(userId, prisma);
+}
+
+export async function unbanUser(userId: string, prisma: PrismaClient = defaultPrisma): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { bannedAt: null, bannedReason: null } });
 }
 
 /** Update a user's editable profile fields. */
@@ -261,7 +364,10 @@ export async function findOrCreateByWallet(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<User> {
   const existing = await prisma.user.findUnique({ where: { walletAddress } });
-  if (existing) return existing;
+  if (existing) {
+    assertNotBanned(existing);
+    return existing;
+  }
   let handle = shortHandle(walletAddress);
   if (await prisma.user.findUnique({ where: { handle } })) handle = walletAddress;
   const user = await prisma.user.create({ data: { walletAddress, handle, role: Role.buyer } });

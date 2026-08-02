@@ -18,6 +18,7 @@ import Leaderboard from './pages/Leaderboard';
 import AdminSellers from './pages/admin/Sellers';
 import AdminOrders from './pages/admin/Orders';
 import AdminShipments from './pages/admin/Shipments';
+import AdminUsers from './pages/admin/Users';
 import Watch from './pages/Watch';
 import StubPage from './pages/StubPage';
 import Profile from './pages/account/Profile';
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="/admin" element={<Navigate to="/admin/shipments" replace />} />
           <Route path="/admin/sellers" element={<AdminSellers session={session} />} />
           <Route path="/admin/orders" element={<AdminOrders session={session} />} />
+          <Route path="/admin/users" element={<AdminUsers session={session} />} />
           <Route path="/admin/shipments" element={<AdminShipments session={session} />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />
 
