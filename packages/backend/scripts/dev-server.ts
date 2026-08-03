@@ -1279,6 +1279,17 @@ async function main() {
             buyNowPrice: b.buyNowPrice != null && String(b.buyNowPrice).trim() !== '' ? usdc(String(b.buyNowPrice)) : undefined,
             quantity: b.quantity ? Number(b.quantity) : undefined,
             weightGrams: b.weightGrams ? Number(b.weightGrams) : undefined,
+            // The preset id is the only thing trusted here: createListing resolves
+            // it against the preset table, so `parcel` is read for 'custom' only.
+            parcelPreset: b.parcelPreset ? String(b.parcelPreset) : undefined,
+            parcel:
+              b.parcel && typeof b.parcel === 'object'
+                ? {
+                    lengthMm: Number((b.parcel as Record<string, unknown>).lengthMm),
+                    widthMm: Number((b.parcel as Record<string, unknown>).widthMm),
+                    heightMm: Number((b.parcel as Record<string, unknown>).heightMm),
+                  }
+                : undefined,
             category: b.category ? String(b.category) : undefined,
           },
           prisma,

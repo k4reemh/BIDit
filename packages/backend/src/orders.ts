@@ -37,6 +37,32 @@ export const NO_SHIP_TIMEOUT_MS = 7 * DAY_MS;
 
 export type DisputeOutcome = 'RELEASE' | 'REFUND';
 
+/** Everything postSaleFulfillment snapshots off the listing. Kept in one place so
+ *  a new snapshot field cannot be added to one settle path and forgotten on the
+ *  other, which would silently give escrow sales a different parcel to direct ones. */
+export const LISTING_FULFILLMENT_SELECT = {
+  sellerId: true,
+  id: true,
+  title: true,
+  photos: true,
+  weightGrams: true,
+  parcelPreset: true,
+  parcelLengthMm: true,
+  parcelWidthMm: true,
+  parcelHeightMm: true,
+} as const;
+
+export type ListingForFulfillment = {
+  id: string;
+  title: string;
+  photos: string[];
+  weightGrams: number | null;
+  parcelPreset: string | null;
+  parcelLengthMm: number | null;
+  parcelWidthMm: number | null;
+  parcelHeightMm: number | null;
+};
+
 /**
  * Post-sale physical fulfillment, shared by the direct and escrow settle paths:
  * create the buyer's "Ready to ship" item, fold it into any active weekly bundle,
@@ -48,7 +74,7 @@ async function postSaleFulfillment(
     orderId: string;
     buyerId: string;
     sellerId: string;
-    listing: { id: string; title: string; photos: string[]; weightGrams: number | null };
+    listing: ListingForFulfillment;
     amount: bigint;
   },
   clock: Clock,
@@ -63,6 +89,12 @@ async function postSaleFulfillment(
       title: params.listing.title,
       photo: params.listing.photos[0] ?? null,
       weightGrams: params.listing.weightGrams,
+      // Snapshot the parcel the buyer was quoted against, not whatever the
+      // listing says at ship time.
+      parcelPreset: params.listing.parcelPreset,
+      parcelLengthMm: params.listing.parcelLengthMm,
+      parcelWidthMm: params.listing.parcelWidthMm,
+      parcelHeightMm: params.listing.parcelHeightMm,
       amount: params.amount,
     },
     clock,
@@ -103,7 +135,7 @@ export async function settleAuction(
 
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { listing: { select: { sellerId: true, id: true, title: true, photos: true, weightGrams: true } } },
+    include: { listing: { select: LISTING_FULFILLMENT_SELECT } },
   });
   if (
     !auction ||
@@ -193,7 +225,7 @@ export async function settleAuctionDirect(
 
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { listing: { select: { sellerId: true, id: true, title: true, photos: true, weightGrams: true } } },
+    include: { listing: { select: LISTING_FULFILLMENT_SELECT } },
   });
   if (
     !auction ||

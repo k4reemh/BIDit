@@ -374,6 +374,9 @@ export const createListing = (body: {
   buyNowPrice?: string;
   quantity?: number;
   weightGrams?: number;
+  /** Preset id from PARCEL_PRESETS, or 'custom' with `parcel` supplied. */
+  parcelPreset?: string;
+  parcel?: { lengthMm?: number; widthMm?: number; heightMm?: number };
 }) => req<SellerListing>('/seller/listings', { method: 'POST', body: JSON.stringify(body) });
 
 export const setStorePrice = (listingId: string, buyNowPrice: string | null) =>

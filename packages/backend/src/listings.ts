@@ -1,5 +1,13 @@
 /** Listing creation + the seller's pre-show queue (Whatnot-style). */
-import { ListingStatus, normalizeWheelEntries, type Micros, type WheelEntry } from '@bidit/shared';
+import {
+  ListingStatus,
+  normalizeWheelEntries,
+  resolveParcel,
+  ParcelError,
+  type Micros,
+  type ParcelDims,
+  type WheelEntry,
+} from '@bidit/shared';
 import { Prisma, type Listing } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
@@ -37,6 +45,9 @@ export interface CreateListingInput {
   buyNowPrice?: Micros;
   quantity?: number;
   weightGrams?: number;
+  /** Preset id from PARCEL_PRESETS, or 'custom' with `parcel` supplied. */
+  parcelPreset?: string;
+  parcel?: Partial<ParcelDims>;
   category?: string;
 }
 
@@ -53,6 +64,15 @@ export async function createListing(
   if (input.startingBid < 0n) throw new ListingError('Starting bid can’t be negative.');
   if (input.buyNowPrice != null && input.buyNowPrice <= 0n) throw new ListingError('Buy-now price must be greater than 0.');
   const quantity = Math.max(1, Math.min(MAX_QUANTITY, Math.floor(input.quantity ?? 1)));
+  // resolveParcel is the only thing that turns a client-supplied preset id into
+  // dimensions, so a caller cannot name a small mailer and attach large numbers.
+  // Custom dimensions outside 1cm..3m throw, which the handler maps to a 400.
+  let parcel: { presetId: string; dims: ParcelDims };
+  try {
+    parcel = resolveParcel(input.parcelPreset, input.parcel);
+  } catch (err) {
+    throw err instanceof ParcelError ? new ListingError(err.message) : err;
+  }
   return prisma.listing.create({
     data: {
       sellerId,
@@ -63,6 +83,10 @@ export async function createListing(
       buyNowPrice: input.buyNowPrice ?? null,
       quantity,
       weightGrams: input.weightGrams ?? null,
+      parcelPreset: parcel.presetId,
+      parcelLengthMm: parcel.dims.lengthMm,
+      parcelWidthMm: parcel.dims.widthMm,
+      parcelHeightMm: parcel.dims.heightMm,
       category: input.category ? clampText(input.category, MAX_CATEGORY_LEN) : null,
       status: ListingStatus.QUEUED,
     },

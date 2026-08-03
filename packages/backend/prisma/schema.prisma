@@ -373,6 +373,15 @@ model Listing {
    *  listing can be auctioned again. */
   quantity    Int           @default(1)
   weightGrams Int?
+  /// Package this item ships in. `parcelPreset` is the stable preset id (or
+  /// 'custom'); the millimetres are SNAPSHOT from the preset table at save time,
+  /// so editing that table reprices new listings without silently repricing old
+  /// ones. Null on listings that predate presets: those fall back to the default
+  /// medium polymailer.
+  parcelPreset   String?
+  parcelLengthMm Int?
+  parcelWidthMm  Int?
+  parcelHeightMm Int?
   category    String?
   status      ListingStatus @default(DRAFT)
   createdAt   DateTime      @default(now())
@@ -501,6 +510,14 @@ model FulfillmentItem {
   title       String
   photo       String?
   weightGrams Int?
+  /// Parcel SNAPSHOT taken when the item was won. The buyer was quoted shipping
+  /// against the listing's package, so the charge has to use that same package.
+  /// Reading it back off the Listing would let a seller edit the parcel after
+  /// the sale and change what the buyer pays.
+  parcelPreset   String?
+  parcelLengthMm Int?
+  parcelWidthMm  Int?
+  parcelHeightMm Int?
   amount      BigInt    // item price paid, for display + forfeit accounting
   /// For a randomizer win: which prize the server landed on. The reel is
   /// broadcast over WebSocket and then gone, so without this nothing durable

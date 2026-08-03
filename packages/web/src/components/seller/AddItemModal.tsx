@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { DEFAULT_PARCEL_ID, findParcelPreset } from '@bidit/shared';
 import { createListing } from '../../api';
 import ImageUpload from '../ImageUpload';
+import ParcelPicker, { type ParcelSelection } from './ParcelPicker';
 import { Tag } from '../../icons';
 
 export default function AddItemModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -10,8 +12,20 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
   const [buyNow, setBuyNow] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [weight, setWeight] = useState('');
+  const [parcel, setParcel] = useState<ParcelSelection>({ presetId: DEFAULT_PARCEL_ID });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  // Picking a package suggests what it usually weighs loaded. Only ever a
+  // prefill: it fills an empty field and never overwrites a number the seller
+  // typed, because their scale beats our guess.
+  const pickParcel = (v: ParcelSelection) => {
+    setParcel(v);
+    if (!weight) {
+      const preset = findParcelPreset(v.presetId);
+      if (preset) setWeight(String(preset.typicalGrams));
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +39,11 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
         buyNowPrice: buyNow.trim() || undefined,
         quantity: Math.max(1, Number(quantity) || 1),
         weightGrams: weight ? Math.max(1, Math.round(Number(weight))) : undefined,
+        parcelPreset: parcel.presetId,
+        parcel:
+          parcel.lengthMm || parcel.widthMm || parcel.heightMm
+            ? { lengthMm: parcel.lengthMm, widthMm: parcel.widthMm, heightMm: parcel.heightMm }
+            : undefined,
       });
       onCreated();
     } catch (err) {
@@ -65,9 +84,10 @@ export default function AddItemModal({ onClose, onCreated }: { onClose: () => vo
             <input type="number" min="0.01" step="0.01" value={buyNow} onChange={(e) => setBuyNow(e.target.value)} placeholder="e.g. 30, appears in your shop" />
           </label>
           <label className="auth__field">
-            <span>Est. shipping weight in grams <em className="muted">· used to quote UPS shipping</em></span>
+            <span>Est. shipping weight in grams <em className="muted">· packed, including the mailer</em></span>
             <input type="number" min="1" step="1" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 30 (a sleeved card + mailer)" />
           </label>
+          <ParcelPicker value={parcel} onChange={pickParcel} />
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={busy}>
             {busy ? 'Adding…' : 'Add to listings'}
           </button>

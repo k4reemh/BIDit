@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { estimateShipment, estimateListingShipping } from '../src/fulfillment.js';
-import { quoteShipping, multiItemSurcharge } from '../src/shipping.js';
+import { quoteShipping } from '../src/shipping.js';
+import { combineParcels, defaultParcel } from '@bidit/shared';
 
 // Proves the estimate reuses seller ship-from + buyer address + item weight and
 // reports both the UPS retail number and the 80% charged fee.
@@ -43,7 +44,7 @@ describe('estimateShipment (money-path integration)', () => {
     expect(est.shippingFee).toBeGreaterThan(0n); // still returns a ballpark
   });
 
-  it('applies a 3% multi-item surcharge on a shipment of several items', async () => {
+  it('prices several items as one combined package, not a per-item surcharge', async () => {
     const dest = { line1: '1 Yonge', city: 'Toronto', region: 'ON', postal: 'M5V 1J1', country: 'Canada' };
     const buyer = await prisma.user.create({ data: { handle: 'multi_' + Date.now(), shippingAddress: dest } });
     const seller = await prisma.user.create({ data: { handle: 'ms_' + Date.now() } });
@@ -55,10 +56,16 @@ describe('estimateShipment (money-path integration)', () => {
     const a = await mk(1); const b = await mk(2); const c = await mk(3);
 
     const three = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id, b.id, c.id] }, prisma);
-    // Three 57g items → 171g combined, then +6% (two extra items).
-    const combined = quoteShipping(origin, dest, 171);
-    expect(three.shippingFee).toBe(multiItemSurcharge(combined, 3));
-    // Adding items raises the fee vs. a single item.
+    // Three 57g items in the default mailer: 171g in whatever single package
+    // actually holds all three, which is what the carrier bills for.
+    const box = combineParcels([defaultParcel(), defaultParcel(), defaultParcel()]);
+    const expected = quoteShipping(origin, dest, 171, {
+      lengthCm: box.dims.lengthMm / 10,
+      widthCm: box.dims.widthMm / 10,
+      heightCm: box.dims.heightMm / 10,
+    });
+    expect(three.shippingFee).toBe(expected);
+    // Three items need a bigger box than one, so they cost more to post.
     const one = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id] }, prisma);
     expect(three.shippingFee).toBeGreaterThan(one.shippingFee);
   });

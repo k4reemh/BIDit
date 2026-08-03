@@ -257,24 +257,12 @@ function applyDiscount(retail: bigint): bigint {
   return (retail * pct) / 100n;
 }
 
-/** Extra handling charged per additional item in one shipment (default 3%),
- *  overridable via BIDIT_MULTI_ITEM_PCT. */
-export function multiItemPct(): number {
-  const s = process.env.BIDIT_MULTI_ITEM_PCT;
-  if (s != null && s.trim() !== '') {
-    const raw = Number(s);
-    if (Number.isFinite(raw) && raw >= 0 && raw <= 100) return raw; // 0 explicitly disables it
-  }
-  return 3;
-}
-
-/** Bump a shipping fee by multiItemPct% for each item beyond the first. */
-export function multiItemSurcharge(shippingFee: bigint, itemCount: number): bigint {
-  const extra = Math.max(0, Math.floor(itemCount) - 1);
-  if (extra === 0) return shippingFee;
-  const bps = 10_000n + BigInt(Math.round(extra * multiItemPct() * 100)); // e.g. +3% → +300 bps each
-  return (shippingFee * bps) / 10_000n;
-}
+// A flat "+3% per extra item" handling surcharge used to live here. It was
+// removed because it bore no relation to what a carrier bills: two slabs in one
+// mailer post for the same price as one, while ten of them need a box and a
+// different rate band entirely. Multi-item shipments are now priced by combining
+// the items into one real parcel (combineParcels in @bidit/shared) and quoting
+// that, which is both cheaper for the common case and correct for the rest.
 
 export interface ShippingBreakdown {
   /** Carrier's published (retail) quote, USDC micro-units. */

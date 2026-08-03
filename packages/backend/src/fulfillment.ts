@@ -12,7 +12,8 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
-import { quoteShipping, quoteShippingBreakdown, multiItemSurcharge, privacyPremium, type ShipLocation } from './shipping.js';
+import { quoteShipping, quoteShippingBreakdown, privacyPremium, type Dimensions, type ShipLocation } from './shipping.js';
+import { combineParcels, defaultParcel, type ParcelDims } from '@bidit/shared';
 import { encryptPii, decryptPii } from './pii.js';
 import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
@@ -24,6 +25,42 @@ export const SHIP_LATER_HOLD_MS = 14 * DAY_MS; // seller holds a "ship later" wi
 export const NO_SHIP_BUSINESS_DAYS = 7;
 /** Fallback weight for a sleeved card + mailer when the seller didn't estimate. */
 const DEFAULT_WEIGHT_G = 60;
+
+/** What a row (listing or won item) says it ships in. Rows saved before parcel
+ *  presets existed have nulls, and fall back to the default medium polymailer. */
+interface HasParcel {
+  parcelLengthMm: number | null;
+  parcelWidthMm: number | null;
+  parcelHeightMm: number | null;
+}
+
+function parcelOf(row: HasParcel): ParcelDims {
+  const { parcelLengthMm: l, parcelWidthMm: w, parcelHeightMm: h } = row;
+  return l && w && h ? { lengthMm: l, widthMm: w, heightMm: h } : defaultParcel();
+}
+
+/** Carrier rates are quoted in centimetres. */
+function toDimensions(p: ParcelDims): Dimensions {
+  return { lengthCm: p.lengthMm / 10, widthCm: p.widthMm / 10, heightCm: p.heightMm / 10 };
+}
+
+/**
+ * The package a set of won items actually ships in, and its total weight.
+ *
+ * This replaces the old flat "+3% per extra item" handling charge, which bore no
+ * relation to what a carrier bills: two slabs in one mailer post for the same
+ * price as one, while ten of them need a box and a different rate entirely.
+ */
+function parcelForItems(items: (HasParcel & { weightGrams: number | null })[]): {
+  dims: Dimensions;
+  weightGrams: number;
+} {
+  const combined = combineParcels(items.map(parcelOf));
+  return {
+    dims: toDimensions(combined.dims),
+    weightGrams: items.reduce((g, it) => g + (it.weightGrams ?? DEFAULT_WEIGHT_G), 0),
+  };
+}
 
 /** Add N business days (skipping Sat/Sun) to a date. Holidays are ignored: fine
  *  for the beta's no-ship deadline. */
@@ -87,6 +124,10 @@ export interface FulfillmentSnapshot {
   title: string;
   photo?: string | null;
   weightGrams?: number | null;
+  parcelPreset?: string | null;
+  parcelLengthMm?: number | null;
+  parcelWidthMm?: number | null;
+  parcelHeightMm?: number | null;
   amount: bigint;
 }
 
@@ -107,6 +148,10 @@ export async function createFulfillmentItem(
         title: snap.title,
         photo: snap.photo ?? null,
         weightGrams: snap.weightGrams ?? null,
+        parcelPreset: snap.parcelPreset ?? null,
+        parcelLengthMm: snap.parcelLengthMm ?? null,
+        parcelWidthMm: snap.parcelWidthMm ?? null,
+        parcelHeightMm: snap.parcelHeightMm ?? null,
         amount: snap.amount,
         status: 'READY_TO_SHIP',
         heldUntil,
@@ -170,7 +215,8 @@ export async function applyWeeklyBundling(
     city: sellerProfile?.originCity,
     postal: sellerProfile?.originPostal,
   };
-  const fee = quoteShipping(origin, dest, item.weightGrams ?? DEFAULT_WEIGHT_G);
+  const one = parcelForItems([item]);
+  const fee = quoteShipping(origin, dest, one.weightGrams, one.dims);
 
   const shipment = await prisma.shipment.create({
     data: {
@@ -394,9 +440,10 @@ export async function createAndPayShipment(
   };
 
   const isPrivate = params.mode === 'PRIVATE' || params.private === true;
-  const weight = items.reduce((g, it) => g + (it.weightGrams ?? DEFAULT_WEIGHT_G), 0);
-  // +3% per additional item in the shipment (matches the estimate shown to the buyer).
-  const shippingFee = multiItemSurcharge(quoteShipping(origin, dest, weight), items.length);
+  // One package for the whole shipment, sized to hold every item (matches the
+  // estimate the buyer was shown).
+  const parcel = parcelForItems(items);
+  const shippingFee = quoteShipping(origin, dest, parcel.weightGrams, parcel.dims);
   const privacyFee = isPrivate ? privacyPremium() : 0n;
 
   const shipment = await prisma.shipment.create({
@@ -475,18 +522,15 @@ export async function estimateShipment(
     postal: seller?.originPostal,
   };
 
-  const weight = items.reduce((g, it) => g + (it.weightGrams ?? DEFAULT_WEIGHT_G), 0);
-  const b = quoteShippingBreakdown(origin, dest ?? {}, weight);
-  // +3% per additional item in the shipment (multi-item handling).
-  const shippingFee = multiItemSurcharge(b.final, items.length);
-  const carrierRetail = multiItemSurcharge(b.carrierRetail, items.length);
+  const parcel = parcelForItems(items);
+  const b = quoteShippingBreakdown(origin, dest ?? {}, parcel.weightGrams, parcel.dims);
   const privacyFee = params.private === true ? privacyPremium() : 0n;
   return {
-    shippingFee,
-    carrierRetail,
+    shippingFee: b.final,
+    carrierRetail: b.carrierRetail,
     discountPct: b.discountPct,
     privacyFee,
-    total: shippingFee + privacyFee,
+    total: b.final + privacyFee,
     hasAddress,
   };
 }
@@ -501,7 +545,16 @@ export async function estimateListingShipping(
   listingId: string,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ shippingFee: bigint; carrierRetail: bigint; discountPct: number; privacyFee: bigint; hasAddress: boolean }> {
-  const listing = await prisma.listing.findUnique({ where: { id: listingId }, select: { sellerId: true, weightGrams: true } });
+  const listing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    select: {
+      sellerId: true,
+      weightGrams: true,
+      parcelLengthMm: true,
+      parcelWidthMm: true,
+      parcelHeightMm: true,
+    },
+  });
   if (!listing) throw new ShippingError('Listing not found.');
   const [buyer, seller] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: buyerId } }),
@@ -515,7 +568,8 @@ export async function estimateListingShipping(
     city: seller?.originCity,
     postal: seller?.originPostal,
   };
-  const b = quoteShippingBreakdown(origin, dest ?? {}, listing.weightGrams ?? DEFAULT_WEIGHT_G);
+  const one = parcelForItems([listing]);
+  const b = quoteShippingBreakdown(origin, dest ?? {}, one.weightGrams, one.dims);
   return {
     shippingFee: b.final,
     carrierRetail: b.carrierRetail,

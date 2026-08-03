@@ -6,7 +6,6 @@ import {
   billableGrams,
   shipDiscountPct,
   usdPerCad,
-  multiItemSurcharge,
   DEFAULT_DIMS,
   type ShipLocation,
 } from '../src/shipping.js';
@@ -74,11 +73,11 @@ describe('UPS Ground estimator', () => {
     expect(quoteShipping(AB, ON, 30)).toBeLessThan(quoteShipping(AB, ON, 200));
   });
 
-  it('adds a 3% surcharge for each item beyond the first', () => {
-    const base = 10_000_000n; // $10
-    expect(multiItemSurcharge(base, 1)).toBe(base); // single item, no surcharge
-    expect(multiItemSurcharge(base, 2)).toBe(10_300_000n); // +3%
-    expect(multiItemSurcharge(base, 3)).toBe(10_600_000n); // +6%
-    expect(multiItemSurcharge(base, 0)).toBe(base); // guards against < 1
+  it('prices a bigger parcel higher than a small one at the same weight', () => {
+    // Dimensional weight only kicks in above the small-parcel threshold, which is
+    // exactly the behaviour a combined multi-item shipment relies on.
+    const mailer = quoteShipping(AB, ON, 500, { lengthCm: 23, widthCm: 30, heightCm: 2 });
+    const box = quoteShipping(AB, ON, 500, { lengthCm: 36, widthCm: 30, heightCm: 15 });
+    expect(box).toBeGreaterThan(mailer);
   });
 });

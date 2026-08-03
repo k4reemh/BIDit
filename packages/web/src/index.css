@@ -2342,3 +2342,53 @@ img { display: block; max-width: 100%; }
   .adm-user__reasonin { width: 100%; }
   .adm-user__act { width: 100%; }
 }
+
+/* ---- parcel picker (seller listing form) ---------------------------------
+   Shipping is priced on size as well as weight, so the seller has to tell us
+   what the item ships in. Picking a mailer off a shelf of pictures is a click;
+   measuring one with a ruler is a task nobody does, so the presets lead and the
+   custom fields stay folded away. */
+.parcel-picker { display: grid; gap: 8px; }
+.parcel-picker__head { display: grid; gap: 2px; font-size: 13px; font-weight: 600; }
+.parcel-picker__head em { font-size: 12px; font-weight: 400; font-style: normal; }
+.parcel-picker__group { margin-top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+.parcel-grid { display: grid; gap: 8px; }
+.parcel-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* auto-fit rather than a viewport breakpoint: this grid lives inside a modal
+   that is much narrower than the window, so a media query guesses wrong. */
+.parcel-grid--4 { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+
+.parcel-card {
+  display: grid; align-content: start; justify-items: center; gap: 3px;
+  padding: 10px 5px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2); color: var(--ink);
+  cursor: pointer; text-align: center;
+  transition: border-color .14s ease, background .14s ease, transform .14s ease;
+}
+.parcel-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.parcel-card__art { color: var(--faint); line-height: 0; }
+.parcel-card__label { font-size: 12px; font-weight: 600; line-height: 1.2; }
+.parcel-card__dims {
+  font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.parcel-card.is-selected {
+  border-color: var(--accent);
+  /* --accent-soft is a pale peach in light and a translucent orange in dark, so
+     the card's own --ink stays readable on both. Pinning a colour here would be
+     navy-on-navy the moment the theme flips. */
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.parcel-card.is-selected .parcel-card__art { color: var(--accent-strong); }
+.parcel-card.is-selected .parcel-card__dims { color: var(--accent-strong); }
+
+.parcel-custom__toggle {
+  justify-self: start;
+  padding: 6px 0; border: 0; background: none;
+  color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.parcel-custom { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.parcel-custom__field { margin: 0; }
