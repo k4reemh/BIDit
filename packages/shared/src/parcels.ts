@@ -142,6 +142,46 @@ export function resolveParcel(
 }
 
 // ---------------------------------------------------------------------------
+// Rate class
+// ---------------------------------------------------------------------------
+
+/** Carriers price a flat mailer, a small parcel and a bulky parcel differently,
+ *  and that step is most of what package size costs. Three classes is enough
+ *  resolution for an estimate. */
+export type PackageClass = 'polymailer' | 'small_box' | 'large_box';
+
+const CLASS_BY_PRESET: Record<string, PackageClass> = {
+  poly_6x9: 'polymailer',
+  poly_9x12: 'polymailer',
+  poly_10x13: 'polymailer',
+  box_6x4x2: 'small_box',
+  box_9x6x3: 'small_box',
+  box_12x9x4: 'large_box',
+  box_14x12x6: 'large_box',
+};
+
+/** Thicker than this is a parcel however flat its footprint: a mailer that will
+ *  not go through a sorting slot is not priced as a mailer. */
+const MAILER_MAX_THICKNESS_MM = 40;
+
+const presetVolume = (id: string) => {
+  const p = findParcelPreset(id)!;
+  return p.lengthMm * p.widthMm * p.heightMm;
+};
+
+/** Rate class for a parcel. A known preset answers directly; a custom size is
+ *  classified by thickness and volume, erring upward so an odd package is never
+ *  quoted as the cheapest class. */
+export function packageClass(presetId: string | null | undefined, dims: ParcelDims): PackageClass {
+  const known = presetId ? CLASS_BY_PRESET[presetId] : undefined;
+  if (known) return known;
+  const volume = dims.lengthMm * dims.widthMm * dims.heightMm;
+  if (dims.heightMm <= MAILER_MAX_THICKNESS_MM && volume <= presetVolume('poly_10x13')) return 'polymailer';
+  if (volume <= presetVolume('box_9x6x3')) return 'small_box';
+  return 'large_box';
+}
+
+// ---------------------------------------------------------------------------
 // Combining several won items into one package
 // ---------------------------------------------------------------------------
 

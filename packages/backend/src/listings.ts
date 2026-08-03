@@ -67,11 +67,18 @@ export async function createListing(
   // resolveParcel is the only thing that turns a client-supplied preset id into
   // dimensions, so a caller cannot name a small mailer and attach large numbers.
   // Custom dimensions outside 1cm..3m throw, which the handler maps to a 400.
-  let parcel: { presetId: string; dims: ParcelDims };
-  try {
-    parcel = resolveParcel(input.parcelPreset, input.parcel);
-  } catch (err) {
-    throw err instanceof ParcelError ? new ListingError(err.message) : err;
+  //
+  // Left null when the seller said nothing. Writing a default mailer here would
+  // look identical to "the seller chose a mailer", which buries the category
+  // fallback: a sealed box listed without touching the picker would quote as a
+  // polymailer forever. Null means "not stated", and the estimator infers it.
+  let parcel: { presetId: string; dims: ParcelDims } | null = null;
+  if (input.parcelPreset) {
+    try {
+      parcel = resolveParcel(input.parcelPreset, input.parcel);
+    } catch (err) {
+      throw err instanceof ParcelError ? new ListingError(err.message) : err;
+    }
   }
   return prisma.listing.create({
     data: {
@@ -83,10 +90,10 @@ export async function createListing(
       buyNowPrice: input.buyNowPrice ?? null,
       quantity,
       weightGrams: input.weightGrams ?? null,
-      parcelPreset: parcel.presetId,
-      parcelLengthMm: parcel.dims.lengthMm,
-      parcelWidthMm: parcel.dims.widthMm,
-      parcelHeightMm: parcel.dims.heightMm,
+      parcelPreset: parcel?.presetId ?? null,
+      parcelLengthMm: parcel?.dims.lengthMm ?? null,
+      parcelWidthMm: parcel?.dims.widthMm ?? null,
+      parcelHeightMm: parcel?.dims.heightMm ?? null,
       category: input.category ? clampText(input.category, MAX_CATEGORY_LEN) : null,
       status: ListingStatus.QUEUED,
     },

@@ -857,10 +857,9 @@ async function main() {
           const est = await estimateListingShipping(userId, String(b.listingId ?? ''), prisma);
           return send(res, 200, {
             shippingFee: formatUsdc(est.shippingFee),
-            carrierRetail: formatUsdc(est.carrierRetail),
-            discountPct: est.discountPct,
             privacyFee: formatUsdc(est.privacyFee),
             hasAddress: est.hasAddress,
+            isFrom: est.isFrom,
           });
         } catch (err) {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });

@@ -611,12 +611,14 @@ export interface ShipEstimate {
   hasAddress: boolean;
 }
 
+/** The bid panel's "~$ est. shipping". Display only: what the buyer actually
+ *  pays is quoted live at ship time and can differ by a couple of dollars. */
 export interface ListingShipEstimate {
   shippingFee: string;
-  carrierRetail: string;
-  discountPct: number;
   privacyFee: string;
   hasAddress: boolean;
+  /** No saved address, so this is the cheapest lane, not a quote for them. */
+  isFrom: boolean;
 }
 
 export interface Purchase {

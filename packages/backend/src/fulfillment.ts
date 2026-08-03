@@ -14,6 +14,7 @@ import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
 import { quoteShipping, quoteShippingBreakdown, privacyPremium, type Dimensions, type ShipLocation } from './shipping.js';
 import { combineParcels, defaultParcel, type ParcelDims } from '@bidit/shared';
+import { estimateShipping } from './ship-estimate.js';
 import { encryptPii, decryptPii } from './pii.js';
 import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
@@ -536,20 +537,29 @@ export async function estimateShipment(
 }
 
 /**
- * Read-only shipping estimate for a single listing (not yet won), for the bid
- * panel, so a buyer sees what shipping will cost before bidding. Uses the seller's
- * ship-from, the listing weight and the buyer's saved address.
+ * The "~$ est. shipping" number on the bid panel, for an item that is still on
+ * the block. DISPLAY ONLY: what the buyer actually pays is quoted live at ship
+ * time. This one has to render for every viewer on every item, so it is pure
+ * arithmetic (see ship-estimate.ts) with no network call and nothing that can
+ * fail mid-auction.
+ *
+ * Missing weight or package fall back to what the category typically ships as,
+ * preferring the listing's own category and then the seller's stream category.
+ * A viewer with no saved address gets the local lane back, flagged `isFrom` so
+ * the panel can present it as a starting price rather than a quote.
  */
 export async function estimateListingShipping(
   buyerId: string,
   listingId: string,
   prisma: PrismaClient = defaultPrisma,
-): Promise<{ shippingFee: bigint; carrierRetail: bigint; discountPct: number; privacyFee: bigint; hasAddress: boolean }> {
+): Promise<{ shippingFee: bigint; privacyFee: bigint; hasAddress: boolean; isFrom: boolean }> {
   const listing = await prisma.listing.findUnique({
     where: { id: listingId },
     select: {
       sellerId: true,
+      category: true,
       weightGrams: true,
+      parcelPreset: true,
       parcelLengthMm: true,
       parcelWidthMm: true,
       parcelHeightMm: true,
@@ -568,14 +578,20 @@ export async function estimateListingShipping(
     city: seller?.originCity,
     postal: seller?.originPostal,
   };
-  const one = parcelForItems([listing]);
-  const b = quoteShippingBreakdown(origin, dest ?? {}, one.weightGrams, one.dims);
+  const { parcelLengthMm: l, parcelWidthMm: w, parcelHeightMm: h } = listing;
+  const est = estimateShipping({
+    origin,
+    dest: hasAddress ? dest : null,
+    category: listing.category ?? seller?.streamCategory ?? null,
+    weightGrams: listing.weightGrams,
+    parcelPreset: listing.parcelPreset,
+    parcelDims: l && w && h ? { lengthMm: l, widthMm: w, heightMm: h } : null,
+  });
   return {
-    shippingFee: b.final,
-    carrierRetail: b.carrierRetail,
-    discountPct: b.discountPct,
+    shippingFee: est.fee,
     privacyFee: privacyPremium(),
     hasAddress,
+    isFrom: est.isFrom,
   };
 }
 

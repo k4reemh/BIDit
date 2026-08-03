@@ -166,8 +166,11 @@ export default function BidPanel({
   // shipping mode. Ship-to-address charges shipping on win; the others bill later.
   const shipNote: { text: string; warn?: boolean } | null = (() => {
     if (!session || !shipEst) return null;
-    if (!shipEst.hasAddress) return { text: 'Add a shipping address to see shipping cost', warn: true };
     const fee = money2(shipEst.shippingFee);
+    // No saved address yet, which is most of a live room. Show the cheapest
+    // lane rather than nothing: a number they can bid against beats a prompt,
+    // and it still asks for the address to make it theirs.
+    if (shipEst.isFrom) return { text: `Shipping from ~$${fee} · add your address for your rate`, warn: true };
     if (shipMode === 'WEEKLY_BUNDLE') return { text: `~$${fee} est. shipping · charged when you win` };
     if (shipMode === 'PRIVATE') {
       const total = money2(parseFloat(shipEst.shippingFee) + parseFloat(shipEst.privacyFee));

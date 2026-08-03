@@ -113,7 +113,7 @@ function centroid(loc: ShipLocation): LatLng | null {
   return COUNTRY_FALLBACK[country] ?? null;
 }
 
-function countryCode(country?: string | null): string {
+export function countryCode(country?: string | null): string {
   const c = norm(country);
   if (!c) return 'US';
   if (c === 'CANADA' || c === 'CA' || c === 'CAN') return 'CA';
