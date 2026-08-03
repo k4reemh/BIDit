@@ -104,6 +104,7 @@ import {
   type DisputeOutcome,
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
+import { diagnoseShipping, type ShippoAddress } from '../src/shippo.js';
 import { ChainSettler } from '../src/chain-settle.js';
 import {
   getBuyerFulfillment,
@@ -1507,6 +1508,48 @@ async function main() {
           }),
         );
         return send(res, 200, out);
+      }
+      // Shippo readiness probe. Rating is free and read-only (this buys nothing),
+      // so it is safe to run against production, and it is the only way to answer
+      // the question the rate system rests on: does this Shippo account return
+      // rates for the lanes we actually sell on? A Canadian origin with no
+      // Canadian carrier account returns ZERO rates, and no amount of caching or
+      // fallback logic fixes that. Override the origin with ?country=&region=
+      // &city=&postal=; otherwise it probes a real seller's ship-from.
+      if (req.method === 'GET' && p === '/admin/shipping/diagnose') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(await isAdmin(userId, prisma))) return send(res, 403, { error: 'admin required' });
+        const q = url.searchParams;
+        let origin: ShippoAddress | null = null;
+        if (q.get('country')) {
+          origin = {
+            city: q.get('city') ?? undefined,
+            state: q.get('region') ?? undefined,
+            zip: q.get('postal') ?? undefined,
+            country: String(q.get('country')),
+          };
+        } else {
+          // Prefer the caller's own ship-from, then any seller who has one, so the
+          // probe reflects a lane that really exists rather than a guess.
+          const profile =
+            (await prisma.sellerProfile.findFirst({
+              where: { userId, originCountry: { not: null }, originPostal: { not: null } },
+            })) ??
+            (await prisma.sellerProfile.findFirst({
+              where: { originCountry: { not: null }, originPostal: { not: null } },
+              orderBy: { createdAt: 'asc' },
+            }));
+          origin = profile
+            ? {
+                city: profile.originCity ?? undefined,
+                state: profile.originRegion ?? undefined,
+                zip: profile.originPostal ?? undefined,
+                country: profile.originCountry!,
+              }
+            : { city: 'Calgary', state: 'AB', zip: 'T2P 1J9', country: 'CA' };
+        }
+        return send(res, 200, { origin, ...(await diagnoseShipping(origin)) });
       }
       // Operator label queue: every package a seller has confirmed that needs a
       // label made. Includes items, package size, both parties' addresses, and the

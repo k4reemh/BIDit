@@ -56,7 +56,7 @@ describe('re-registering over an unverified signup', () => {
     const email = 'hasvalue@example.com';
     const u = await registerWithEmail({ email, password: 'firstpass1' });
     const accountId = await getOrCreateUserAccount(u.id, prisma);
-    await deposit({ accountId, amount: usdc('10'), reference: 'seed-hasvalue' }, prisma);
+    await deposit({ accountId, amount: usdc('10'), refId: 'seed-hasvalue' }, prisma);
     await expect(registerWithEmail({ email, password: 'takeover1' })).rejects.toThrow(/already registered/);
   });
 });
@@ -80,7 +80,7 @@ describe('admin ban', () => {
   it('leaves the ledger and orders intact, so a ban is reversible', async () => {
     const u = await registerWithEmail({ email: 'keepdata@example.com', password: 'goodpass1' });
     const accountId = await getOrCreateUserAccount(u.id, prisma);
-    await deposit({ accountId, amount: usdc('25'), reference: 'seed-keepdata' }, prisma);
+    await deposit({ accountId, amount: usdc('25'), refId: 'seed-keepdata' }, prisma);
     await banUser(u.id, null, prisma);
     // Nothing was destroyed: in-flight escrow can still settle on a banned account.
     expect(await prisma.ledgerEntry.count({ where: { accountId } })).toBeGreaterThan(0);
