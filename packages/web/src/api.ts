@@ -750,3 +750,29 @@ export async function restore(): Promise<Session | null> {
     return null; // network error: keep the token, retry next load
   }
 }
+
+// ---- address validation -----------------------------------------------------
+
+/** Advisory only. `unchecked` means we could not reach the carrier, which is not
+ *  a reason to stop anyone saving their own address. */
+export interface AddressCheck {
+  status: 'ok' | 'warning' | 'unchecked';
+  messages: string[];
+  suggestion: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    region?: string;
+    postal?: string;
+    country?: string;
+  } | null;
+}
+
+export const validateAddress = (a: {
+  name?: string;
+  line1?: string;
+  city?: string;
+  region?: string;
+  postal?: string;
+  country?: string;
+}) => req<AddressCheck>('/address/validate', { method: 'POST', body: JSON.stringify(a) });

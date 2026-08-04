@@ -2424,3 +2424,23 @@ img { display: block; max-width: 100%; }
 .ship-notice__title { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
 .ship-notice p { font-size: 13px; line-height: 1.5; }
 .ship-notice a { color: var(--accent); font-weight: 600; }
+
+/* ---- carrier address check ----------------------------------------------
+   Advice, not a gate. Carrier databases are wrong about plenty of real
+   addresses, so this warns and offers a correction; the save already happened. */
+.addrchk {
+  margin: 4px 0 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--r);
+  background: var(--surface-2);
+  font-size: 13px; line-height: 1.5;
+}
+.addrchk--warn { border-left-color: var(--amber); }
+.addrchk--tweak { border-left-color: var(--accent); }
+.addrchk b { display: block; margin-bottom: 2px; }
+.addrchk p { margin: 0; color: var(--muted); }
+.addrchk__apply {
+  margin-top: 7px; padding: 0;
+  border: 0; background: none;
+  color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer;
+}

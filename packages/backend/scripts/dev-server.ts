@@ -104,7 +104,7 @@ import {
   type DisputeOutcome,
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
-import { diagnoseShipping, type ShippoAddress } from '../src/shippo.js';
+import { diagnoseShipping, validateAddress, type ShippoAddress } from '../src/shippo.js';
 import { QuoteStaleError } from '../src/ship-charge.js';
 import { ChainSettler } from '../src/chain-settle.js';
 import {
@@ -866,6 +866,30 @@ async function main() {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+      // Advisory address check, used by the delivery-address and ship-from forms.
+      // It never decides whether a save is allowed: the client saves either way
+      // and shows what came back. Metered because each call hits Shippo.
+      if (req.method === 'POST' && p === '/address/validate') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
+        const b = await readJson(req);
+        const str = (v: unknown, max = 120) => (typeof v === 'string' ? v.trim().slice(0, max) : undefined);
+        const country = str(b.country, 60);
+        if (!country) return send(res, 400, { error: 'Country is required.' });
+        return send(
+          res,
+          200,
+          await validateAddress({
+            name: str(b.name),
+            street1: str(b.line1),
+            city: str(b.city),
+            state: str(b.region, 60),
+            zip: str(b.postal, 24),
+            country,
+          }),
+        );
       }
       if (req.method === 'POST' && p === '/shipments/estimate') {
         const userId = authUser(req);

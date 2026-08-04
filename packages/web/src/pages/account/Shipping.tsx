@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
-import { updateMe } from '../../api';
+import { updateMe, validateAddress, type AddressCheck } from '../../api';
+import AddressCheckNote from '../../components/AddressCheckNote';
 import { Check } from '../../icons';
 
 const EMPTY = { name: '', line1: '', line2: '', city: '', region: '', postal: '', country: '' };
@@ -10,19 +11,44 @@ export default function Shipping() {
   const [f, setF] = useState({ ...EMPTY, ...(session.shippingAddress ?? {}) });
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [check, setCheck] = useState<AddressCheck | null>(null);
+
+  // Check whatever is already on file, once, on load. Addresses entered during
+  // onboarding never pass through the save path below, and that flow advances
+  // too fast to show a warning in, so this is where they get looked at.
+  useEffect(() => {
+    const a = session.shippingAddress;
+    if (!a?.line1 || !a?.country) return;
+    let live = true;
+    validateAddress(a).then((c) => { if (live) setCheck(c); }).catch(() => {});
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   const valid = f.name && f.line1 && f.city && f.postal && f.country;
 
   const save = async () => {
     setBusy(true);
+    setCheck(null);
     try {
+      // Save first, always. The carrier check is advice, and a carrier database
+      // that has not heard of someone's street is not a reason to stop them
+      // entering where they live.
       setSession(await updateMe({ shippingAddress: { ...f } }));
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
+      setCheck(await validateAddress(f).catch(() => null));
     } finally {
       setBusy(false);
     }
+  };
+
+  const applySuggestion = (s: NonNullable<AddressCheck['suggestion']>) => {
+    const next = { ...f, ...Object.fromEntries(Object.entries(s).filter(([, v]) => v)) };
+    setF(next);
+    setCheck(null);
+    void updateMe({ shippingAddress: next }).then(setSession);
   };
 
   return (
@@ -54,6 +80,7 @@ export default function Shipping() {
           <div className="fld"><label>Postal / ZIP</label><input value={f.postal} onChange={set('postal')} placeholder="T2P 1J9" /></div>
           <div className="fld"><label>Country</label><input value={f.country} onChange={set('country')} placeholder="Canada" /></div>
         </div>
+        <AddressCheckNote check={check} onApply={applySuggestion} />
         <div className="acct-actions">
           <button className="btn btn-primary" onClick={save} disabled={!valid || busy}>
             {busy ? 'Saving…' : 'Save address'}

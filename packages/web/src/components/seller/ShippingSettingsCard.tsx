@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { saveShippingSettings, refreshMe, type Session } from '../../api';
+import { saveShippingSettings, refreshMe, validateAddress, type Session, type AddressCheck } from '../../api';
+import AddressCheckNote from '../AddressCheckNote';
 import { Check } from '../../icons';
 
 /** Seller ship-from origin (drives shipping quotes) + which shipping modes they
@@ -24,9 +25,11 @@ export default function ShippingSettingsCard({
   const [priv, setPriv] = useState(s?.privateShipping ?? false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [check, setCheck] = useState<AddressCheck | null>(null);
 
   const save = async () => {
     setBusy(true);
+    setCheck(null);
     try {
       await saveShippingSettings({
         originName: name.trim() || null,
@@ -43,6 +46,14 @@ export default function ShippingSettingsCard({
       setSession(await refreshMe());
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
+      // Advisory, after the save. A ship-from the carrier cannot place is worth
+      // knowing about now rather than when a label refuses to print.
+      setCheck(
+        await validateAddress({
+          name: name.trim(), line1: line1.trim(), city: city.trim(),
+          region: region.trim(), postal: postal.trim(), country: country.trim(),
+        }).catch(() => null),
+      );
     } finally {
       setBusy(false);
     }
@@ -65,6 +76,17 @@ export default function ShippingSettingsCard({
         <div className="fld"><label>City</label><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" /></div>
         <div className="fld"><label>Postal / ZIP</label><input value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="ZIP / postal" /></div>
       </div>
+
+      <AddressCheckNote
+        check={check}
+        onApply={(sug) => {
+          if (sug.line1) setLine1(sug.line1);
+          if (sug.city) setCity(sug.city);
+          if (sug.region) setRegion(sug.region);
+          if (sug.postal) setPostal(sug.postal);
+          setCheck(null);
+        }}
+      />
 
       <div className="ship-opts">
         <label className="ship-priv">

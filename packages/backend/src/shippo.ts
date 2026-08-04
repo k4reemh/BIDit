@@ -207,6 +207,103 @@ export async function getRates(
 }
 
 // ---------------------------------------------------------------------------
+// Address validation
+// ---------------------------------------------------------------------------
+
+export interface AddressCheck {
+  /** `ok` the carrier recognises it, `warning` it does not, `unchecked` we could
+   *  not ask. Never `invalid`: this only ever advises. */
+  status: 'ok' | 'warning' | 'unchecked';
+  messages: string[];
+  /** The carrier's corrected version, when it differs from what was entered. */
+  suggestion: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    region?: string;
+    postal?: string;
+    country?: string;
+  } | null;
+}
+
+interface RawValidatedAddress {
+  street1?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  validation_results?: {
+    is_valid?: boolean;
+    messages?: { text?: string; code?: string }[];
+  };
+}
+
+const differs = (a?: string, b?: string) =>
+  (a ?? '').trim().toUpperCase() !== (b ?? '').trim().toUpperCase();
+
+/**
+ * Ask the carrier whether an address is deliverable, and what it should say.
+ *
+ * Advisory on purpose. Carrier databases are wrong about plenty of real
+ * addresses (new builds, rural routes, anything outside the US), so a hard block
+ * would lock people out of their own homes. A bad address instead fails at label
+ * time, weeks later, which is far more expensive to unpick than a warning now.
+ *
+ * Never throws: an unreachable Shippo returns `unchecked`, and the caller saves
+ * the address regardless.
+ */
+export async function validateAddress(a: ShippoAddress): Promise<AddressCheck> {
+  if (!shippoKey()) return { status: 'unchecked', messages: [], suggestion: null };
+  try {
+    const data = await shippoFetch<RawValidatedAddress>('/addresses', {
+      method: 'POST',
+      body: JSON.stringify({ ...a, validate: true }),
+    });
+    const res = data.validation_results ?? {};
+    const messages = (res.messages ?? [])
+      .map((m) => String(m?.text ?? '').trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    if (res.is_valid !== true) {
+      return {
+        status: 'warning',
+        messages: messages.length ? messages : ['We could not confirm this address with the carrier.'],
+        suggestion: null,
+      };
+    }
+
+    // Valid, but the carrier may have normalised it. Only offer a suggestion when
+    // something actually changed, so nobody is asked to "correct" what they typed.
+    const changed =
+      differs(a.street1, data.street1) ||
+      differs(a.city, data.city) ||
+      differs(a.state, data.state) ||
+      differs(a.zip, data.zip);
+    return {
+      status: 'ok',
+      messages,
+      suggestion: changed
+        ? {
+            line1: data.street1,
+            line2: data.street2,
+            city: data.city,
+            region: data.state,
+            postal: data.zip,
+            country: data.country,
+          }
+        : null,
+    };
+  } catch (err) {
+    // Deliberately quiet about the address itself: this runs on every save and
+    // the input is someone's home.
+    console.warn('[shippo] address validation unavailable:', (err as Error)?.message ?? err);
+    return { status: 'unchecked', messages: [], suggestion: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Diagnostics
 // ---------------------------------------------------------------------------
 
