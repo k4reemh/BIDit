@@ -16,6 +16,8 @@
  * (bigint), consistent with the ledger.
  */
 
+import { normalizeCountry } from '@bidit/shared';
+
 const USDC = 1_000_000n; // one dollar in micro-units
 
 export interface ShipLocation {
@@ -113,38 +115,20 @@ function centroid(loc: ShipLocation): LatLng | null {
   return COUNTRY_FALLBACK[country] ?? null;
 }
 
-/** Free-text country names people actually type, mapped to ISO alpha-2. */
-const COUNTRY_ALIASES: Record<string, string> = {
-  CANADA: 'CA', CAN: 'CA',
-  'UNITED STATES': 'US', 'UNITED STATES OF AMERICA': 'US', USA: 'US', AMERICA: 'US',
-  'UNITED KINGDOM': 'GB', UK: 'GB', 'GREAT BRITAIN': 'GB', BRITAIN: 'GB',
-  ENGLAND: 'GB', SCOTLAND: 'GB', WALES: 'GB', 'NORTHERN IRELAND': 'GB',
-  MEXICO: 'MX', GERMANY: 'DE', FRANCE: 'FR', SPAIN: 'ES', ITALY: 'IT',
-  NETHERLANDS: 'NL', 'THE NETHERLANDS': 'NL', HOLLAND: 'NL', BELGIUM: 'BE',
-  AUSTRIA: 'AT', SWITZERLAND: 'CH', PORTUGAL: 'PT', IRELAND: 'IE', POLAND: 'PL',
-  SWEDEN: 'SE', NORWAY: 'NO', DENMARK: 'DK', FINLAND: 'FI', GREECE: 'GR',
-  'CZECH REPUBLIC': 'CZ', CZECHIA: 'CZ', HUNGARY: 'HU', ROMANIA: 'RO', UKRAINE: 'UA',
-  AUSTRALIA: 'AU', 'NEW ZEALAND': 'NZ', JAPAN: 'JP', 'SOUTH KOREA': 'KR', KOREA: 'KR',
-  CHINA: 'CN', 'HONG KONG': 'HK', SINGAPORE: 'SG', TAIWAN: 'TW', INDIA: 'IN',
-  PHILIPPINES: 'PH', THAILAND: 'TH', VIETNAM: 'VN', INDONESIA: 'ID', MALAYSIA: 'MY',
-  BRAZIL: 'BR', ARGENTINA: 'AR', CHILE: 'CL', COLOMBIA: 'CO', PERU: 'PE',
-  'UNITED ARAB EMIRATES': 'AE', UAE: 'AE', 'SAUDI ARABIA': 'SA', QATAR: 'QA',
-  ISRAEL: 'IL', TURKEY: 'TR', 'SOUTH AFRICA': 'ZA', EGYPT: 'EG', NIGERIA: 'NG',
-};
-
+/**
+ * Free text → ISO alpha-2, sharing the exact table the country dropdowns render
+ * from, so a value the form offers is always one the pricer understands.
+ *
+ * Empty stays 'US' (the pre-dropdown default this module always had). An
+ * unrecognised name becomes XX rather than a truncation: "Germany".slice(0, 2)
+ * is GE, which is Georgia's code, and a wrong country prices a parcel to the
+ * wrong place without anyone noticing. XX fails at the carrier, so the charge
+ * lands on the formula fallback instead of on a wrong lane.
+ */
 export function countryCode(country?: string | null): string {
   const c = norm(country);
   if (!c) return 'US';
-  const alias = COUNTRY_ALIASES[c];
-  if (alias) return alias;
-  // Already a code: pass it through.
-  if (/^[A-Z]{2}$/.test(c)) return c;
-  // An unrecognised full name must NOT be truncated to two letters: GERMANY
-  // would become GE, which is Georgia's ISO code, and the parcel would be
-  // silently priced to the wrong country. XX is invalid on purpose, so the
-  // carrier refuses, the rate call comes back empty, and the charge lands on
-  // the formula fallback instead of on a wrong lane.
-  return 'XX';
+  return normalizeCountry(c) ?? 'XX';
 }
 
 function haversineKm(a: LatLng, b: LatLng): number {

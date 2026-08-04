@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CountrySelect from './CountrySelect';
 import Logo from './Logo';
 import CreateCoinCard from './seller/CreateCoinCard';
 import { submitSellerOnboarding, type Session } from '../api';
@@ -172,7 +173,7 @@ export default function SellerOnboarding({ session, setSession }: { session: Ses
             <div className="fld"><label>Street address</label><input value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="123 Main St" /></div>
             <div className="fld"><label>Apt, suite, unit <span className="muted">(optional)</span></label><input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Unit 4" /></div>
             <div className="fld-row">
-              <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>
+              <div className="fld"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
               <div className="fld"><label>State / Region</label><input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CA, AB…" /></div>
             </div>
             <div className="fld-row">

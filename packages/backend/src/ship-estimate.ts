@@ -200,7 +200,15 @@ const zoneCache = new Map<string, number>();
 export function zoneForRegions(origin: ShipLocation, dest: ShipLocation): number {
   const a = regionKey(origin);
   const b = regionKey(dest);
-  if (!a || !b) return UNKNOWN_ZONE;
+  if (!a || !b) {
+    // No centroids on EITHER side but the same country: a domestic shipment in
+    // a country we have no map for (UK to UK, Germany to Germany). Mid domestic
+    // beats the far default, which was pricing London to Manchester like a
+    // cross-continent haul. One side resolving and the other not stays far:
+    // that shape is usually a typo, and a typo must not quote cheap.
+    if (!a && !b && countryCode(origin.country) === countryCode(dest.country)) return 3;
+    return UNKNOWN_ZONE;
+  }
   if (a === b) return 1;
   const cacheKey = a < b ? `${a}|${b}` : `${b}|${a}`; // distance is symmetric
   const hit = zoneCache.get(cacheKey);

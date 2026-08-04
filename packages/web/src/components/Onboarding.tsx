@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import CountrySelect from './CountrySelect';
 import Logo from './Logo';
 import { INTERESTS } from '../data';
 import { completeOnboarding, setHandle as claimHandle, updateMe, ApiError, type Session } from '../api';
@@ -217,7 +218,7 @@ export default function Onboarding({
               </div>
               <div className="fld-row">
                 <div className="fld"><label>Postal / ZIP</label><input value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="ZIP / postal" /></div>
-                <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>
+                <div className="fld"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
               </div>
             </>
           )}

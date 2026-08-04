@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
 import { updateMe, validateAddress, type AddressCheck } from '../../api';
 import AddressCheckNote from '../../components/AddressCheckNote';
+import CountrySelect from '../../components/CountrySelect';
 import { Check } from '../../icons';
 
 const EMPTY = { name: '', line1: '', line2: '', city: '', region: '', postal: '', country: '' };
@@ -78,7 +79,7 @@ export default function Shipping() {
         </div>
         <div className="fld-row">
           <div className="fld"><label>Postal / ZIP</label><input value={f.postal} onChange={set('postal')} placeholder="T2P 1J9" /></div>
-          <div className="fld"><label>Country</label><input value={f.country} onChange={set('country')} placeholder="Canada" /></div>
+          <div className="fld"><label>Country</label><CountrySelect value={f.country} onChange={(c) => setF({ ...f, country: c })} /></div>
         </div>
         <AddressCheckNote check={check} onApply={applySuggestion} />
         <div className="acct-actions">

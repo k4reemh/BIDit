@@ -5,4 +5,5 @@ export * from './auction.js';
 export * from './randomizer.js';
 export * from './giveaway.js';
 export * from './parcels.js';
+export * from './countries.js';
 export * from './protocol.js';

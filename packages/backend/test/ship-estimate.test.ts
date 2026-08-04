@@ -76,6 +76,19 @@ describe('zones', () => {
     expect(zoneForRegions(AB, dest('FR', 'Île-de-France'))).toBe(4);
   });
 
+  it('treats a domestic shipment in an unmapped country as mid domestic', () => {
+    // UK to UK: no centroids on either side, but London to Manchester is not a
+    // cross-continent haul. Only when BOTH sides are unmapped and the country
+    // matches: one side resolving and the other not is usually a typo, and a
+    // typo must not quote cheap.
+    const uk = (region: string) => ({ country: 'United Kingdom', region });
+    expect(zoneForRegions(uk('England'), uk('Greater Manchester'))).toBe(3);
+    const de = (region: string) => ({ country: 'Germany', region });
+    expect(zoneForRegions(de('Bayern'), de('Berlin'))).toBe(3);
+    // Cross-border between two unmapped countries stays far.
+    expect(zoneForRegions(uk('England'), de('Berlin'))).toBe(4);
+  });
+
   it('is symmetric', () => {
     expect(zoneForRegions(AB, dest('US', 'TX'))).toBe(zoneForRegions(dest('US', 'TX'), AB));
   });

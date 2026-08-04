@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { saveShippingSettings, refreshMe, validateAddress, type Session, type AddressCheck } from '../../api';
 import AddressCheckNote from '../AddressCheckNote';
+import CountrySelect from '../CountrySelect';
 import { Check } from '../../icons';
 
 /** Seller ship-from origin (drives shipping quotes) + which shipping modes they
@@ -69,7 +70,7 @@ export default function ShippingSettingsCard({
       <div className="fld"><label>Apt, suite, unit <span className="muted">(optional)</span></label><input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Unit 4" /></div>
 
       <div className="fld-row">
-        <div className="fld"><label>Country</label><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US, CA…" /></div>
+        <div className="fld"><label>Country</label><CountrySelect value={country} onChange={setCountry} /></div>
         <div className="fld"><label>State / Region</label><input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CA, AB…" /></div>
       </div>
       <div className="fld-row">

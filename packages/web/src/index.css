@@ -2444,3 +2444,17 @@ img { display: block; max-width: 100%; }
   border: 0; background: none;
   color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer;
 }
+
+/* ---- country dropdown ----------------------------------------------------
+   Styled to sit beside the text inputs it replaced: same border, radius and
+   padding, so the address form reads as one control set. */
+.country-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 14px;
+  appearance: auto;
+}
+.country-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.country-select:invalid, .country-select option[value=""] { color: var(--muted); }
