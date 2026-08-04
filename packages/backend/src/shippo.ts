@@ -146,6 +146,11 @@ export interface RateResult {
    *  enabled). Empty rates + a message here is the signal that a carrier account
    *  is missing, which is the difference between "expensive" and "impossible". */
   messages: string[];
+  /** Cross-border only: whether the customs declaration made it onto the rate
+   *  call. A cross-border lane with zero rates has exactly two explanations,
+   *  a declaration that failed to attach (ours to fix) or carrier accounts that
+   *  refuse the lane (account admin, not code), and this is what separates them. */
+  customs?: { attached: boolean; error?: string };
 }
 
 /** What the customs form says the parcel holds. Rating cross-border REQUIRES
@@ -193,6 +198,7 @@ export async function getRates(
   // Cross-border needs the customs declaration attached BEFORE rating, not just
   // at label time. Best effort: if the declaration cannot be created, rate
   // without it and let the caller's zero-rate fallback do its job.
+  let customsStatus: { attached: boolean; error?: string } | undefined;
   if (customs && countryOf(from) !== countryOf(to)) {
     try {
       const decl = await shippoFetch<{ object_id?: string }>('/customs/declarations', {
@@ -222,8 +228,14 @@ export async function getRates(
           ],
         }),
       });
-      if (decl.object_id) body.customs_declaration = decl.object_id;
+      if (decl.object_id) {
+        body.customs_declaration = decl.object_id;
+        customsStatus = { attached: true };
+      } else {
+        customsStatus = { attached: false, error: 'created but no object_id returned' };
+      }
     } catch (err) {
+      customsStatus = { attached: false, error: (err as Error)?.message ?? String(err) };
       console.warn('[shippo] customs declaration failed; rating without one:', (err as Error)?.message ?? err);
     }
   }
@@ -257,7 +269,7 @@ export async function getRates(
     .filter(Boolean)
     .slice(0, 20);
 
-  return { rates, messages };
+  return { rates, messages, customs: customsStatus };
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +383,8 @@ export interface LaneProbe {
    *  lane is served by one carrier or ten, which is the difference between
    *  "this works" and "this works until that one account has a bad day". */
   rates: string[];
+  /** Whether the customs declaration attached (cross-border lanes only). */
+  customs?: { attached: boolean; error?: string };
   messages: string[];
   error: string | null;
 }
@@ -419,7 +433,7 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
     try {
       // A representative declared value, so cross-border lanes are tested the
       // way a real charge would rate them (without customs they return zero).
-      const { rates, messages } = await getRates(origin, d.to, PROBE_PARCEL, {
+      const { rates, messages, customs } = await getRates(origin, d.to, PROBE_PARCEL, {
         declaredValueUsd: 20,
         description: 'Collectible trading card',
       });
@@ -431,6 +445,7 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
         rateCount: rates.length,
         cheapest: sorted[0] ?? null,
         rates: sorted.map((r) => `${r.carrier} ${r.service}: ${r.amount.toFixed(2)} ${r.currency}${r.estimatedDays ? ` (${r.estimatedDays}d)` : ''}`),
+        customs,
         messages,
         error: null,
       });
