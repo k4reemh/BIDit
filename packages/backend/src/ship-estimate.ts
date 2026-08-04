@@ -34,7 +34,7 @@ const USDC = 1_000_000n;
 // headline lanes so a change to these shows up as an intentional diff.
 // ---------------------------------------------------------------------------
 
-const BASE = 8.0;
+const BASE = 5.0;
 
 /** Zone 1 same metro, 5 opposite corner. */
 const DISTANCE: Record<number, number> = { 1: 0.5, 2: 2.0, 3: 3.5, 4: 4.5, 5: 5.5 };

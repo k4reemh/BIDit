@@ -31,14 +31,14 @@ describe('headline lanes', () => {
   // Pinned so that a change to the constants shows up as a deliberate diff
   // rather than quietly moving every price on the site.
   it('quotes the lanes BIDit actually sells on', () => {
-    expect(quote(dest('Canada', 'AB'), 100, 'poly_9x12')).toBe(9.0);
-    expect(quote(dest('Canada', 'ON'), 100, 'poly_9x12')).toBe(13.25);
-    expect(quote(dest('Canada', 'NS'), 100, 'poly_9x12')).toBe(14.25);
-    expect(quote(dest('US', 'WA'), 100, 'poly_9x12')).toBe(13.5);
-    expect(quote(dest('US', 'TX'), 100, 'poly_9x12')).toBe(16.25);
-    expect(quote(dest('US', 'FL'), 100, 'poly_9x12')).toBe(17.25);
-    expect(quote(dest('US', 'TX'), 900, 'box_9x6x3')).toBe(25.5);
-    expect(quote(dest('US', 'TX'), 5000, 'box_14x12x6')).toBe(56.0);
+    expect(quote(dest('Canada', 'AB'), 100, 'poly_9x12')).toBe(6.0);
+    expect(quote(dest('Canada', 'ON'), 100, 'poly_9x12')).toBe(10.25);
+    expect(quote(dest('Canada', 'NS'), 100, 'poly_9x12')).toBe(11.25);
+    expect(quote(dest('US', 'WA'), 100, 'poly_9x12')).toBe(10.5);
+    expect(quote(dest('US', 'TX'), 100, 'poly_9x12')).toBe(13.25);
+    expect(quote(dest('US', 'FL'), 100, 'poly_9x12')).toBe(14.25);
+    expect(quote(dest('US', 'TX'), 900, 'box_9x6x3')).toBe(22.5);
+    expect(quote(dest('US', 'TX'), 5000, 'box_14x12x6')).toBe(53.0);
   });
 
   it('no longer prices Seattle the same as Dallas', () => {

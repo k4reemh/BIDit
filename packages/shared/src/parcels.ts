@@ -185,54 +185,84 @@ export function packageClass(presetId: string | null | undefined, dims: ParcelDi
 // Combining several won items into one package
 // ---------------------------------------------------------------------------
 
-/** Packing is never perfect: items do not tessellate and need padding. */
-const PACKING_FACTOR = 1.15;
-
 const volume = (d: ParcelDims) => d.lengthMm * d.widthMm * d.heightMm;
 
 /**
- * The package a multi-item shipment actually needs.
+ * How many items one package of that class realistically holds.
  *
- * This replaces the old flat "+3% per extra item" surcharge, which had nothing
- * to do with what a carrier charges: two slabs in one mailer cost the same to
- * post as one, while ten of them need a box and a different rate entirely.
+ * A polymailer is mostly air around a few flat cards, so several fit in the one
+ * the seller would have used for a single card. A box is already sized around
+ * the thing it holds, so a second one needs a bigger box.
+ */
+const ITEMS_PER_PACKAGE: Record<PackageClass, number> = {
+  polymailer: 8,
+  small_box: 1,
+  large_box: 1,
+};
+
+const byVolume = () => [...PARCEL_PRESETS].sort((a, b) => volume(a) - volume(b));
+
+const asDims = (p: ParcelPreset): ParcelDims => ({ lengthMm: p.lengthMm, widthMm: p.widthMm, heightMm: p.heightMm });
+
+const exactPreset = (d: ParcelDims) =>
+  PARCEL_PRESETS.find((p) => p.lengthMm === d.lengthMm && p.widthMm === d.widthMm && p.heightMm === d.heightMm) ?? null;
+
+/**
+ * The package a multi-item shipment actually ships in.
  *
- * Two constraints, both required. The result must hold the combined padded
- * volume, AND it must be at least as large as the biggest single item, since a
- * long card cannot be folded into a cube of equal volume.
+ * Items from one seller to one buyer go in ONE box, so this picks that box. The
+ * weight is summed separately by the caller, which is the honest part: weight is
+ * genuinely additive and is what carriers bill small parcels on.
+ *
+ * Size is the part that needs judgement, and the obvious rule is wrong. Summing
+ * the items' package volumes treats a polymailer as if it were full, so two
+ * sleeved cards came out needing a large box: an eight dollar overcharge on the
+ * most common multi-item shipment there is. What the volumes actually describe
+ * is the packaging, not the contents.
+ *
+ * So: start from the biggest package any single item would have needed, and step
+ * up one size for each additional packageful. A percentage surcharge per item
+ * was considered and rejected for the same reason: five cards in one mailer post
+ * for the price of one, while two heavy boxes cost nearly double, and no single
+ * percentage describes both.
  */
 export function combineParcels(parcels: ParcelDims[]): { presetId: string; dims: ParcelDims } {
   if (parcels.length === 0) return { presetId: DEFAULT_PARCEL_ID, dims: defaultParcel() };
   if (parcels.length === 1) {
     const only = parcels[0]!;
-    const exact = PARCEL_PRESETS.find(
-      (p) => p.lengthMm === only.lengthMm && p.widthMm === only.widthMm && p.heightMm === only.heightMm,
-    );
-    return { presetId: exact?.id ?? CUSTOM_PARCEL_ID, dims: only };
+    return { presetId: exactPreset(only)?.id ?? CUSTOM_PARCEL_ID, dims: only };
   }
 
-  const needed = parcels.reduce((v, p) => v + volume(p), 0) * PACKING_FACTOR;
+  const ordered = byVolume();
+  const biggest = parcels.reduce((a, b) => (volume(b) > volume(a) ? b : a));
   const longestSide = Math.max(...parcels.map((p) => Math.max(p.lengthMm, p.widthMm)));
 
-  const ordered = [...PARCEL_PRESETS].sort((a, b) => volume(a) - volume(b));
-  for (const p of ordered) {
-    if (volume(p) >= needed && Math.max(p.lengthMm, p.widthMm) >= longestSide) {
-      return { presetId: p.id, dims: { lengthMm: p.lengthMm, widthMm: p.widthMm, heightMm: p.heightMm } };
-    }
+  // The floor: the smallest standard package that would hold the largest single
+  // item. A custom parcel bigger than anything in the table falls through to the
+  // oversized branch below.
+  const baseIdx = ordered.findIndex(
+    (p) => volume(p) >= volume(biggest) && Math.max(p.lengthMm, p.widthMm) >= longestSide,
+  );
+  const base = baseIdx >= 0 ? ordered[baseIdx]! : ordered[ordered.length - 1]!;
+  const perPackage = ITEMS_PER_PACKAGE[packageClass(base.id, asDims(base))];
+  const steps = Math.floor((parcels.length - 1) / perPackage);
+  const targetIdx = (baseIdx >= 0 ? baseIdx : ordered.length - 1) + steps;
+
+  if (targetIdx < ordered.length && baseIdx >= 0) {
+    return { presetId: ordered[targetIdx]!.id, dims: asDims(ordered[targetIdx]!) };
   }
 
-  // Nothing in the table fits. Build a custom parcel rather than quoting the
-  // largest preset, which would under-quote a genuinely oversized shipment.
+  // Past the largest standard box. Grow a custom one rather than capping at the
+  // biggest preset, which would under-quote a genuinely oversized shipment.
   const largest = ordered[ordered.length - 1]!;
-  const base = { lengthMm: largest.lengthMm, widthMm: largest.widthMm, heightMm: largest.heightMm };
-  const grow = Math.max(1, needed / volume(base));
+  const overflow = Math.max(1, targetIdx - (ordered.length - 1) + 1);
   return {
     presetId: CUSTOM_PARCEL_ID,
     dims: {
-      lengthMm: Math.min(MAX_PARCEL_MM, Math.max(base.lengthMm, longestSide)),
-      widthMm: base.widthMm,
+      lengthMm: Math.min(MAX_PARCEL_MM, Math.max(largest.lengthMm, longestSide)),
+      widthMm: largest.widthMm,
       // Height absorbs the overflow: stacking is how a taller box is made.
-      heightMm: Math.min(MAX_PARCEL_MM, Math.round(base.heightMm * grow)),
+      heightMm: Math.min(MAX_PARCEL_MM, largest.heightMm * overflow),
     },
   };
 }

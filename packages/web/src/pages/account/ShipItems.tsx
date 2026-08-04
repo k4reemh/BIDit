@@ -9,7 +9,6 @@ import {
   discardFulfillmentItem,
   confirmReceived,
   refreshMe,
-  updateMe,
   money2,
   type Fulfillment,
   type FulfillmentItem,
@@ -33,10 +32,6 @@ export default function ShipItems() {
   const load = () => getFulfillment().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your items.'));
   useEffect(() => { void load(); }, []);
 
-  const toggleBundle = async () => {
-    setSession(await updateMe({ bundleShipping: !session.bundleShipping }));
-  };
-
   // Group ready-to-ship items by seller: a shipment can only hold one seller's items.
   const bySeller = new Map<string, FulfillmentItem[]>();
   for (const it of data?.items ?? []) {
@@ -58,6 +53,18 @@ export default function ShipItems() {
         <p className="muted">Cards you’ve won, held for you. Ship them whenever you like. Bundle a seller’s items to pay shipping once.</p>
       </div>
 
+      {/* Said plainly and up front. Shipping rates are new, and a buyer who
+          thinks they were overcharged should know there is a person to ask
+          before they decide the platform is taking them for a ride. */}
+      <div className="card acct-card ship-notice">
+        <h3 className="ship-notice__title">We’re still tuning shipping prices</h3>
+        <p className="muted">
+          If a quote looks wrong, message us on X at{' '}
+          <a href="https://x.com/biditsol" target="_blank" rel="noreferrer">@biditsol</a> with your order.
+          We refund overcharges. If a quote comes in far under the real cost, we may reach out about the difference.
+        </p>
+      </div>
+
       {/* Shipping is blocked server-side without a delivery address, so say it
           here rather than letting them pick items and hit an error. */}
       {!hasAddress && (
@@ -74,10 +81,10 @@ export default function ShipItems() {
         </div>
       )}
 
-      <label className="ship-priv card acct-card" style={{ alignItems: 'center', padding: '12px 14px' }}>
-        <input type="checkbox" checked={session.bundleShipping ?? false} onChange={toggleBundle} />
-        <span><b>Weekly bundling</b>: where a seller offers it, pay shipping once a week and get all that week’s wins in one package.</span>
-      </label>
+      {/* The weekly-bundling opt-in lived here. It only ever did anything through
+          the charge-on-win path, which is off for launch, so leaving the checkbox
+          would promise a discount that never arrives. Selecting several items
+          below still pays one shipping fee, which is the part that works. */}
 
       {error && <div className="auth__error">{error}</div>}
 

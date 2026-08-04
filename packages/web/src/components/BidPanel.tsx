@@ -162,23 +162,6 @@ export default function BidPanel({
   const final = remaining !== null && remaining <= 5;
   const showExt = extended > 0 && Date.now() - extended < 1500;
 
-  // The grey "~$ est. shipping" note under the bid, worded for the buyer's chosen
-  // shipping mode. Ship-to-address charges shipping on win; the others bill later.
-  const shipNote: { text: string; warn?: boolean } | null = (() => {
-    if (!session || !shipEst) return null;
-    const fee = money2(shipEst.shippingFee);
-    // No saved address yet, which is most of a live room. Show the cheapest
-    // lane rather than nothing: a number they can bid against beats a prompt,
-    // and it still asks for the address to make it theirs.
-    if (shipEst.isFrom) return { text: `Shipping from ~$${fee} · add your address for your rate`, warn: true };
-    if (shipMode === 'WEEKLY_BUNDLE') return { text: `~$${fee} est. shipping · charged when you win` };
-    if (shipMode === 'PRIVATE') {
-      const total = money2(parseFloat(shipEst.shippingFee) + parseFloat(shipEst.privacyFee));
-      return { text: `~$${total} est. shipping (incl. $${money2(shipEst.privacyFee)} private) · when you ship` };
-    }
-    return { text: `~$${fee} est. shipping · pay later when you ship` }; // SHIP_LATER
-  })();
-
   // Self-heal a frozen timer: if the clock reaches 0 but no AUCTION_CLOSED lands
   // (a dropped socket ate the one-shot event), nudge a re-sync every few seconds so
   // the server replays the result and the panel unsticks instead of hanging at 0.
@@ -263,7 +246,6 @@ export default function BidPanel({
                 <div className="bp__cur"><span>Current bid</span><b>{auction!.currentBid ? `$${auction!.currentBid}` : 'No bids'}</b></div>
                 <div className={`bp__timer${low ? ' low beat' : ''}${final ? ' final' : ''}`}>{remaining! > 0 ? `${remaining!.toFixed(1)}s` : 'Settling…'}</div>
               </div>
-              {shipNote && <button type="button" className={`bp__shipnote${shipNote.warn ? ' warn' : ''}`} onClick={() => setShipOpen(true)} title="Change shipping option">{shipNote.text}</button>}
               <div className="bp__barwrap">
                 <div className="bp__bar"><div className={`bp__fill${low ? ' low' : ''}`} style={{ width: `${pct}%` }} /></div>
                 {low && <BidSparks fill={pct / 100} active={low} />}
@@ -347,7 +329,9 @@ export default function BidPanel({
       )}
       {win && <WinCelebration win={win} onDone={() => setWin(null)} />}
       {gWinner && <GiveawayReveal win={gWinner} isMe={!!session && gWinner.winnerUserId === session.userId} onDone={() => setGWinner(null)} />}
-      {shipOpen && <ShippingMenu value={shipMode} onClose={() => setShipOpen(false)} onChange={setShipMode} />}
+      {shipOpen && (
+        <ShippingMenu value={shipMode} estimate={shipEst} onClose={() => setShipOpen(false)} onChange={setShipMode} />
+      )}
     </aside>
   );
 }

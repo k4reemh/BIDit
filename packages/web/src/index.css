@@ -2392,3 +2392,35 @@ img { display: block; max-width: 100%; }
 }
 .parcel-custom { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .parcel-custom__field { margin: 0; }
+
+/* ---- shipping estimate inside the shipping popup ------------------------
+   Moved off the bid panel: a number that changes with every item competes with
+   the clock and the price during a live auction. One tap away instead. */
+.shipest {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface-2);
+}
+.shipest--from { border-style: dashed; }
+.shipest__row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.shipest__row b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.shipest__note { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+
+/* A shipping option that exists but is not open yet. Shown rather than hidden so
+   people can see it is coming; not selectable so nobody sets a mode that would
+   charge them without showing a price first. */
+.shipopt.soon { opacity: .55; cursor: default; }
+.shipopt.soon:hover { border-color: var(--line); transform: none; }
+.shipopt__soon {
+  margin-left: 8px; padding: 1px 7px;
+  border-radius: 999px; background: var(--surface-3);
+  color: var(--muted); font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; font-style: normal;
+}
+
+/* ---- "we're still tuning shipping" notice on Ready to ship -------------- */
+.ship-notice { border-left: 3px solid var(--accent); }
+.ship-notice__title { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+.ship-notice p { font-size: 13px; line-height: 1.5; }
+.ship-notice a { color: var(--accent); font-weight: 600; }

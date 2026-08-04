@@ -182,11 +182,24 @@ export async function createFulfillmentItem(
  * falls back to Standard (the item just stays Ready-to-Ship). Runs after the item
  * is created, inside the sale settlement.
  */
+/** "Ship to my address" is off for launch: shipping is paid only from Ready to
+ *  ship, where the buyer sees the price and confirms it. Set
+ *  BIDIT_SHIP_ON_WIN=1 to turn the auto-charge path back on.
+ *
+ *  Gating it here rather than only hiding the option in the UI: buyers who
+ *  already chose that mode still carry bundleShipping, and would otherwise keep
+ *  getting charged on win by a flow that no longer has a way to show them the
+ *  price first. */
+export function shipOnWinEnabled(): boolean {
+  return process.env.BIDIT_SHIP_ON_WIN === '1';
+}
+
 export async function applyWeeklyBundling(
   params: { orderId: string; buyerId: string; sellerId: string },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
+  if (!shipOnWinEnabled()) return;
   const [buyer, sellerProfile, item] = await Promise.all([
     prisma.user.findUnique({ where: { id: params.buyerId } }),
     prisma.sellerProfile.findUnique({ where: { userId: params.sellerId } }),

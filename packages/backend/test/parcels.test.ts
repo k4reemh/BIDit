@@ -92,11 +92,31 @@ describe('combineParcels', () => {
     expect(r.dims).toEqual(mailer);
   });
 
-  it('grows to a package that actually holds everything', () => {
-    const r = combineParcels([mailer, mailer, mailer]);
-    expect(vol(r.dims)).toBeGreaterThanOrEqual(vol(mailer) * 3);
-    // And it is a real preset, not an invented box, when one fits.
-    expect(findParcelPreset(r.presetId)).not.toBeNull();
+  it('keeps a handful of flat items in the one mailer they fit in', () => {
+    // A polymailer is mostly air. Summing the items' PACKAGE volumes used to put
+    // two sleeved cards in a large box, which was an eight dollar overcharge on
+    // the most common multi-item shipment there is.
+    for (const n of [2, 3, 5, 8]) {
+      const r = combineParcels(Array.from({ length: n }, () => mailer));
+      expect(r.dims, `${n} cards`).toEqual(mailer);
+    }
+  });
+
+  it('steps up once a mailer genuinely will not hold them', () => {
+    const ten = combineParcels(Array.from({ length: 10 }, () => mailer));
+    expect(vol(ten.dims)).toBeGreaterThan(vol(mailer));
+    expect(findParcelPreset(ten.presetId)).not.toBeNull(); // a real preset, not an invented box
+  });
+
+  it('gives every extra BOX its own step, because boxes do not nest', () => {
+    // Two booster boxes cannot share the box one of them came in, so unlike
+    // mailers each additional one moves up a size.
+    const box = { lengthMm: findParcelPreset('box_9x6x3')!.lengthMm, widthMm: findParcelPreset('box_9x6x3')!.widthMm, heightMm: findParcelPreset('box_9x6x3')!.heightMm };
+    const one = combineParcels([box]);
+    const two = combineParcels([box, box]);
+    const three = combineParcels([box, box, box]);
+    expect(vol(two.dims)).toBeGreaterThan(vol(one.dims));
+    expect(vol(three.dims)).toBeGreaterThan(vol(two.dims));
   });
 
   it('never returns a package shorter than the longest item', () => {

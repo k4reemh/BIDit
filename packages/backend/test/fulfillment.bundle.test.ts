@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { ManualClock } from '../src/clock.js';
 import { createAuction, startAuction, placeBid, closeDueAuctions } from '../src/auction.js';
@@ -19,6 +19,14 @@ const ADDRESS = { name: 'Kareem', line1: '1 Main St', city: 'Calgary', region: '
 
 beforeEach(async () => {
   await resetDb();
+  // Charging shipping on win is gated off for launch (shipOnWinEnabled). The
+  // code is still here and still has to work, so these exercise it with the
+  // flag on; the last test in this file pins the default being off.
+  process.env.BIDIT_SHIP_ON_WIN = '1';
+});
+
+afterEach(() => {
+  delete process.env.BIDIT_SHIP_ON_WIN;
 });
 
 async function makeBundlingSeller() {
@@ -122,5 +130,25 @@ describe('weekly bundling', () => {
     expect(shipments[0]!.status).toBe('PAID');
     // Non-bundling seller → no weekly pass; each win pays its own shipping.
     expect(await prisma.weeklyShippingPass.count({ where: { buyerId: buyer.userId } })).toBe(0);
+  });
+
+  it('is OFF by default, so nothing is charged on win', async () => {
+    // The launch default: shipping is only ever paid from Ready to ship, where
+    // the buyer sees the price and confirms it. A buyer who had already chosen
+    // "ship to my address" still carries bundleShipping, so hiding the option in
+    // the UI is not enough on its own.
+    delete process.env.BIDIT_SHIP_ON_WIN;
+    const clock = new ManualClock(T0);
+    const { sellerId, listingId } = await makeBundlingSeller();
+    await prisma.sellerProfile.update({
+      where: { userId: sellerId },
+      data: { originCountry: 'CA', originRegion: 'AB', originPostal: 'T2P' },
+    });
+    const buyer = await makeFundedUser('100');
+    await prisma.user.update({ where: { id: buyer.userId }, data: { bundleShipping: true, shippingAddress: ADDRESS } });
+
+    const item = await sale(listingId, buyer.userId, '5', clock);
+    expect(item.status).toBe('READY_TO_SHIP'); // waits for the buyer, not charged
+    expect(await prisma.shipment.count({ where: { buyerId: buyer.userId } })).toBe(0);
   });
 });
