@@ -313,6 +313,10 @@ export interface LaneProbe {
   to: ShippoAddress;
   rateCount: number;
   cheapest: ShippoRate | null;
+  /** Every rate, cheapest first, compact. The cheapest alone hides whether a
+   *  lane is served by one carrier or ten, which is the difference between
+   *  "this works" and "this works until that one account has a bad day". */
+  rates: string[];
   messages: string[];
   error: string | null;
 }
@@ -360,11 +364,17 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
   for (const d of destinations) {
     try {
       const { rates, messages } = await getRates(origin, d.to, PROBE_PARCEL);
-      const cheapest = rates.reduce<ShippoRate | null>(
-        (best, r) => (best === null || r.amount < best.amount ? r : best),
-        null,
-      );
-      lanes.push({ lane: d.lane, from: origin, to: d.to, rateCount: rates.length, cheapest, messages, error: null });
+      const sorted = [...rates].sort((a, b) => a.amount - b.amount);
+      lanes.push({
+        lane: d.lane,
+        from: origin,
+        to: d.to,
+        rateCount: rates.length,
+        cheapest: sorted[0] ?? null,
+        rates: sorted.map((r) => `${r.carrier} ${r.service}: ${r.amount.toFixed(2)} ${r.currency}${r.estimatedDays ? ` (${r.estimatedDays}d)` : ''}`),
+        messages,
+        error: null,
+      });
     } catch (err) {
       lanes.push({
         lane: d.lane,
@@ -372,6 +382,7 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
         to: d.to,
         rateCount: 0,
         cheapest: null,
+        rates: [],
         messages: [],
         error: (err as Error)?.message ?? String(err),
       });

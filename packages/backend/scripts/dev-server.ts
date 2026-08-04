@@ -1578,6 +1578,11 @@ async function main() {
         let origin: ShippoAddress | null = null;
         if (q.get('country')) {
           origin = {
+            // Carriers reject a nameless, streetless sender: without these the
+            // rate call still answers but warns, and it stops being a fair test
+            // of the label that would actually be bought.
+            name: q.get('name') ?? 'BIDit Seller',
+            street1: q.get('line1') ?? '1 Main St',
             city: q.get('city') ?? undefined,
             state: q.get('region') ?? undefined,
             zip: q.get('postal') ?? undefined,
@@ -1596,12 +1601,14 @@ async function main() {
             }));
           origin = profile
             ? {
+                name: profile.originName ?? 'BIDit Seller',
+                street1: profile.originLine1 ?? '1 Main St',
                 city: profile.originCity ?? undefined,
                 state: profile.originRegion ?? undefined,
                 zip: profile.originPostal ?? undefined,
                 country: profile.originCountry!,
               }
-            : { city: 'Calgary', state: 'AB', zip: 'T2P 1J9', country: 'CA' };
+            : { name: 'BIDit Seller', street1: '1 Main St', city: 'Calgary', state: 'AB', zip: 'T2P 1J9', country: 'CA' };
         }
         return send(res, 200, { origin, ...(await diagnoseShipping(origin)) });
       }
