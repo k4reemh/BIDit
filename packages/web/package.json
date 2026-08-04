@@ -9,6 +9,7 @@
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
+    "@bidit/shared": "*",
     "@solana/web3.js": "^1.98.4",
     "livekit-client": "^2.20.0",
     "react": "^18.3.1",
