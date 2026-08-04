@@ -148,6 +148,19 @@ export interface RateResult {
   messages: string[];
 }
 
+/** What the customs form says the parcel holds. Rating cross-border REQUIRES
+ *  one: without it UPS answers "111549: Hard: Invalid Shipment Contents Value"
+ *  and the lane returns zero rates, which is exactly what a Calgary → Dallas
+ *  probe came back with. Domestic lanes ignore it. */
+export interface RateCustoms {
+  /** Total declared value of the contents, USD. */
+  declaredValueUsd: number;
+  /** One-line contents description. */
+  description?: string;
+}
+
+const countryOf = (a: ShippoAddress) => a.country.trim().toUpperCase();
+
 /**
  * Live rates for one origin/destination/parcel. `async: false` makes Shippo
  * return the rates inline instead of making us poll.
@@ -156,8 +169,10 @@ export async function getRates(
   from: ShippoAddress,
   to: ShippoAddress,
   parcel: ShippoParcel,
+  customs?: RateCustoms,
 ): Promise<RateResult> {
-  const body = {
+  const parcelWeightG = Math.max(1, Math.round(parcel.weightGrams));
+  const body: Record<string, unknown> = {
     address_from: from,
     address_to: to,
     parcels: [
@@ -168,12 +183,51 @@ export async function getRates(
         width: (parcel.widthMm / 10).toFixed(2),
         height: (parcel.heightMm / 10).toFixed(2),
         distance_unit: 'cm',
-        weight: String(Math.max(1, Math.round(parcel.weightGrams))),
+        weight: String(parcelWeightG),
         mass_unit: 'g',
       },
     ],
     async: false,
   };
+
+  // Cross-border needs the customs declaration attached BEFORE rating, not just
+  // at label time. Best effort: if the declaration cannot be created, rate
+  // without it and let the caller's zero-rate fallback do its job.
+  if (customs && countryOf(from) !== countryOf(to)) {
+    try {
+      const decl = await shippoFetch<{ object_id?: string }>('/customs/declarations', {
+        method: 'POST',
+        body: JSON.stringify({
+          contents_type: 'MERCHANDISE',
+          // DDU per the locked shipping decision: the buyer pays any duties on
+          // delivery rather than us prepaying them into the label price.
+          incoterm: 'DDU',
+          non_delivery_option: 'RETURN',
+          certify: true,
+          certify_signer: from.name?.trim() || 'BIDit Seller',
+          items: [
+            {
+              description: (customs.description?.trim() || 'Collectible trading cards').slice(0, 100),
+              quantity: 1,
+              // Contents must weigh LESS than the packed parcel (the mailer and
+              // padding are real grams), or carriers reject the declaration.
+              net_weight: String(Math.max(1, Math.round(parcelWeightG * 0.8))),
+              mass_unit: 'g',
+              // Zero is the "Invalid Shipment Contents Value" error by another
+              // route, so the declared value is floored at a dollar.
+              value_amount: Math.max(1, customs.declaredValueUsd).toFixed(2),
+              value_currency: 'USD',
+              origin_country: countryOf(from),
+            },
+          ],
+        }),
+      });
+      if (decl.object_id) body.customs_declaration = decl.object_id;
+    } catch (err) {
+      console.warn('[shippo] customs declaration failed; rating without one:', (err as Error)?.message ?? err);
+    }
+  }
+
   const data = await shippoFetch<{ rates?: RawRate[]; messages?: unknown[] }>('/shipments', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -363,7 +417,12 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
   const lanes: LaneProbe[] = [];
   for (const d of destinations) {
     try {
-      const { rates, messages } = await getRates(origin, d.to, PROBE_PARCEL);
+      // A representative declared value, so cross-border lanes are tested the
+      // way a real charge would rate them (without customs they return zero).
+      const { rates, messages } = await getRates(origin, d.to, PROBE_PARCEL, {
+        declaredValueUsd: 20,
+        description: 'Collectible trading card',
+      });
       const sorted = [...rates].sort((a, b) => a.amount - b.amount);
       lanes.push({
         lane: d.lane,

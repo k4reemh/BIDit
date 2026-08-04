@@ -648,7 +648,14 @@ export async function estimateShipment(
   // normal delivery, and the privacy premium covers the detour through the hub.
   // The label the operator actually buys is the seller-to-hub leg, priced
   // separately.
-  const rate = await rateShipment(ctx.origin, ctx.dest, ctx.parcel);
+  // The customs declaration carries what the buyer actually paid for the items:
+  // the honest declared value, and the one cross-border rating refuses to work
+  // without (a declaration-less CA→US rate call returns zero rates).
+  const declaredValueUsd = Number(ctx.items.reduce((sum, it) => sum + it.amount, 0n)) / 1e6;
+  const rate = await rateShipment(ctx.origin, ctx.dest, ctx.parcel, {
+    declaredValueUsd,
+    description: 'Collectible trading cards',
+  });
   const quote = await issueQuote(
     { buyerId: params.buyerId, itemIds: params.itemIds, rate, isPrivate },
     clock,

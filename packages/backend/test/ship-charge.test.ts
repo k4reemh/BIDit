@@ -270,3 +270,19 @@ describe('the fallback price matches what the bid panel promised', () => {
     expect(est.shippingFee).toBe(panel + shipMarkupMicros());
   });
 });
+
+describe('cross-border customs', () => {
+  it('declares what the buyer actually paid, so CA to US lanes rate at all', async () => {
+    // Rating a cross-border parcel with no customs declaration does not error,
+    // it silently returns zero rates (UPS: "111549: Invalid Shipment Contents
+    // Value"), which is how every Calgary seller was landing on the fallback.
+    const { buyer, ids } = await scenario({ items: 2 }); // 2 items x $20
+    await prisma.user.update({
+      where: { id: buyer.id },
+      data: { shippingAddress: { ...ADDRESS, city: 'Dallas', region: 'TX', postal: '75201', country: 'US' } },
+    });
+    await estimateShipment({ buyerId: buyer.id, itemIds: ids }, systemClock, prisma);
+    expect(live.lastCustoms).toBeDefined();
+    expect(live.lastCustoms!.declaredValueUsd).toBe(40); // the real paid total
+  });
+});

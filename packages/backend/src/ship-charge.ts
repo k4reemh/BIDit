@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
-import { getRates, shippoKey, type ShippoAddress, type ShippoRate } from './shippo.js';
+import { getRates, shippoKey, type RateCustoms, type ShippoAddress, type ShippoRate } from './shippo.js';
 import { usdPerCad, countryCode, type Dimensions, type ShipLocation } from './shipping.js';
 import { estimateShipping } from './ship-estimate.js';
 
@@ -47,13 +47,25 @@ export function shipMarkupMicros(): bigint {
 
 export interface LiveRateProvider {
   /** Carrier rates for a parcel, cheapest-first is not required. Throws on any
-   *  failure; callers fall back to the local model. */
-  rates(from: ShippoAddress, to: ShippoAddress, parcel: { lengthMm: number; widthMm: number; heightMm: number; weightGrams: number }): Promise<ShippoRate[]>;
+   *  failure; callers fall back to the local model. `customs` is what the
+   *  declaration will say: rating a cross-border parcel without one gets zero
+   *  rates back, not an error. */
+  rates(
+    from: ShippoAddress,
+    to: ShippoAddress,
+    parcel: { lengthMm: number; widthMm: number; heightMm: number; weightGrams: number },
+    customs?: RateCustoms,
+  ): Promise<ShippoRate[]>;
 }
 
 class ShippoLiveRates implements LiveRateProvider {
-  async rates(from: ShippoAddress, to: ShippoAddress, parcel: { lengthMm: number; widthMm: number; heightMm: number; weightGrams: number }) {
-    const { rates, messages } = await getRates(from, to, parcel);
+  async rates(
+    from: ShippoAddress,
+    to: ShippoAddress,
+    parcel: { lengthMm: number; widthMm: number; heightMm: number; weightGrams: number },
+    customs?: RateCustoms,
+  ) {
+    const { rates, messages } = await getRates(from, to, parcel, customs);
     if (rates.length === 0) {
       // Carrier-side complaints are the difference between "expensive lane" and
       // "no carrier account for this country", and only the log will ever say so.
@@ -67,11 +79,20 @@ class ShippoLiveRates implements LiveRateProvider {
 export class MockLiveRates implements LiveRateProvider {
   constructor(private next: ShippoRate[] | Error = []) {}
   calls = 0;
+  /** What the last rate call declared to customs, so tests can pin that the
+   *  real item value reaches the declaration. */
+  lastCustoms: RateCustoms | undefined;
   set(next: ShippoRate[] | Error): void {
     this.next = next;
   }
-  async rates(): Promise<ShippoRate[]> {
+  async rates(
+    _from?: ShippoAddress,
+    _to?: ShippoAddress,
+    _parcel?: { lengthMm: number; widthMm: number; heightMm: number; weightGrams: number },
+    customs?: RateCustoms,
+  ): Promise<ShippoRate[]> {
     this.calls += 1;
+    this.lastCustoms = customs;
     if (this.next instanceof Error) throw this.next;
     return this.next;
   }
@@ -154,18 +175,24 @@ export async function rateShipment(
   origin: FullAddress,
   dest: FullAddress,
   parcel: { dims: Dimensions; weightGrams: number },
+  customs?: RateCustoms,
 ): Promise<RealRate> {
   const markup = shipMarkupMicros();
   const live = getLiveRateProvider();
 
   if (live) {
     try {
-      const rates = await live.rates(toShippoAddress(origin), toShippoAddress(dest), {
-        lengthMm: Math.round(parcel.dims.lengthCm * 10),
-        widthMm: Math.round(parcel.dims.widthCm * 10),
-        heightMm: Math.round(parcel.dims.heightCm * 10),
-        weightGrams: parcel.weightGrams,
-      });
+      const rates = await live.rates(
+        toShippoAddress(origin),
+        toShippoAddress(dest),
+        {
+          lengthMm: Math.round(parcel.dims.lengthCm * 10),
+          widthMm: Math.round(parcel.dims.widthCm * 10),
+          heightMm: Math.round(parcel.dims.heightCm * 10),
+          weightGrams: parcel.weightGrams,
+        },
+        customs,
+      );
       const best = cheapestUsable(rates);
       if (best) {
         return {
