@@ -286,3 +286,25 @@ describe('cross-border customs', () => {
     expect(live.lastCustoms!.declaredValueUsd).toBe(40); // the real paid total
   });
 });
+
+describe('foreign-currency rates', () => {
+  it('converts only when an operator has set the exchange rate', async () => {
+    process.env.BIDIT_SHIP_MARKUP_CENTS = '0';
+    const { buyer, ids } = await scenario();
+    live.set([rate({ amount: 10, currency: 'GBP' })]);
+
+    // No BIDIT_FX_GBP_USD: the GBP rate is unusable, so the model prices it.
+    const withoutFx = await estimateShipment({ buyerId: buyer.id, itemIds: ids }, systemClock, prisma);
+    expect((await prisma.shipQuote.findUniqueOrThrow({ where: { id: withoutFx.quoteId! } })).source).toBe('model');
+
+    // With a rate set, 10 GBP at 1.25 charges as $12.50: converted, not guessed.
+    process.env.BIDIT_FX_GBP_USD = '1.25';
+    try {
+      const withFx = await estimateShipment({ buyerId: buyer.id, itemIds: ids }, systemClock, prisma);
+      expect(withFx.shippingFee).toBe(usdc('12.5'));
+      expect((await prisma.shipQuote.findUniqueOrThrow({ where: { id: withFx.quoteId! } })).source).toBe('shippo');
+    } finally {
+      delete process.env.BIDIT_FX_GBP_USD;
+    }
+  });
+});

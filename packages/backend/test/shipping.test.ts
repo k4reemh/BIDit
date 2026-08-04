@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  countryCode,
   quoteShipping,
   quoteShippingBreakdown,
   zoneForKm,
@@ -79,5 +80,30 @@ describe('UPS Ground estimator', () => {
     const mailer = quoteShipping(AB, ON, 500, { lengthCm: 23, widthCm: 30, heightCm: 2 });
     const box = quoteShipping(AB, ON, 500, { lengthCm: 36, widthCm: 30, heightCm: 15 });
     expect(box).toBeGreaterThan(mailer);
+  });
+});
+
+describe('countryCode', () => {
+  it('maps the names people actually type to ISO codes', () => {
+    expect(countryCode('United Kingdom')).toBe('GB');
+    expect(countryCode('UK')).toBe('GB');
+    expect(countryCode('england')).toBe('GB');
+    expect(countryCode('Germany')).toBe('DE');
+    expect(countryCode('Canada')).toBe('CA');
+    expect(countryCode('united states')).toBe('US');
+    expect(countryCode('Australia')).toBe('AU');
+  });
+
+  it('passes two-letter codes through untouched', () => {
+    expect(countryCode('gb')).toBe('GB');
+    expect(countryCode('JP')).toBe('JP');
+  });
+
+  it('refuses to truncate an unknown name into a WRONG code', () => {
+    // "Germany".slice(0, 2) is GE, which is Georgia: a parcel silently priced to
+    // the wrong country. Unknowns become XX, which no carrier accepts, so the
+    // charge lands on the formula fallback instead of on a wrong lane.
+    expect(countryCode('Deutschland')).toBe('XX');
+    expect(countryCode('Republic of Elbonia')).toBe('XX');
   });
 });

@@ -143,6 +143,11 @@ function toUsd(amount: number, currency: string): number | null {
   const c = currency.toUpperCase();
   if (c === 'USD') return amount;
   if (c === 'CAD') return amount * usdPerCad();
+  // Other currencies convert only when an operator has set a rate, e.g.
+  // BIDIT_FX_GBP_USD=1.27 for UK lanes. No rate means the carrier rate is
+  // SKIPPED, never guessed: a wrong exchange rate is a silently wrong charge.
+  const fx = Number(process.env[`BIDIT_FX_${c}_USD`] ?? '');
+  if (Number.isFinite(fx) && fx > 0 && fx < 1000) return amount * fx;
   return null;
 }
 

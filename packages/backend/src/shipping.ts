@@ -113,12 +113,38 @@ function centroid(loc: ShipLocation): LatLng | null {
   return COUNTRY_FALLBACK[country] ?? null;
 }
 
+/** Free-text country names people actually type, mapped to ISO alpha-2. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  CANADA: 'CA', CAN: 'CA',
+  'UNITED STATES': 'US', 'UNITED STATES OF AMERICA': 'US', USA: 'US', AMERICA: 'US',
+  'UNITED KINGDOM': 'GB', UK: 'GB', 'GREAT BRITAIN': 'GB', BRITAIN: 'GB',
+  ENGLAND: 'GB', SCOTLAND: 'GB', WALES: 'GB', 'NORTHERN IRELAND': 'GB',
+  MEXICO: 'MX', GERMANY: 'DE', FRANCE: 'FR', SPAIN: 'ES', ITALY: 'IT',
+  NETHERLANDS: 'NL', 'THE NETHERLANDS': 'NL', HOLLAND: 'NL', BELGIUM: 'BE',
+  AUSTRIA: 'AT', SWITZERLAND: 'CH', PORTUGAL: 'PT', IRELAND: 'IE', POLAND: 'PL',
+  SWEDEN: 'SE', NORWAY: 'NO', DENMARK: 'DK', FINLAND: 'FI', GREECE: 'GR',
+  'CZECH REPUBLIC': 'CZ', CZECHIA: 'CZ', HUNGARY: 'HU', ROMANIA: 'RO', UKRAINE: 'UA',
+  AUSTRALIA: 'AU', 'NEW ZEALAND': 'NZ', JAPAN: 'JP', 'SOUTH KOREA': 'KR', KOREA: 'KR',
+  CHINA: 'CN', 'HONG KONG': 'HK', SINGAPORE: 'SG', TAIWAN: 'TW', INDIA: 'IN',
+  PHILIPPINES: 'PH', THAILAND: 'TH', VIETNAM: 'VN', INDONESIA: 'ID', MALAYSIA: 'MY',
+  BRAZIL: 'BR', ARGENTINA: 'AR', CHILE: 'CL', COLOMBIA: 'CO', PERU: 'PE',
+  'UNITED ARAB EMIRATES': 'AE', UAE: 'AE', 'SAUDI ARABIA': 'SA', QATAR: 'QA',
+  ISRAEL: 'IL', TURKEY: 'TR', 'SOUTH AFRICA': 'ZA', EGYPT: 'EG', NIGERIA: 'NG',
+};
+
 export function countryCode(country?: string | null): string {
   const c = norm(country);
   if (!c) return 'US';
-  if (c === 'CANADA' || c === 'CA' || c === 'CAN') return 'CA';
-  if (c === 'UNITED STATES' || c === 'USA' || c === 'US' || c === 'UNITED STATES OF AMERICA') return 'US';
-  return c.slice(0, 2); // best-effort ISO-ish
+  const alias = COUNTRY_ALIASES[c];
+  if (alias) return alias;
+  // Already a code: pass it through.
+  if (/^[A-Z]{2}$/.test(c)) return c;
+  // An unrecognised full name must NOT be truncated to two letters: GERMANY
+  // would become GE, which is Georgia's ISO code, and the parcel would be
+  // silently priced to the wrong country. XX is invalid on purpose, so the
+  // carrier refuses, the rate call comes back empty, and the charge lands on
+  // the formula fallback instead of on a wrong lane.
+  return 'XX';
 }
 
 function haversineKm(a: LatLng, b: LatLng): number {

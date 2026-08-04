@@ -407,7 +407,10 @@ const PROBE_PARCEL: ShippoParcel = { lengthMm: 305, widthMm: 229, heightMm: 19, 
  * on? A Canadian origin with no Canadian carrier account returns zero rates, and
  * no amount of caching fixes that.
  */
-export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingDiagnosis> {
+export async function diagnoseShipping(
+  origin: ShippoAddress,
+  extraDest?: ShippoAddress,
+): Promise<ShippingDiagnosis> {
   const key = shippoKey();
   if (!key) {
     return { configured: false, testKey: false, carrierAccounts: [], carrierError: null, lanes: [] };
@@ -427,6 +430,7 @@ export async function diagnoseShipping(origin: ShippoAddress): Promise<ShippingD
     { lane: 'origin → CA (Ontario)', to: { city: 'Toronto', state: 'ON', zip: 'M5V 2T6', country: 'CA' } },
     { lane: 'origin → CA (Alberta)', to: { city: 'Calgary', state: 'AB', zip: 'T2P 1J9', country: 'CA' } },
   ];
+  if (extraDest) destinations.push({ lane: `origin → custom (${extraDest.country})`, to: extraDest });
 
   const lanes: LaneProbe[] = [];
   for (const d of destinations) {
