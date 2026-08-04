@@ -107,54 +107,6 @@ async function uniquePlaceholderHandle(prisma: PrismaClient): Promise<string> {
  * `handle` is optional, when omitted a placeholder is generated and the user
  * picks their real username during onboarding. New users start onboarded=false.
  */
-/** Has this account ever held money or traded? A pending signup never has, so
- *  this is the belt-and-braces check before letting a re-registration reuse it. */
-async function hasValue(userId: string, prisma: PrismaClient): Promise<boolean> {
-  const [orders, ledger] = await Promise.all([
-    prisma.order.count({ where: { OR: [{ buyerId: userId }, { sellerId: userId }] } }),
-    prisma.ledgerEntry.count({ where: { account: { userId } } }),
-  ]);
-  return orders > 0 || ledger > 0;
-}
-
-/**
- * Re-run a signup over an existing UNVERIFIED row rather than creating a second
- * account for the same address. Everything from the abandoned attempt is
- * replaced: new password, fresh placeholder handle if they never chose one, and
- * any old sessions are revoked so a link left open on another device cannot ride
- * along on the new registration.
- */
-async function resetPendingSignup(
-  existing: User,
-  input: { email: string; password: string; handle?: string },
-  prisma: PrismaClient,
-): Promise<User> {
-  let handle = existing.handle;
-  if (input.handle && input.handle.trim()) {
-    const wanted = input.handle.trim().toLowerCase();
-    if (!HANDLE_RE.test(wanted)) throw new AuthError('Handle must be 3-20 chars: letters, numbers or underscores.');
-    const taken = await prisma.user.findUnique({ where: { handle: wanted } });
-    if (taken && taken.id !== existing.id) throw new AuthError('That handle is taken.');
-    handle = wanted;
-  }
-  const user = await prisma.user.update({
-    where: { id: existing.id },
-    data: {
-      handle,
-      passwordHash: await hashPassword(input.password),
-      // Wipe the abandoned attempt's verification state so a code mailed to the
-      // previous attempt cannot be replayed against this one.
-      verifyCodeHash: null,
-      verifyCodeExpiresAt: null,
-      verifyAttempts: 0,
-      onboarded: false,
-    },
-  });
-  await revokeUserSessions(user.id, prisma);
-  await getOrCreateUserAccount(user.id, prisma);
-  return user;
-}
-
 export async function registerWithEmail(
   input: { email: string; password: string; handle?: string },
   prisma: PrismaClient = defaultPrisma,
@@ -165,18 +117,16 @@ export async function registerWithEmail(
   if (input.password.length > MAX_PASSWORD_LEN) throw new AuthError(`Password must be at most ${MAX_PASSWORD_LEN} characters.`);
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    // An UNVERIFIED row is a half-finished signup, not an account: nobody has
-    // proven they own that address, so it must not squat the email forever. It
-    // used to, which left people unable to sign up and unable to sign in
-    // (login just bounced them back to a verification screen).
-    //
-    // Safe to take over precisely because it is unverified: whoever registers
-    // now still has to read the code sent to that inbox, so this hands an
-    // attacker nothing the real owner does not already control. Verified
-    // accounts are never touched, and neither is one that somehow holds value.
-    if (existing.emailVerified) throw new AuthError('That email is already registered.');
-    if (await hasValue(existing.id, prisma)) throw new AuthError('That email is already registered.');
-    return resetPendingSignup(existing, input, prisma);
+    // ANY existing row refuses a new signup, verified or not. An earlier
+    // iteration let a fresh signup take over an unverified row so a
+    // half-finished attempt could not squat the address, but from the outside
+    // that looks exactly like registering on top of someone's account and
+    // mailing yourself their code. The lockout that takeover existed to solve
+    // is covered without it: the owner of a pending signup can still sign in
+    // with their original password (which routes to the verify screen), or run
+    // forgot-password, whose emailed code both sets a new password and marks
+    // the address verified, since reading it proves inbox ownership.
+    throw new AuthError('That email is already registered. Sign in, or reset your password if you forgot it.');
   }
 
   let handle: string;

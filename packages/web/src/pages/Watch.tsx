@@ -48,7 +48,13 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   }, [coin]);
 
   const pumpUrl = `https://pump.fun/coin/${coin}`;
-  const title = pump?.name || 'Live stream';
+  // The seller's card settings win everywhere they exist; the coin's pump.fun
+  // metadata is the fallback, not the source of truth. Clicking a card on the
+  // home grid must land on a page that matches the card.
+  const r = typeof resolved === 'object' && resolved !== null ? resolved : null;
+  const title = r?.streamTitle || pump?.name || 'Live stream';
+  const offlineArt = r?.streamImage || pump?.image || null;
+  const description = r?.description || pump?.description || null;
   const sellerHandle = resolved?.sellerHandle;
 
   return (
@@ -61,8 +67,8 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
               mint={coin}
               offline={
                 <>
-                  {pump?.image
-                    ? <img className="theater__art" src={pump.image} alt="" />
+                  {offlineArt
+                    ? <img className="theater__art" src={offlineArt} alt="" />
                     : <div className="theater__art theater__art--ph" />}
                   <div className="theater__scrim" />
                   <div className="theater__center">
@@ -116,7 +122,7 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
           <div className="watch__meta">
             <h1 className="display watch__title">{title}</h1>
             <div className="watch__coin">{coin}</div>
-            {pump?.description && <p className="muted watch__desc">{pump.description}</p>}
+            {description && <p className="muted watch__desc">{description}</p>}
           </div>
         </section>
 

@@ -74,7 +74,7 @@ export default function ShippingMenu({
   // Portal to <body>: rendered inline it lives inside the sticky .watch__side
   // stacking context, which traps the fixed scrim BELOW the livestream overlay.
   return createPortal(
-    <div className="modal__scrim" onClick={onClose}>
+    <div className="modal__scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal shipmenu" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="smodal__kicker"><Truck width={15} height={15} /> Shipping</div>

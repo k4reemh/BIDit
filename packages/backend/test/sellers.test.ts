@@ -23,6 +23,10 @@ describe('coin <-> seller resolution', () => {
       sellerHandle: 'seller_jane',
       verified: true, // linkCoinToSeller is the admin/seed path
       sellerAvatar: null,
+      // Stream-card overrides ride along so the watch page can honour them.
+      streamTitle: null,
+      streamImage: null,
+      description: null,
     });
   });
 

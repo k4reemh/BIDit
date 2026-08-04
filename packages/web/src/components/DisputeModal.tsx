@@ -41,7 +41,7 @@ export default function DisputeModal({
   };
 
   return (
-    <div className="modal__scrim" onClick={onClose}>
+    <div className="modal__scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
 

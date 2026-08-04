@@ -53,7 +53,7 @@ export default function ShopOverlay({
   };
 
   return (
-    <div className="modal__scrim shop__scrim" onClick={onClose}>
+    <div className="modal__scrim shop__scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="shop" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="shop__head">

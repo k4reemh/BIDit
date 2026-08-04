@@ -70,7 +70,7 @@ import {
   backfillRenamedCategories,
   startAuctionFromListing,
 } from '../src/sellers.js';
-import { createListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
+import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
 import {
@@ -1342,6 +1342,34 @@ async function main() {
         );
         return send(res, 200, listingDto(listing));
       }
+      // Edit a queued listing: title, photo, prices, quantity, weight, parcel.
+      if (req.method === 'POST' && p === '/seller/listing/update') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const listing = await updateListing(
+          userId,
+          String(b.listingId ?? ''),
+          {
+            title: typeof b.title === 'string' ? b.title : undefined,
+            imageUrl: typeof b.imageUrl === 'string' ? b.imageUrl : undefined,
+            startingBid: b.startingBid != null && String(b.startingBid).trim() !== '' ? usdc(String(b.startingBid)) : undefined,
+            quantity: b.quantity != null ? Number(b.quantity) : undefined,
+            weightGrams: b.weightGrams === null ? null : b.weightGrams != null ? Number(b.weightGrams) : undefined,
+            parcelPreset: typeof b.parcelPreset === 'string' ? b.parcelPreset : undefined,
+            parcel:
+              b.parcel && typeof b.parcel === 'object'
+                ? {
+                    lengthMm: Number((b.parcel as Record<string, unknown>).lengthMm),
+                    widthMm: Number((b.parcel as Record<string, unknown>).widthMm),
+                    heightMm: Number((b.parcel as Record<string, unknown>).heightMm),
+                  }
+                : undefined,
+          },
+          prisma,
+        );
+        return send(res, 200, listingDto(listing));
+      }
       // Set or clear (null) the store buy-now price on an existing listing.
       if (req.method === 'POST' && p === '/seller/listing/store-price') {
         const userId = authUser(req);
@@ -2138,7 +2166,18 @@ async function liveCoins(viewerCount: (room: string) => number) {
       prize: giveaway?.prize ?? null,
     };
   });
-  rows.sort((a, b) => Number(b.hasAuction || b.hasGiveaway) - Number(a.hasAuction || a.hasGiveaway));
+  // Grid order, most watchable first:
+  //   1. actually LIVE (streaming on pump.fun, or a running auction/giveaway),
+  //   2. verified sellers ahead of unverified at the same liveness,
+  //   3. busier rooms ahead of quieter ones,
+  //   4. offline last, verified still first among them.
+  const liveness = (r: (typeof rows)[number]) => Number(r.streamLive || r.hasAuction || r.hasGiveaway);
+  rows.sort(
+    (a, b) =>
+      liveness(b) - liveness(a) ||
+      Number(b.verified) - Number(a.verified) ||
+      b.viewers - a.viewers,
+  );
   return rows;
 }
 
@@ -2172,6 +2211,11 @@ function listingDto(l: {
   status: string;
   quantity: number;
   photos: string[];
+  weightGrams?: number | null;
+  parcelPreset?: string | null;
+  parcelLengthMm?: number | null;
+  parcelWidthMm?: number | null;
+  parcelHeightMm?: number | null;
   wheel?: unknown;
 }) {
   const wheel = normalizeWheelEntries(l.wheel);
@@ -2183,6 +2227,12 @@ function listingDto(l: {
     status: l.status,
     quantity: l.quantity,
     imageUrl: l.photos[0] ?? null,
+    weightGrams: l.weightGrams ?? null,
+    parcelPreset: l.parcelPreset ?? null,
+    parcel:
+      l.parcelLengthMm && l.parcelWidthMm && l.parcelHeightMm
+        ? { lengthMm: l.parcelLengthMm, widthMm: l.parcelWidthMm, heightMm: l.parcelHeightMm }
+        : null,
     wheel: wheel.length ? wheel : null,
   };
 }

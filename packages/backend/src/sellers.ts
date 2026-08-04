@@ -33,6 +33,13 @@ export interface ResolvedRoom {
   verified: boolean;
   /** Seller's profile photo, if set. */
   sellerAvatar?: string | null;
+  /** The seller's stream-card overrides. The home grid already prefers these;
+   *  the watch page has to as well, or clicking a card lands on a page that
+   *  contradicts it (coin name and coin art instead of what the seller set). */
+  streamTitle?: string | null;
+  streamImage?: string | null;
+  /** The seller's own words (their pitch), shown under the coin address. */
+  description?: string | null;
 }
 
 /** Map a Pump.fun coin address -> the seller's room, if a seller has linked it.
@@ -56,6 +63,9 @@ export async function resolveRoomByCoin(
     sellerHandle: profile.user.handle,
     verified: profile.verified,
     sellerAvatar: mediaUrl('avatar', profile.user.id, profile.user.avatarUrl),
+    streamTitle: profile.streamTitle ?? null,
+    streamImage: mediaUrl('cover', profile.user.id, profile.streamImage),
+    description: profile.pitch ?? null,
   };
 }
 

@@ -7,7 +7,7 @@ import AddWheelModal from '../../components/seller/AddWheelModal';
 import EmptyState from '../../components/EmptyState';
 import { Tag, Dice, Plus, Bag } from '../../icons';
 
-function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void }) {
+function ListingCard({ l, onStarted, onEdit }: { l: SellerListing; onStarted: () => void; onEdit: (l: SellerListing) => void }) {
   const [dur, setDur] = useState('30');
   const [busy, setBusy] = useState(false);
   const [priceOpen, setPriceOpen] = useState(false);
@@ -53,6 +53,11 @@ function ListingCard({ l, onStarted }: { l: SellerListing; onStarted: () => void
           {!isWheel && l.buyNowPrice && <span className="pill lc__store"><Bag width={12} height={12} /> ${l.buyNowPrice}</span>}
           <span className="lc__start">Start ${l.startingBid}</span>
         </div>
+        {l.status !== 'LIVE' && l.status !== 'SOLD' && (
+          <button className="lc__storelink" onClick={() => onEdit(l)}>
+            <Tag width={13} height={13} /> Edit listing
+          </button>
+        )}
         {/* Store (buy now) price: items only, until sold out */}
         {!isWheel && l.status !== 'SOLD' && (
           priceOpen ? (
@@ -90,10 +95,11 @@ export default function Listings() {
   const { session } = useSeller();
   const [listings, setListings] = useState<SellerListing[] | null>(null);
   const [modal, setModal] = useState<'item' | 'wheel' | null>(null);
+  const [editing, setEditing] = useState<SellerListing | null>(null);
 
   const load = () => getListings().then(setListings).catch(() => setListings([]));
   useEffect(() => { load(); }, []);
-  const onCreated = () => { setModal(null); load(); };
+  const onCreated = () => { setModal(null); setEditing(null); load(); };
 
   // Live-refresh statuses: when an auction ends the listing flips off LIVE
   // (to QUEUED/SOLD) server-side: reload so the seller can immediately start the
@@ -126,11 +132,12 @@ export default function Listings() {
         <EmptyState icon={Tag} title="No listings yet" sub="Add a single item, or build a randomizer wheel with multiple prizes. Both auction live to bidders." />
       ) : (
         <div className="listing-grid">
-          {listings.map((l) => <ListingCard key={l.id} l={l} onStarted={load} />)}
+          {listings.map((l) => <ListingCard key={l.id} l={l} onStarted={load} onEdit={setEditing} />)}
         </div>
       )}
 
       {modal === 'item' && <AddItemModal onClose={() => setModal(null)} onCreated={onCreated} />}
+      {editing && <AddItemModal existing={editing} onClose={() => setEditing(null)} onCreated={onCreated} />}
       {modal === 'wheel' && <AddWheelModal onClose={() => setModal(null)} onCreated={onCreated} />}
     </>
   );

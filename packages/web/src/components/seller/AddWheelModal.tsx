@@ -53,7 +53,7 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
   };
 
   return (
-    <div className="modal__scrim" onClick={onClose}>
+    <div className="modal__scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="smodal__kicker smodal__kicker--wheel"><Dice width={15} height={15} /> Randomizer</div>

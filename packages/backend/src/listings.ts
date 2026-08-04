@@ -100,6 +100,75 @@ export async function createListing(
   });
 }
 
+export interface UpdateListingInput {
+  title?: string;
+  /** Replaces the photo; empty string clears it. */
+  imageUrl?: string;
+  startingBid?: Micros;
+  quantity?: number;
+  /** null clears the weight back to "not stated". */
+  weightGrams?: number | null;
+  parcelPreset?: string;
+  parcel?: Partial<ParcelDims>;
+}
+
+/**
+ * Edit a listing that has not sold yet. Ownership-gated, and refused while an
+ * auction is LIVE: the price and quantity on the block are what bidders are
+ * bidding on, and changing them mid-flight would reprice an auction under the
+ * people already in it. Won items are untouched either way, since fulfillment
+ * snapshots everything it needs at win time.
+ */
+export async function updateListing(
+  sellerId: string,
+  listingId: string,
+  patch: UpdateListingInput,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<Listing> {
+  await requireSeller(sellerId, prisma);
+  const listing = await prisma.listing.findUnique({ where: { id: listingId } });
+  if (!listing || listing.sellerId !== sellerId) throw new ListingError('That listing isn’t yours.');
+  if (listing.status === ListingStatus.LIVE) throw new ListingError('This listing is in a live auction. Edit it after the auction ends.');
+  if (listing.status === ListingStatus.SOLD) throw new ListingError('This listing has sold out and can’t be edited.');
+
+  const data: Record<string, unknown> = {};
+  if (patch.title !== undefined) {
+    const title = clampText(patch.title, MAX_TITLE_LEN);
+    if (!title) throw new ListingError('Title can’t be empty.');
+    data.title = title;
+  }
+  if (patch.imageUrl !== undefined) {
+    data.photos = patch.imageUrl && patch.imageUrl.length <= MAX_PHOTO_LEN ? [patch.imageUrl] : [];
+  }
+  if (patch.startingBid !== undefined) {
+    if (patch.startingBid < 0n) throw new ListingError('Starting bid can’t be negative.');
+    data.startingBid = patch.startingBid;
+  }
+  if (patch.quantity !== undefined) {
+    // Wheel quantity is the prize pool, managed by the wheel builder; editing it
+    // here would mint or destroy sellable spins without touching the prizes.
+    if (listing.wheel) throw new ListingError('A randomizer’s quantity comes from its prizes.');
+    data.quantity = Math.max(1, Math.min(MAX_QUANTITY, Math.floor(patch.quantity)));
+  }
+  if (patch.weightGrams !== undefined) {
+    data.weightGrams = patch.weightGrams === null ? null : Math.max(1, Math.round(patch.weightGrams));
+  }
+  if (patch.parcelPreset !== undefined) {
+    let parcel: { presetId: string; dims: ParcelDims };
+    try {
+      parcel = resolveParcel(patch.parcelPreset, patch.parcel);
+    } catch (err) {
+      throw err instanceof ParcelError ? new ListingError(err.message) : err;
+    }
+    data.parcelPreset = parcel.presetId;
+    data.parcelLengthMm = parcel.dims.lengthMm;
+    data.parcelWidthMm = parcel.dims.widthMm;
+    data.parcelHeightMm = parcel.dims.heightMm;
+  }
+  if (Object.keys(data).length === 0) return listing;
+  return prisma.listing.update({ where: { id: listingId }, data });
+}
+
 /** A seller's listings, queue first. */
 export function listSellerListings(
   sellerId: string,

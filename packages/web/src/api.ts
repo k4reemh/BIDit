@@ -184,6 +184,9 @@ export interface SellerListing {
   status: string;
   quantity: number;
   imageUrl: string | null;
+  weightGrams: number | null;
+  parcelPreset: string | null;
+  parcel: { lengthMm: number; widthMm: number; heightMm: number } | null;
   wheel: WheelEntryInput[] | null;
 }
 export interface SellerOrder {
@@ -379,6 +382,19 @@ export const createListing = (body: {
   parcel?: { lengthMm?: number; widthMm?: number; heightMm?: number };
 }) => req<SellerListing>('/seller/listings', { method: 'POST', body: JSON.stringify(body) });
 
+export const updateListing = (
+  listingId: string,
+  patch: {
+    title?: string;
+    imageUrl?: string;
+    startingBid?: string;
+    quantity?: number;
+    weightGrams?: number | null;
+    parcelPreset?: string;
+    parcel?: { lengthMm?: number; widthMm?: number; heightMm?: number };
+  },
+) => req<SellerListing>('/seller/listing/update', { method: 'POST', body: JSON.stringify({ listingId, ...patch }) });
+
 export const setStorePrice = (listingId: string, buyNowPrice: string | null) =>
   req<SellerListing>('/seller/listing/store-price', {
     method: 'POST',
@@ -535,6 +551,11 @@ export interface ResolvedRoom {
   sellerHandle: string;
   verified: boolean;
   sellerAvatar?: string | null;
+  /** Seller's stream-card overrides: what the home grid shows, so the watch
+   *  page must show it too. */
+  streamTitle?: string | null;
+  streamImage?: string | null;
+  description?: string | null;
 }
 export const getLive = () => req<LiveCoin[]>('/live');
 export const getPumpCoin = (mint: string) => req<PumpCoin>(`/pump/coin?mint=${encodeURIComponent(mint)}`);

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { prisma } from '../src/db.js';
 import { registerWithEmail, loginWithEmail, banUser, unbanUser } from '../src/authz.js';
+import { requestPasswordReset, resetPassword } from '../src/password-reset.js';
 import { getOrCreateUserAccount, deposit } from '../src/ledger.js';
 import { usdc } from '@bidit/shared';
 import { resetDb } from './setup.js';
@@ -10,54 +12,56 @@ beforeEach(async () => {
 });
 
 /**
- * An unverified row is a half-finished signup, not an account. It used to squat
- * the email address forever: registering again was refused ("already
- * registered") and signing in only bounced you back to the verification screen,
- * so the address became permanently unusable.
+ * One email, one row, no takeovers. An earlier iteration let a fresh signup
+ * take over an unverified row; from the outside that looked exactly like
+ * registering on top of someone's account and mailing yourself their code.
+ * Refusal does not bring back the old lockout, because the owner of a pending
+ * signup still has two ways in: their original password, or a password reset
+ * whose emailed code doubles as verification.
  */
-describe('re-registering over an unverified signup', () => {
-  it('lets the same email sign up again and replaces the pending attempt', async () => {
-    const email = 'pending@example.com';
+describe('signing up with an email that already has an account', () => {
+  it('refuses whether the existing row is verified or not', async () => {
+    const email = 'claimed@example.com';
     const first = await registerWithEmail({ email, password: 'firstpass1' });
     expect(first.emailVerified).toBe(false);
 
-    const second = await registerWithEmail({ email, password: 'secondpass1' });
-    expect(second.id).toBe(first.id); // reused the row, no duplicate account
-    expect(await prisma.user.count({ where: { email } })).toBe(1);
-
-    // The new password works and the abandoned one does not.
-    expect(await loginWithEmail({ email, password: 'secondpass1' })).toBeTruthy();
-    expect(await loginWithEmail({ email, password: 'firstpass1' })).toBeNull();
-  });
-
-  it('clears the old verification code so it cannot be replayed', async () => {
-    const email = 'replay@example.com';
-    const u = await registerWithEmail({ email, password: 'firstpass1' });
-    await prisma.user.update({
-      where: { id: u.id },
-      data: { verifyCodeHash: 'stale', verifyCodeExpiresAt: new Date(Date.now() + 9e5), verifyAttempts: 3 },
-    });
-    await registerWithEmail({ email, password: 'secondpass1' });
-    const row = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
-    expect(row.verifyCodeHash).toBeNull();
-    expect(row.verifyAttempts).toBe(0);
-  });
-
-  it('still refuses a VERIFIED email', async () => {
-    const email = 'verified@example.com';
-    const u = await registerWithEmail({ email, password: 'firstpass1' });
-    await prisma.user.update({ where: { id: u.id }, data: { emailVerified: true } });
+    // Unverified: refused. No password change, no fresh code, no new session.
     await expect(registerWithEmail({ email, password: 'takeover1' })).rejects.toThrow(/already registered/);
-    // The real owner's password is untouched.
     expect(await loginWithEmail({ email, password: 'firstpass1' })).toBeTruthy();
+    expect(await loginWithEmail({ email, password: 'takeover1' })).toBeNull();
+
+    // Verified: refused the same way.
+    await prisma.user.update({ where: { id: first.id }, data: { emailVerified: true } });
+    await expect(registerWithEmail({ email, password: 'takeover1' })).rejects.toThrow(/already registered/);
+    expect(await prisma.user.count({ where: { email } })).toBe(1);
   });
 
-  it('refuses to reuse a row that somehow holds value', async () => {
-    const email = 'hasvalue@example.com';
-    const u = await registerWithEmail({ email, password: 'firstpass1' });
-    const accountId = await getOrCreateUserAccount(u.id, prisma);
-    await deposit({ accountId, amount: usdc('10'), refId: 'seed-hasvalue' }, prisma);
-    await expect(registerWithEmail({ email, password: 'takeover1' })).rejects.toThrow(/already registered/);
+  it('leaves the pending-signup owner a way back in: password reset verifies too', async () => {
+    // The refusal must not resurrect the old lockout, where an abandoned signup
+    // made its address permanently unusable. The escape hatch is the reset
+    // flow: the code lands in the real inbox, and reading it proves ownership,
+    // so it both sets a new password and marks the email verified.
+    const email = 'comeback@example.com';
+    const u = await registerWithEmail({ email, password: 'forgotten1' });
+    expect(u.emailVerified).toBe(false);
+
+    await requestPasswordReset(email, prisma);
+    const row = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(row.resetCodeHash).toBeTruthy();
+    // The code is only ever stored as an HMAC, so recover it the way the
+    // password-reset tests do: search the six-digit space.
+    const secret = process.env.AUTH_SECRET ?? 'dev-secret';
+    let code = '';
+    for (let i = 0; i < 1_000_000; i++) {
+      const c = String(i).padStart(6, '0');
+      if (createHmac('sha256', secret).update(`reset:${c}`).digest('hex') === row.resetCodeHash) { code = c; break; }
+    }
+    expect(code).not.toBe('');
+    await resetPassword({ email, code, password: 'recovered1' }, prisma);
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: u.id } });
+    expect(after.emailVerified).toBe(true); // reset doubled as verification
+    expect(await loginWithEmail({ email, password: 'recovered1' })).toBeTruthy();
   });
 });
 
