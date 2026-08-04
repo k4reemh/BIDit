@@ -6,7 +6,7 @@ import { settleAuctionDirect } from '../src/orders.js';
 import { createAndPayShipment, confirmShipmentForLabel, createShipmentLabel, markShipmentShipped } from '../src/fulfillment.js';
 import { listNotifications } from '../src/notifications.js';
 import { usdc } from '@bidit/shared';
-import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
+import { resetDb, makeFundedUser, makeRunningAuction, payForShipment } from './setup.js';
 
 const T0 = new Date('2026-04-01T00:00:00.000Z').getTime();
 const ADDRESS = { name: 'K', line1: '1 Main St', city: 'Calgary', region: 'AB', postal: 'T2P', country: 'CA' };
@@ -33,7 +33,7 @@ describe('notifications', () => {
     expect(sellerN.items.some((n) => n.kind === 'sold')).toBe(true);
 
     const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { buyerId: buyer.userId } });
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock);
     await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId: auction.sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
     await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://labels.test/x.pdf', trackingNumber: '1Z' }, clock, prisma);
     await markShipmentShipped(shipment.id, clock, prisma);

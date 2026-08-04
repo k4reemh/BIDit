@@ -17,7 +17,7 @@ import {
 import { getSettledBalance, getSystemTotal } from '../src/ledger.js';
 import { privacyPremium } from '../src/shipping.js';
 import { usdc, AuctionStatus, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
-import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
+import { resetDb, makeFundedUser, makeRunningAuction, payForShipment } from './setup.js';
 
 const T0 = new Date('2026-02-01T00:00:00.000Z').getTime();
 const ADDRESS = { name: 'Kareem', line1: '1 Main St', city: 'Calgary', region: 'AB', postal: 'T2P', country: 'CA' };
@@ -69,7 +69,7 @@ describe('fulfillment', () => {
     const buyerBefore = await getSettledBalance(buyer.accountId, prisma);
     const feeBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma);
 
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock);
     expect(shipment.status).toBe('PAID');
     expect(shipment.shippingFee).toBeGreaterThan(0n);
 
@@ -89,7 +89,7 @@ describe('fulfillment', () => {
     const clock = new ManualClock(T0);
     const { item, buyer, sellerId } = await wonAndSettled(clock);
     await setAddress(buyer.userId);
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock);
 
     // Platform-label flow: seller confirms size → BIDit makes the label → seller ships.
     await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
@@ -108,7 +108,7 @@ describe('fulfillment', () => {
     const clock = new ManualClock(T0);
     const { item, buyer, sellerId } = await wonAndSettled(clock);
     await setAddress(buyer.userId);
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock);
     expect(shipment.status).toBe('PAID');
 
     // Can't ship before BIDit has generated a label.
@@ -171,7 +171,7 @@ describe('fulfillment', () => {
   it('requires a shipping address before shipping', async () => {
     const clock = new ManualClock(T0);
     const { item, buyer } = await wonAndSettled(clock);
-    await expect(createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma)).rejects.toBeInstanceOf(
+    await expect(payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock)).rejects.toBeInstanceOf(
       ShippingError,
     );
   });
@@ -189,7 +189,7 @@ describe('fulfillment', () => {
     const item2 = await prisma.fulfillmentItem.findFirstOrThrow({ where: { buyerId: a.buyer.userId, sellerId: auction2.sellerId } });
     await setAddress(a.buyer.userId);
     await expect(
-      createAndPayShipment({ buyerId: a.buyer.userId, itemIds: [a.item.id, item2.id] }, clock, prisma),
+      payForShipment({ buyerId: a.buyer.userId, itemIds: [a.item.id, item2.id] }, clock),
     ).rejects.toBeInstanceOf(ShippingError);
   });
 
@@ -200,7 +200,7 @@ describe('fulfillment', () => {
     const feeBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma);
     const platformBefore = await getSettledBalance(SYSTEM_ACCOUNT_IDS.PLATFORM, prisma);
 
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id], mode: 'PRIVATE' }, clock, prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id], mode: 'PRIVATE' }, clock);
     expect(shipment.privacyFee).toBe(privacyPremium());
     // Base shipping + privacy premium both land in the FEE pool; buyback pool untouched.
     expect(await getSettledBalance(SYSTEM_ACCOUNT_IDS.FEE, prisma)).toBe(feeBefore + shipment.shippingFee + shipment.privacyFee);

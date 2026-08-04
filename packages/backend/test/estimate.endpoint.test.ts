@@ -3,9 +3,12 @@ import { prisma } from '../src/db.js';
 import { estimateShipment, estimateListingShipping } from '../src/fulfillment.js';
 import { quoteShipping } from '../src/shipping.js';
 import { combineParcels, defaultParcel } from '@bidit/shared';
+import { systemClock } from '../src/clock.js';
+import { shipMarkupMicros } from '../src/ship-charge.js';
 
-// Proves the estimate reuses seller ship-from + buyer address + item weight and
-// reports both the UPS retail number and the 80% charged fee.
+// Proves the estimate reuses the seller's ship-from, the buyer's address and the
+// item weight, and that a priceable lane hands back a quote id (the only thing
+// the charge path will accept).
 describe('estimateShipment (money-path integration)', () => {
   beforeEach(async () => {
     await prisma.fulfillmentItem.deleteMany({});
@@ -23,13 +26,12 @@ describe('estimateShipment (money-path integration)', () => {
       data: { orderId: 'o_' + Date.now(), buyerId: buyer.id, sellerId: seller.id, listingId: 'l1', title: 'Tony Chopper', weightGrams: 57, amount: 93_000_000n, status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
     });
 
-    const est = await estimateShipment({ buyerId: buyer.id, itemIds: [item.id] }, prisma);
+    const est = await estimateShipment({ buyerId: buyer.id, itemIds: [item.id] }, systemClock, prisma);
     expect(est.hasAddress).toBe(true);
-    // Calgary→Toronto is a far domestic zone; 80% of retail, both positive.
-    expect(est.carrierRetail).toBeGreaterThan(0n);
-    expect(est.shippingFee).toBe((est.carrierRetail * 80n) / 100n);
+    expect(est.shippingFee).toBeGreaterThan(0n);
     expect(est.total).toBe(est.shippingFee);
-    console.log('  → UPS retail $' + (Number(est.carrierRetail)/1e6).toFixed(2) + ' → buyer pays $' + (Number(est.shippingFee)/1e6).toFixed(2));
+    // A real address gets a quote id, which is the only thing that can be paid.
+    expect(est.quoteId).toBeTruthy();
   });
 
   it('flags a missing buyer address instead of throwing', async () => {
@@ -39,9 +41,11 @@ describe('estimateShipment (money-path integration)', () => {
     const item = await prisma.fulfillmentItem.create({
       data: { orderId: 'o2_' + Date.now(), buyerId: buyer.id, sellerId: seller.id, listingId: 'l2', title: 'X', weightGrams: 57, amount: 1_000_000n, status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
     });
-    const est = await estimateShipment({ buyerId: buyer.id, itemIds: [item.id] }, prisma);
+    const est = await estimateShipment({ buyerId: buyer.id, itemIds: [item.id] }, systemClock, prisma);
     expect(est.hasAddress).toBe(false);
     expect(est.shippingFee).toBeGreaterThan(0n); // still returns a ballpark
+    // ...but no quote: there is no lane priced yet, so nothing to charge against.
+    expect(est.quoteId).toBeNull();
   });
 
   it('prices several items as one combined package, not a per-item surcharge', async () => {
@@ -55,18 +59,20 @@ describe('estimateShipment (money-path integration)', () => {
     });
     const a = await mk(1); const b = await mk(2); const c = await mk(3);
 
-    const three = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id, b.id, c.id] }, prisma);
+    const three = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id, b.id, c.id] }, systemClock, prisma);
     // Three 57g items in the default mailer: 171g in whatever single package
     // actually holds all three, which is what the carrier bills for.
     const box = combineParcels([defaultParcel(), defaultParcel(), defaultParcel()]);
+    // No Shippo key in tests, so this is the model fallback, plus the flat
+    // handling markup that every charged price carries.
     const expected = quoteShipping(origin, dest, 171, {
       lengthCm: box.dims.lengthMm / 10,
       widthCm: box.dims.widthMm / 10,
       heightCm: box.dims.heightMm / 10,
-    });
+    }) + shipMarkupMicros();
     expect(three.shippingFee).toBe(expected);
     // Three items need a bigger box than one, so they cost more to post.
-    const one = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id] }, prisma);
+    const one = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id] }, systemClock, prisma);
     expect(three.shippingFee).toBeGreaterThan(one.shippingFee);
   });
 

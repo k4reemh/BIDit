@@ -602,12 +602,17 @@ export interface Fulfillment {
   shipments: Shipment[];
 }
 
+/** A real carrier quote for a shipment the buyer is about to pay for. `quoteId`
+ *  is what makes it payable: the charge consumes it, so the amount taken is
+ *  always the amount shown. Null when there is no address to price against. */
 export interface ShipEstimate {
+  quoteId: string | null;
   shippingFee: string;
-  carrierRetail: string;
-  discountPct: number;
   privacyFee: string;
   total: string;
+  carrier: string;
+  service: string;
+  estDays: number | null;
   hasAddress: boolean;
 }
 
@@ -640,8 +645,12 @@ export const estimateShipment = (itemIds: string[], opts?: { private?: boolean }
   req<ShipEstimate>('/shipments/estimate', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
 export const estimateListingShipping = (listingId: string) =>
   req<ListingShipEstimate>('/shipping/quote-listing', { method: 'POST', body: JSON.stringify({ listingId }) });
-export const createShipment = (itemIds: string[], opts?: { mode?: string; private?: boolean }) =>
-  req<Shipment>('/shipments', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
+/** `quoteId` comes from estimateShipment and is what gets charged. Without it the
+ *  server refuses rather than pricing the shipment a second time. */
+export const createShipment = (
+  itemIds: string[],
+  opts?: { mode?: string; private?: boolean; quoteId?: string | null },
+) => req<Shipment>('/shipments', { method: 'POST', body: JSON.stringify({ itemIds, ...opts }) });
 export const discardFulfillmentItem = (itemId: string) =>
   req<Fulfillment>('/shipment/discard', { method: 'POST', body: JSON.stringify({ itemId }) });
 export const confirmReceived = (shipmentId: string) =>

@@ -15,6 +15,14 @@ import { getOrCreateUserAccount, settleShipping } from './ledger.js';
 import { quoteShipping, quoteShippingBreakdown, privacyPremium, type Dimensions, type ShipLocation } from './shipping.js';
 import { combineParcels, defaultParcel, type ParcelDims } from '@bidit/shared';
 import { estimateShipping } from './ship-estimate.js';
+import {
+  rateShipment,
+  issueQuote,
+  consumeQuote,
+  shipMarkupMicros,
+  QuoteStaleError,
+  type FullAddress,
+} from './ship-charge.js';
 import { encryptPii, decryptPii } from './pii.js';
 import { notify } from './notifications.js';
 import { maybeVerifySeller } from './seller-verify.js';
@@ -394,7 +402,7 @@ export function listPrivateShipments(prisma: PrismaClient = defaultPrisma) {
 // ---------------------------------------------------------------------------
 
 export async function createAndPayShipment(
-  params: { buyerId: string; itemIds: string[]; mode?: ShipMode; private?: boolean },
+  params: { buyerId: string; itemIds: string[]; mode?: ShipMode; private?: boolean; quoteId?: string },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ) {
@@ -441,10 +449,18 @@ export async function createAndPayShipment(
   };
 
   const isPrivate = params.mode === 'PRIVATE' || params.private === true;
-  // One package for the whole shipment, sized to hold every item (matches the
-  // estimate the buyer was shown).
-  const parcel = parcelForItems(items);
-  const shippingFee = quoteShipping(origin, dest, parcel.weightGrams, parcel.dims);
+
+  // The price comes from the quote the buyer was shown, never from a fresh
+  // calculation here. Re-pricing at charge time is how "it said $12" becomes a
+  // $16 ledger entry. consumeQuote also claims the row, so a double-clicked Pay
+  // button charges once.
+  if (!params.quoteId) throw new QuoteStaleError('Check the shipping price, then try again.');
+  const quote = await consumeQuote(
+    { quoteId: params.quoteId, buyerId: params.buyerId, itemIds: ids, isPrivate },
+    clock,
+    prisma,
+  );
+  const shippingFee = quote.amountMicros;
   const privacyFee = isPrivate ? privacyPremium() : 0n;
 
   const shipment = await prisma.shipment.create({
@@ -455,20 +471,38 @@ export async function createAndPayShipment(
       status: 'PENDING_PAYMENT',
       shippingFee,
       privacyFee,
+      // NOT Shipment.carrier: that field means "the carrier currently holding
+      // this parcel" and drives tracking lookups. Writing the quoted carrier
+      // there would put 'estimated' in front of the tracker on any model-quoted
+      // shipment, which 404s at Shippo and leaves the package undeliverable
+      // forever. The quoted service is linked through ShipQuote.shipmentId
+      // instead, for the operator buying the label.
       shipTo: encryptPii(isPrivate ? hubAddress() : dest) as Prisma.InputJsonValue,
       privateLeg2: isPrivate ? (encryptPii(dest) as Prisma.InputJsonValue) : undefined,
     },
   });
+  await prisma.shipQuote.update({ where: { id: quote.id }, data: { shipmentId: shipment.id } });
 
   const buyerAccountId = await getOrCreateUserAccount(params.buyerId, prisma);
 
   // Charge the buyer: the whole fee (base shipping + any privacy premium) goes to
   // the FEE pool: the platform buys the label. Throws InsufficientFundsError
   // (mapped to a friendly 400 by the caller) if short.
-  await settleShipping(
-    { buyerAccountId, amount: shippingFee + privacyFee, shipmentId: shipment.id },
-    prisma,
-  );
+  try {
+    await settleShipping(
+      { buyerAccountId, amount: shippingFee + privacyFee, shipmentId: shipment.id },
+      prisma,
+    );
+  } catch (err) {
+    // Nothing moved, so put the quote back and drop the unpaid shipment.
+    // Otherwise a buyer who is briefly short of funds tops up, hits Ship again,
+    // and is told the PRICE expired, which is both wrong and unfixable from
+    // their side. The claim above still stops a double click: the concurrent
+    // second call fails on the claim, not here.
+    await prisma.shipQuote.update({ where: { id: quote.id }, data: { consumedAt: null, shipmentId: null } });
+    await prisma.shipment.deleteMany({ where: { id: shipment.id, status: 'PENDING_PAYMENT' } });
+    throw err;
+  }
 
   const now = clock.now();
   await prisma.shipment.update({ where: { id: shipment.id }, data: { status: 'PAID', paidAt: now } });
@@ -481,29 +515,26 @@ export async function createAndPayShipment(
   return prisma.shipment.findUniqueOrThrow({ where: { id: shipment.id } });
 }
 
-/**
- * Read-only shipping estimate for a set of ready-to-ship items, same origin,
- * destination and weight the real charge would use, so the buyer sees the fee
- * before committing. Charges nothing and creates nothing.
- */
-export async function estimateShipment(
-  params: { buyerId: string; itemIds: string[]; private?: boolean },
-  prisma: PrismaClient = defaultPrisma,
+/** Everything a real carrier quote needs about the two ends and the parcel. */
+async function shipmentContext(
+  buyerId: string,
+  itemIds: string[],
+  prisma: PrismaClient,
 ): Promise<{
-  shippingFee: bigint;
-  carrierRetail: bigint;
-  discountPct: number;
-  privacyFee: bigint;
-  total: bigint;
+  items: Awaited<ReturnType<PrismaClient['fulfillmentItem']['findMany']>>;
+  sellerId: string;
+  origin: FullAddress;
+  dest: (FullAddress & Record<string, unknown>) | null;
   hasAddress: boolean;
+  parcel: { dims: Dimensions; weightGrams: number };
 }> {
-  const ids = [...new Set(params.itemIds)].filter(Boolean);
-  if (ids.length === 0) throw new ShippingError('Select at least one item to estimate.');
+  const ids = [...new Set(itemIds)].filter(Boolean);
+  if (ids.length === 0) throw new ShippingError('Select at least one item to ship.');
 
   const items = await prisma.fulfillmentItem.findMany({ where: { id: { in: ids } } });
   if (items.length === 0) throw new ShippingError('Those items were not found.');
   for (const it of items) {
-    if (it.buyerId !== params.buyerId) throw new ShippingError('Those items aren’t yours.');
+    if (it.buyerId !== buyerId) throw new ShippingError('Those items aren’t yours.');
   }
   const sellerId = items[0]!.sellerId;
   if (items.some((it) => it.sellerId !== sellerId)) {
@@ -511,28 +542,87 @@ export async function estimateShipment(
   }
 
   const [buyer, seller] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: params.buyerId } }),
+    prisma.user.findUniqueOrThrow({ where: { id: buyerId } }),
     prisma.sellerProfile.findUnique({ where: { userId: sellerId } }),
   ]);
-  const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
+  const dest = decryptPii<FullAddress & Record<string, unknown>>(buyer.shippingAddress);
   const hasAddress = !!(dest && dest.line1 && dest.country);
-  const origin: ShipLocation = {
+  const origin: FullAddress = {
+    name: seller?.originName,
+    line1: seller?.originLine1,
+    line2: seller?.originLine2,
     country: seller?.originCountry,
     region: seller?.originRegion,
     city: seller?.originCity,
     postal: seller?.originPostal,
   };
+  return { items, sellerId, origin, dest: dest ?? null, hasAddress, parcel: parcelForItems(items) };
+}
 
-  const parcel = parcelForItems(items);
-  const b = quoteShippingBreakdown(origin, dest ?? {}, parcel.weightGrams, parcel.dims);
-  const privacyFee = params.private === true ? privacyPremium() : 0n;
+/**
+ * Price a shipment for real and hand back a quote the buyer can pay.
+ *
+ * Asks the carrier with both real addresses, the seller's declared package and
+ * its weight, and takes the cheapest rate. The returned `quoteId` is what
+ * createAndPayShipment consumes, so the buyer is charged exactly the number they
+ * were shown rather than a second, independently computed one.
+ *
+ * Creates a ShipQuote row. Charges nothing.
+ */
+export async function estimateShipment(
+  params: { buyerId: string; itemIds: string[]; private?: boolean },
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{
+  quoteId: string | null;
+  shippingFee: bigint;
+  privacyFee: bigint;
+  total: bigint;
+  carrier: string;
+  service: string;
+  estDays: number | null;
+  hasAddress: boolean;
+}> {
+  const ctx = await shipmentContext(params.buyerId, params.itemIds, prisma);
+  const isPrivate = params.private === true;
+  const privacyFee = isPrivate ? privacyPremium() : 0n;
+
+  // No address means no lane to price and nothing to pay for yet. Quote the
+  // model so the page still shows a number, but issue no quote: there is nothing
+  // here anyone should be able to get charged for.
+  if (!ctx.dest || !ctx.hasAddress) {
+    const fee = quoteShipping(ctx.origin, {}, ctx.parcel.weightGrams, ctx.parcel.dims) + shipMarkupMicros();
+    return {
+      quoteId: null,
+      shippingFee: fee,
+      privacyFee,
+      total: fee + privacyFee,
+      carrier: 'estimated',
+      service: 'Standard',
+      estDays: null,
+      hasAddress: false,
+    };
+  }
+
+  // Private Secure Shipping is quoted to the buyer's own address, the same as a
+  // normal delivery, and the privacy premium covers the detour through the hub.
+  // The label the operator actually buys is the seller-to-hub leg, priced
+  // separately.
+  const rate = await rateShipment(ctx.origin, ctx.dest, ctx.parcel);
+  const quote = await issueQuote(
+    { buyerId: params.buyerId, itemIds: params.itemIds, rate, isPrivate },
+    clock,
+    prisma,
+  );
   return {
-    shippingFee: b.final,
-    carrierRetail: b.carrierRetail,
-    discountPct: b.discountPct,
+    quoteId: quote.id,
+    shippingFee: rate.amountMicros,
     privacyFee,
-    total: b.final + privacyFee,
-    hasAddress,
+    total: rate.amountMicros + privacyFee,
+    carrier: rate.carrier,
+    service: rate.service,
+    estDays: rate.estDays,
+    hasAddress: true,
   };
 }
 

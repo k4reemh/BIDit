@@ -2,7 +2,8 @@ import { prisma } from '../src/db.js';
 import { ensureSystemAccounts } from '../src/bootstrap.js';
 import { deposit, getOrCreateUserAccount } from '../src/ledger.js';
 import { createAuction, startAuction } from '../src/auction.js';
-import type { ManualClock } from '../src/clock.js';
+import { systemClock, type Clock, type ManualClock } from '../src/clock.js';
+import { estimateShipment, createAndPayShipment, type ShipMode } from '../src/fulfillment.js';
 import { usdc } from '@bidit/shared';
 
 let counter = 0;
@@ -10,7 +11,7 @@ let counter = 0;
 /** Wipe every table and re-seed the system accounts. */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "PumpCoinCreateAttempt","ChatModerator","ChatMessage","ChatBlock","ChainTransfer","DepositReceipt","PointsEvent","Notification","WeeklyShippingPass","FulfillmentItem","Shipment","GiveawayEntry","Giveaway","Buyback","Withdrawal","Hold","LedgerEntry","Bid","Order","Auction","Listing","SellerProfile","Account","User" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "ShipQuote","PumpCoinCreateAttempt","ChatModerator","ChatMessage","ChatBlock","ChainTransfer","DepositReceipt","PointsEvent","Notification","WeeklyShippingPass","FulfillmentItem","Shipment","GiveawayEntry","Giveaway","Buyback","Withdrawal","Hold","LedgerEntry","Bid","Order","Auction","Listing","SellerProfile","Account","User" RESTART IDENTITY CASCADE',
   );
   await ensureSystemAccounts(prisma);
 }
@@ -33,6 +34,27 @@ export async function makeFundedUser(
   const user = await makeUser('buyer');
   await deposit({ accountId: user.accountId, amount: usdc(amount) }, prisma);
   return user;
+}
+
+/**
+ * Price a shipment, then pay for it: what the buyer's two clicks actually do.
+ *
+ * The charge refuses to price a shipment itself, so it needs a quote from the
+ * estimate. Tests that only care about what happens AFTER shipping is paid go
+ * through here rather than repeating the two steps. See ship-charge.test.ts for
+ * the quote rules themselves.
+ */
+export async function payForShipment(
+  params: { buyerId: string; itemIds: string[]; mode?: ShipMode; private?: boolean },
+  clock: Clock = systemClock,
+) {
+  const isPrivate = params.mode === 'PRIVATE' || params.private === true;
+  const est = await estimateShipment(
+    { buyerId: params.buyerId, itemIds: params.itemIds, private: isPrivate },
+    clock,
+    prisma,
+  );
+  return createAndPayShipment({ ...params, quoteId: est.quoteId ?? undefined }, clock, prisma);
 }
 
 export interface RunningAuction {

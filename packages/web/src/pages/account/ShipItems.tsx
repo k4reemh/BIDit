@@ -118,8 +118,9 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
   const toggle = (id: string) =>
     setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  // Live UPS estimate for the current selection: refreshes as items or the
-  // privacy toggle change. Debounced so rapid clicks don't spam the backend.
+  // Real carrier quote for the current selection, refreshed as items or the
+  // privacy toggle change. Each call issues a quote the Ship button then spends,
+  // so it is debounced: every request is a carrier lookup, not a local sum.
   const selKey = [...sel].sort().join(',');
   useEffect(() => {
     const ids = selKey ? selKey.split(',') : [];
@@ -135,15 +136,30 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
 
   const ship = async () => {
     const ids = [...sel];
-    if (ids.length === 0) return;
+    if (ids.length === 0 || !est?.quoteId) return;
     setBusy(true); setErr(''); setMsg('');
     try {
-      const shipment = await createShipment(ids, priv ? { mode: 'PRIVATE', private: true } : undefined);
+      const opts = { quoteId: est.quoteId, ...(priv ? { mode: 'PRIVATE', private: true } : {}) };
+      const shipment = await createShipment(ids, opts);
       const total = priv ? `$${money2(shipment.shippingFee)} + $${money2(shipment.privacyFee)} privacy` : `$${money2(shipment.shippingFee)}`;
       setMsg(`Shipping paid (${total}). The seller has been notified to ship.`);
       onChanged();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Couldn’t create the shipment.');
+      // The quote went stale (20 minutes on a tab left open, or a double click).
+      // Re-price and show the new number rather than charging silently against a
+      // figure the buyer never agreed to.
+      const stale = e instanceof Error && /expired|Check the shipping price/i.test(e.message);
+      if (stale) {
+        const fresh = await estimateShipment(ids, priv ? { private: true } : undefined).catch(() => null);
+        if (fresh) setEst(fresh);
+        setErr(
+          fresh?.hasAddress
+            ? `That price expired. Shipping is now $${money2(fresh.total)}. Check it and ship again.`
+            : 'That price expired. Try again.',
+        );
+      } else {
+        setErr(e instanceof Error ? e.message : 'Couldn’t create the shipment.');
+      }
     } finally {
       setBusy(false);
     }
@@ -190,7 +206,15 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
         est.hasAddress ? (
           <div className="ship-est">
             <div className="ship-est__row">
-              <span className="muted">Estimated shipping <em className="ship-est__note">UPS est. ${money2(est.carrierRetail)} · {est.discountPct}% of retail{sel.size > 1 ? ' · +3% per extra item' : ''}</em></span>
+              <span className="muted">
+                Shipping
+                {est.carrier !== 'estimated' && (
+                  <em className="ship-est__note">
+                    {est.carrier} {est.service}
+                    {est.estDays ? ` · about ${est.estDays} day${est.estDays === 1 ? '' : 's'}` : ''}
+                  </em>
+                )}
+              </span>
               <b>${money2(est.shippingFee)}</b>
             </div>
             {Number(est.privacyFee) > 0 && (
@@ -200,13 +224,13 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
           </div>
         ) : (
           <div className="ship-est ship-est--warn">
-            <span className="muted">Add a shipping address to see your UPS shipping estimate.</span>
+            <span className="muted">Add a shipping address to price these items.</span>
           </div>
         )
       )}
 
       <div className="acct-actions">
-        <button className="btn btn-primary" disabled={busy || sel.size === 0} onClick={ship}>
+        <button className="btn btn-primary" disabled={busy || sel.size === 0 || !est?.quoteId} onClick={ship}>
           {busy ? 'Processing…' : est && est.hasAddress ? `Ship ${sel.size} item${sel.size === 1 ? '' : 's'} · $${money2(est.total)}` : `Ship ${sel.size} item${sel.size === 1 ? '' : 's'}`}
         </button>
       </div>

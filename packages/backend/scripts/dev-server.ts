@@ -105,6 +105,7 @@ import {
 } from '../src/orders.js';
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
 import { diagnoseShipping, type ShippoAddress } from '../src/shippo.js';
+import { QuoteStaleError } from '../src/ship-charge.js';
 import { ChainSettler } from '../src/chain-settle.js';
 import {
   getBuyerFulfillment,
@@ -871,14 +872,23 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
         const itemIds = Array.isArray(b.itemIds) ? (b.itemIds as unknown[]).map(String) : [];
+        // Every call here can hit a carrier API, so it is metered like the other
+        // money endpoints rather than left open to a refresh loop.
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         try {
-          const est = await estimateShipment({ buyerId: userId, itemIds, private: b.private === true }, prisma);
+          const est = await estimateShipment(
+            { buyerId: userId, itemIds, private: b.private === true },
+            systemClock,
+            prisma,
+          );
           return send(res, 200, {
+            quoteId: est.quoteId,
             shippingFee: formatUsdc(est.shippingFee),
-            carrierRetail: formatUsdc(est.carrierRetail),
-            discountPct: est.discountPct,
             privacyFee: formatUsdc(est.privacyFee),
             total: formatUsdc(est.total),
+            carrier: est.carrier,
+            service: est.service,
+            estDays: est.estDays,
             hasAddress: est.hasAddress,
           });
         } catch (err) {
@@ -891,9 +901,16 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const b = await readJson(req);
         const itemIds = Array.isArray(b.itemIds) ? (b.itemIds as unknown[]).map(String) : [];
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
         try {
           const shipment = await createAndPayShipment(
-            { buyerId: userId, itemIds, mode: b.mode as ShipMode | undefined, private: b.private === true },
+            {
+              buyerId: userId,
+              itemIds,
+              mode: b.mode as ShipMode | undefined,
+              private: b.private === true,
+              quoteId: b.quoteId ? String(b.quoteId) : undefined,
+            },
             systemClock,
             prisma,
           );
@@ -901,6 +918,9 @@ async function main() {
           return send(res, 200, await shipmentDto(shipment.id));
         } catch (err) {
           if (err instanceof ShippingError) return send(res, 400, { error: err.message });
+          // 409, not 400: the request was well formed, the price just moved. The
+          // client re-estimates and shows the buyer the new number to confirm.
+          if (err instanceof QuoteStaleError) return send(res, 409, { error: err.message, code: 'QUOTE_STALE' });
           if (err instanceof InsufficientFundsError) {
             return send(res, 400, { error: 'Not enough balance to cover shipping.' });
           }

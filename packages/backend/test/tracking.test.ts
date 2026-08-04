@@ -8,7 +8,7 @@ import { createAndPayShipment, confirmShipmentForLabel, createShipmentLabel } fr
 import { ShipmentTracker, MockTrackingProvider, resolveCarrierToken, guessCarrier } from '../src/tracking.js';
 import { getSettledBalance, getBuybackPending, getSystemTotal } from '../src/ledger.js';
 import { usdc, OrderStatus, SYSTEM_ACCOUNT_IDS } from '@bidit/shared';
-import { resetDb, makeFundedUser, makeRunningAuction } from './setup.js';
+import { resetDb, makeFundedUser, makeRunningAuction, payForShipment } from './setup.js';
 
 const T0 = new Date('2026-01-01T00:00:00.000Z').getTime();
 const ADDRESS = { name: 'Card Fan', line1: '1 Yonge St', city: 'Toronto', region: 'ON', postal: 'M5V 1J1', country: 'Canada' };
@@ -29,7 +29,7 @@ async function shippedEscrowOrder(clock: ManualClock) {
   await closeDueAuctions(clock, prisma);
   const order = (await settleAuction(auction.auctionId, escrow, clock, prisma))!;
   const item = await prisma.fulfillmentItem.findFirstOrThrow({ where: { orderId: order.id } });
-  const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock, prisma);
+  const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, clock);
   await confirmShipmentForLabel({ shipmentId: shipment.id, sellerId: auction.sellerId, lengthCm: 10, widthCm: 10, heightCm: 2, weightGrams: 30 }, clock, prisma);
   await createShipmentLabel({ shipmentId: shipment.id, labelUrl: 'https://l/x.pdf', trackingNumber: 'TRK1', carrier: 'shippo' }, clock, prisma);
   return { escrow, order, shipment, buyer, sellerId: auction.sellerId };

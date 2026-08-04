@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { prisma } from '../src/db.js';
-import { ManualClock } from '../src/clock.js';
+import { ManualClock, systemClock } from '../src/clock.js';
 import { updateProfile, eraseUserData } from '../src/authz.js';
 import { estimateShipment, createAndPayShipment, purgeDeliveredShipmentPii } from '../src/fulfillment.js';
 import { decryptPii } from '../src/pii.js';
 import { usdc, OrderStatus } from '@bidit/shared';
-import { resetDb, makeUser, makeFundedUser } from './setup.js';
+import { resetDb, makeUser, makeFundedUser, payForShipment } from './setup.js';
 
 /** A real LOCKED order behind a fulfillment item. createAndPayShipment refuses to
  *  ship an item whose order is missing or finished, so these fixtures need one. */
@@ -54,12 +54,12 @@ describe('PII encryption across the shipping flow', () => {
     });
 
     // Estimate must decrypt the address (real quote, not the no-address fallback).
-    const est = await estimateShipment({ buyerId: buyer.userId, itemIds: [item.id] }, prisma);
+    const est = await estimateShipment({ buyerId: buyer.userId, itemIds: [item.id] }, systemClock, prisma);
     expect(est.hasAddress).toBe(true);
     expect(est.shippingFee).toBeGreaterThan(0n);
 
     // Ship it: the shipment's stored address snapshot must also be encrypted.
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, new ManualClock(Date.now()), prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, new ManualClock(Date.now()));
     const srow = await prisma.shipment.findUniqueOrThrow({ where: { id: shipment.id } });
     expect(typeof srow.shipTo).toBe('string');
     expect(String(srow.shipTo)).toMatch(/^encv1:/); // encrypted at rest
@@ -90,7 +90,7 @@ describe('PII encryption across the shipping flow', () => {
     const item = await prisma.fulfillmentItem.create({
       data: { orderId: (await lockedOrder(buyer.userId, seller.userId)).id, buyerId: buyer.userId, sellerId: seller.userId, listingId: 'l', title: 'Card', weightGrams: 57, amount: usdc('20'), status: 'READY_TO_SHIP', heldUntil: new Date(Date.now() + 1e9) },
     });
-    const shipment = await createAndPayShipment({ buyerId: buyer.userId, itemIds: [item.id] }, new ManualClock(Date.now()), prisma);
+    const shipment = await payForShipment({ buyerId: buyer.userId, itemIds: [item.id] }, new ManualClock(Date.now()));
     if (deliveredAt) await prisma.shipment.update({ where: { id: shipment.id }, data: { status: 'DELIVERED', deliveredAt } });
     return { buyer, shipment };
   }

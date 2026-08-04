@@ -539,6 +539,43 @@ model FulfillmentItem {
 /// One package: items from ONE seller to ONE buyer, one shipping fee. All four
 /// shipping modes (standard / weekly bundle / ship-later / private) are just
 /// policies over how items land here and when the fee is charged.
+/// A shipping price the buyer was shown and can be charged.
+///
+/// The estimate and the charge used to quote independently, so nothing stopped
+/// them disagreeing: the buyer confirmed one number and the ledger moved
+/// another. Now the estimate issues one of these and paying consumes it, so the
+/// amount charged is always exactly the amount displayed.
+///
+/// `consumedAt` is claimed with a conditional update, which makes a double-click
+/// on Pay charge once rather than twice.
+model ShipQuote {
+  id           String    @id @default(cuid())
+  buyerId      String
+  /// Hash of the sorted item ids. Binds the price to the exact selection, so a
+  /// quote for one card cannot be replayed against a cart of ten.
+  itemIdsHash  String
+  /// What the buyer pays, micro-USDC, markup included. Excludes the privacy fee.
+  amountMicros BigInt
+  /// Shippo's rate object. The label bought later references this exact rate, so
+  /// the parcel that ships is the one that was priced. Null on the model
+  /// fallback, which has no carrier behind it.
+  rateObjectId String?
+  carrier      String
+  service      String
+  estDays      Int?
+  /// 'shippo' for a live carrier rate, 'model' when Shippo was unreachable and
+  /// the local estimate stood in. Worth keeping: a run of 'model' rows is how
+  /// a silent Shippo outage becomes visible.
+  source       String
+  isPrivate    Boolean   @default(false)
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  shipmentId   String?
+  createdAt    DateTime  @default(now())
+
+  @@index([buyerId, expiresAt])
+}
+
 model Shipment {
   id             String    @id @default(cuid())
   buyerId        String
