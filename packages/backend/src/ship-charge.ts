@@ -21,7 +21,8 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getRates, shippoKey, type ShippoAddress, type ShippoRate } from './shippo.js';
-import { quoteShipping, usdPerCad, countryCode, type Dimensions, type ShipLocation } from './shipping.js';
+import { usdPerCad, countryCode, type Dimensions, type ShipLocation } from './shipping.js';
+import { estimateShipping } from './ship-estimate.js';
 
 const USDC = 1_000_000n;
 
@@ -181,12 +182,24 @@ export async function rateShipment(
     }
   }
 
-  // The model quotes RETAIL and gets the configured discount applied inside
-  // quoteShipping. A Shippo rate is already wholesale, which is why the discount
-  // never touches the branch above: charging 80% of what the label costs would
-  // lose money on every shipment.
+  // Fall back to the SAME formula the bid panel quoted from, not the old
+  // zone/per-pound model. Those two disagree wildly on the lanes BIDit actually
+  // sells: the panel said $10.50 to Seattle while the old model charged $24.17.
+  // A buyer who is shown one number and charged another has been misled whether
+  // or not a carrier was reachable, so the fallback has to be the same pricing
+  // the estimate promised, plus the same handling markup a Shippo quote carries.
   return {
-    amountMicros: quoteShipping(origin, dest, parcel.weightGrams, parcel.dims) + markup,
+    amountMicros:
+      estimateShipping({
+        origin,
+        dest,
+        weightGrams: parcel.weightGrams,
+        parcelDims: {
+          lengthMm: Math.round(parcel.dims.lengthCm * 10),
+          widthMm: Math.round(parcel.dims.widthCm * 10),
+          heightMm: Math.round(parcel.dims.heightCm * 10),
+        },
+      }).fee + markup,
     rateObjectId: null,
     carrier: 'estimated',
     service: 'Standard',

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { prisma } from '../src/db.js';
 import { estimateShipment, estimateListingShipping } from '../src/fulfillment.js';
-import { quoteShipping } from '../src/shipping.js';
 import { combineParcels, defaultParcel } from '@bidit/shared';
 import { systemClock } from '../src/clock.js';
 import { shipMarkupMicros } from '../src/ship-charge.js';
+import { estimateShipping } from '../src/ship-estimate.js';
 
 // Proves the estimate reuses the seller's ship-from, the buyer's address and the
 // item weight, and that a priceable lane hands back a quote id (the only thing
@@ -63,13 +63,11 @@ describe('estimateShipment (money-path integration)', () => {
     // Three 57g items in the default mailer: 171g in whatever single package
     // actually holds all three, which is what the carrier bills for.
     const box = combineParcels([defaultParcel(), defaultParcel(), defaultParcel()]);
-    // No Shippo key in tests, so this is the model fallback, plus the flat
-    // handling markup that every charged price carries.
-    const expected = quoteShipping(origin, dest, 171, {
-      lengthCm: box.dims.lengthMm / 10,
-      widthCm: box.dims.widthMm / 10,
-      heightCm: box.dims.heightMm / 10,
-    }) + shipMarkupMicros();
+    // No Shippo provider in tests, so this is the fallback: the SAME formula the
+    // bid panel quotes from, plus the flat handling markup every charged price
+    // carries. Pinning it here is what stops the two paths drifting apart again.
+    const expected =
+      estimateShipping({ origin, dest, weightGrams: 171, parcelDims: box.dims }).fee + shipMarkupMicros();
     expect(three.shippingFee).toBe(expected);
     // Three items need a bigger box than one, so they cost more to post.
     const one = await estimateShipment({ buyerId: buyer.id, itemIds: [a.id] }, systemClock, prisma);

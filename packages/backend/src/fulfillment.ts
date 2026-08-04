@@ -12,7 +12,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
 import { getOrCreateUserAccount, settleShipping } from './ledger.js';
-import { quoteShipping, quoteShippingBreakdown, privacyPremium, type Dimensions, type ShipLocation } from './shipping.js';
+import { privacyPremium, type Dimensions, type ShipLocation } from './shipping.js';
 import { combineParcels, defaultParcel, type ParcelDims } from '@bidit/shared';
 import { estimateShipping } from './ship-estimate.js';
 import {
@@ -51,6 +51,33 @@ function parcelOf(row: HasParcel): ParcelDims {
 /** Carrier rates are quoted in centimetres. */
 function toDimensions(p: ParcelDims): Dimensions {
   return { lengthCm: p.lengthMm / 10, widthCm: p.widthMm / 10, heightCm: p.heightMm / 10 };
+}
+
+/**
+ * The price when no carrier was asked: the same formula the bid panel quotes
+ * from, plus the handling markup every charged price carries.
+ *
+ * Every path that prices without Shippo goes through here. Letting one of them
+ * reach for the old zone/per-pound model instead is how a buyer gets shown
+ * $10.50 and charged $24.17 for the same parcel.
+ */
+function modelFee(
+  origin: ShipLocation,
+  dest: ShipLocation | null,
+  parcel: { dims: Dimensions; weightGrams: number },
+): bigint {
+  return (
+    estimateShipping({
+      origin,
+      dest,
+      weightGrams: parcel.weightGrams,
+      parcelDims: {
+        lengthMm: Math.round(parcel.dims.lengthCm * 10),
+        widthMm: Math.round(parcel.dims.widthCm * 10),
+        heightMm: Math.round(parcel.dims.heightCm * 10),
+      },
+    }).fee + shipMarkupMicros()
+  );
 }
 
 /**
@@ -238,7 +265,7 @@ export async function applyWeeklyBundling(
     postal: sellerProfile?.originPostal,
   };
   const one = parcelForItems([item]);
-  const fee = quoteShipping(origin, dest, one.weightGrams, one.dims);
+  const fee = modelFee(origin, dest, one);
 
   const shipment = await prisma.shipment.create({
     data: {
@@ -604,7 +631,7 @@ export async function estimateShipment(
   // model so the page still shows a number, but issue no quote: there is nothing
   // here anyone should be able to get charged for.
   if (!ctx.dest || !ctx.hasAddress) {
-    const fee = quoteShipping(ctx.origin, {}, ctx.parcel.weightGrams, ctx.parcel.dims) + shipMarkupMicros();
+    const fee = modelFee(ctx.origin, null, ctx.parcel);
     return {
       quoteId: null,
       shippingFee: fee,

@@ -13,6 +13,7 @@ import type { ShippoRate } from '../src/shippo.js';
 import { deposit, getOrCreateUserAccount } from '../src/ledger.js';
 import { usdc, OrderStatus } from '@bidit/shared';
 import { systemClock } from '../src/clock.js';
+import { estimateShipping } from '../src/ship-estimate.js';
 import { resetDb } from './setup.js';
 
 const rate = (over: Partial<ShippoRate> = {}): ShippoRate => ({
@@ -244,5 +245,28 @@ describe('the parcel that gets priced', () => {
     await estimateShipment({ buyerId: buyer.id, itemIds: ids }, systemClock, prisma);
     // One carrier call for the whole shipment, not one per item.
     expect(live.calls).toBe(1);
+  });
+});
+
+describe('the fallback price matches what the bid panel promised', () => {
+  it('quotes the same formula the estimate showed, not a second model', async () => {
+    // This drifted once: the fallback reached for the old zone/per-pound model
+    // while the panel used the new formula, so a Seattle buyer saw $10.50 and
+    // would have been charged $24.17. Both paths must price the same way.
+    const { buyer, ids } = await scenario();
+    live.set(new Error('shippo down'));
+
+    const est = await estimateShipment({ buyerId: buyer.id, itemIds: ids }, systemClock, prisma);
+    const item = await prisma.fulfillmentItem.findUniqueOrThrow({ where: { id: ids[0]! } });
+    const panel = estimateShipping({
+      origin: { country: 'Canada', region: 'AB', city: 'Calgary', postal: 'T2P 1J9' },
+      dest: { country: ADDRESS.country, region: ADDRESS.region, city: ADDRESS.city, postal: ADDRESS.postal },
+      weightGrams: item.weightGrams,
+      parcelDims: null,
+    }).fee;
+
+    // The charge is the panel's number plus the flat handling markup, and
+    // nothing else.
+    expect(est.shippingFee).toBe(panel + shipMarkupMicros());
   });
 });
