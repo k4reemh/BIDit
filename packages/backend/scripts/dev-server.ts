@@ -106,7 +106,7 @@ import {
 import { getTrackingProvider, ShipmentTracker } from '../src/tracking.js';
 import { diagnoseShipping, validateAddress, type ShippoAddress } from '../src/shippo.js';
 import { countryCode } from '../src/shipping.js';
-import { QuoteStaleError } from '../src/ship-charge.js';
+import { QuoteStaleError, shipMarkupMicros } from '../src/ship-charge.js';
 import { ChainSettler } from '../src/chain-settle.js';
 import {
   getBuyerFulfillment,
@@ -1623,7 +1623,18 @@ async function main() {
               country: String(q.get('destCountry')),
             }
           : undefined;
-        return send(res, 200, { origin, ...(await diagnoseShipping(origin, extraDest)) });
+        const diag = await diagnoseShipping(origin, extraDest);
+        // The number that actually matters per lane: cheapest usable rate in
+        // USD plus the same flat markup a real charge carries. USDC settles
+        // 1:1 with USD, so this IS what the buyer's balance would move by.
+        const markupUsd = Number(shipMarkupMicros()) / 1e6;
+        const lanes = diag.lanes.map((l) => ({
+          ...l,
+          buyerPaysUsdc: l.cheapestUsd
+            ? `${(l.cheapestUsd.usd + markupUsd).toFixed(2)} (${l.cheapestUsd.carrier} ${l.cheapestUsd.service} + ${markupUsd.toFixed(2)} handling)`
+            : null,
+        }));
+        return send(res, 200, { origin, ...diag, lanes });
       }
       // Operator label queue: every package a seller has confirmed that needs a
       // label made. Includes items, package size, both parties' addresses, and the

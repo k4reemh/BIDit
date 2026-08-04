@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
-import { getRates, shippoKey, type RateCustoms, type ShippoAddress, type ShippoRate } from './shippo.js';
+import { getRates, shippoKey, rateAmountUsd, type RateCustoms, type ShippoAddress, type ShippoRate } from './shippo.js';
 import { usdPerCad, countryCode, type Dimensions, type ShipLocation } from './shipping.js';
 import { estimateShipping } from './ship-estimate.js';
 
@@ -140,15 +140,7 @@ function toShippoAddress(a: FullAddress): ShippoAddress {
  * model rather than charging a number derived from a guessed exchange rate.
  */
 function toUsd(amount: number, currency: string): number | null {
-  const c = currency.toUpperCase();
-  if (c === 'USD') return amount;
-  if (c === 'CAD') return amount * usdPerCad();
-  // Other currencies convert only when an operator has set a rate, e.g.
-  // BIDIT_FX_GBP_USD=1.27 for UK lanes. No rate means the carrier rate is
-  // SKIPPED, never guessed: a wrong exchange rate is a silently wrong charge.
-  const fx = Number(process.env[`BIDIT_FX_${c}_USD`] ?? '');
-  if (Number.isFinite(fx) && fx > 0 && fx < 1000) return amount * fx;
-  return null;
+  return rateAmountUsd(amount, currency, usdPerCad());
 }
 
 export interface RealRate {

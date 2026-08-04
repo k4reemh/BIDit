@@ -9,6 +9,8 @@
  * errors come back as a typed ShippoError they can catch and fall through on.
  */
 
+import { usdPerCad } from './shipping.js';
+
 const BASE = 'https://api.goshippo.com';
 const TIMEOUT_MS = 8_000;
 
@@ -165,6 +167,22 @@ export interface RateCustoms {
 }
 
 const countryOf = (a: ShippoAddress) => a.country.trim().toUpperCase();
+
+/**
+ * A carrier rate in USD, or null when we have no exchange rate for its
+ * currency. Shared by the charge path and the probe, so the number an admin
+ * sees in a diagnosis is computed by the same code that will bill the buyer.
+ * USD passes through; CAD uses BIDIT_CAD_USD; anything else needs
+ * BIDIT_FX_<CUR>_USD set, and is otherwise SKIPPED, never guessed.
+ */
+export function rateAmountUsd(amount: number, currency: string, usdPerCadRate: number): number | null {
+  const c = currency.toUpperCase();
+  if (c === 'USD') return amount;
+  if (c === 'CAD') return amount * usdPerCadRate;
+  const fx = Number(process.env[`BIDIT_FX_${c}_USD`] ?? '');
+  if (Number.isFinite(fx) && fx > 0 && fx < 1000) return amount * fx;
+  return null;
+}
 
 /**
  * Live rates for one origin/destination/parcel. `async: false` makes Shippo
@@ -383,6 +401,13 @@ export interface LaneProbe {
    *  lane is served by one carrier or ten, which is the difference between
    *  "this works" and "this works until that one account has a bad day". */
   rates: string[];
+  /** Cheapest rate CONVERTED to USD by the same code that bills buyers, or null
+   *  when no rate on the lane has a known exchange rate. Native amounts answer
+   *  "does the carrier serve this"; this answers "what would the buyer pay". */
+  cheapestUsd: { usd: number; carrier: string; service: string; currency: string } | null;
+  /** Currencies present on the lane that were skipped for lack of a
+   *  BIDIT_FX_<CUR>_USD rate: rates the buyer cannot be charged yet. */
+  skippedCurrencies: string[];
   /** Whether the customs declaration attached (cross-border lanes only). */
   customs?: { attached: boolean; error?: string };
   messages: string[];
@@ -442,6 +467,19 @@ export async function diagnoseShipping(
         description: 'Collectible trading card',
       });
       const sorted = [...rates].sort((a, b) => a.amount - b.amount);
+      // Cheapest by converted USD, exactly as the charge path picks it: within
+      // one lane the currencies can differ, and 10 GBP is not cheaper than 11 USD.
+      const cad = usdPerCad();
+      let best: { usd: number; carrier: string; service: string; currency: string } | null = null;
+      const skipped = new Set<string>();
+      for (const r of rates) {
+        const usd = rateAmountUsd(r.amount, r.currency, cad);
+        if (usd === null) {
+          skipped.add(r.currency);
+          continue;
+        }
+        if (!best || usd < best.usd) best = { usd, carrier: r.carrier, service: r.service, currency: r.currency };
+      }
       lanes.push({
         lane: d.lane,
         from: origin,
@@ -449,6 +487,8 @@ export async function diagnoseShipping(
         rateCount: rates.length,
         cheapest: sorted[0] ?? null,
         rates: sorted.map((r) => `${r.carrier} ${r.service}: ${r.amount.toFixed(2)} ${r.currency}${r.estimatedDays ? ` (${r.estimatedDays}d)` : ''}`),
+        cheapestUsd: best,
+        skippedCurrencies: [...skipped],
         customs,
         messages,
         error: null,
@@ -461,6 +501,8 @@ export async function diagnoseShipping(
         rateCount: 0,
         cheapest: null,
         rates: [],
+        cheapestUsd: null,
+        skippedCurrencies: [],
         messages: [],
         error: (err as Error)?.message ?? String(err),
       });
