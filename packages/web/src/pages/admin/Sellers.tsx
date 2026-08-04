@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getSellerApplications, verifySellerAdmin, adminReassignCoin, getAdminPromo, markPromoPaid, type SellerApplication, type AdminPromo, type Session } from '../../api';
+import { getSellerApplications, verifySellerAdmin, adminReassignCoin, adminSetSellerVisibility, getAdminPromo, markPromoPaid, type SellerApplication, type AdminPromo, type Session } from '../../api';
 import { Check } from '../../icons';
 
 const fmt = (ms: number | null) =>
@@ -123,12 +123,25 @@ function Row({ r, onVerify, busy, onDone }: { r: SellerApplication; onVerify: (i
           ) : (
             <span className="vbadge vbadge--pending">{r.fulfilledCount}/{r.threshold} to Verified</span>
           )}
+          {r.hiddenFromLive && <span className="vbadge vbadge--pending">Hidden from Live</span>}
         </div>
-        {!r.verified && (
-          <button className="btn btn-primary btn-sm" onClick={() => onVerify(r.userId)} disabled={busy}>
-            {busy ? 'Verifying…' : 'Verify'}
-          </button>
-        )}
+        <div className="adm-row__acts">
+          {r.pumpCoinAddress && (
+            // Retire a stream from the home grid and browse without unlinking
+            // anything: built for cleaning test streams off the site.
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={async () => { await adminSetSellerVisibility(r.userId, !r.hiddenFromLive); onDone(); }}
+            >
+              {r.hiddenFromLive ? 'Show on Live' : 'Hide from Live'}
+            </button>
+          )}
+          {!r.verified && (
+            <button className="btn btn-primary btn-sm" onClick={() => onVerify(r.userId)} disabled={busy}>
+              {busy ? 'Verifying…' : 'Verify'}
+            </button>
+          )}
+        </div>
       </div>
       <div className="adm-row__grid">
         <span><b>Email</b> {r.email ?? 'n/a'}</span>

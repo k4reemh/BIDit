@@ -311,12 +311,14 @@ export function quoteShipping(origin: ShipLocation, dest: ShipLocation, weightGr
 }
 
 /** Flat privacy premium for Private Secure Shipping (buyer pays shipping + this).
- *  Configurable via BIDIT_PRIVACY_FEE_CENTS; defaults to $4.00. */
+ *  It funds a real second leg: the seller ships to BIDit, and BIDit re-ships to
+ *  the buyer, so the premium has to cover most of another label plus handling.
+ *  Configurable via BIDIT_PRIVACY_FEE_CENTS; defaults to $10.00. */
 export function privacyPremium(): bigint {
   const s = process.env.BIDIT_PRIVACY_FEE_CENTS;
   if (s != null && s.trim() !== '') {
     const cents = Number(s);
     if (Number.isFinite(cents) && cents >= 0) return (BigInt(Math.round(cents)) * USDC) / 100n;
   }
-  return 4n * USDC; // default $4.00
+  return 10n * USDC; // default $10.00
 }

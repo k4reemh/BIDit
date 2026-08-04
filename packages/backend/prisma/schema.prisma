@@ -202,6 +202,10 @@ model SellerProfile {
   weeklyBundling      Boolean   @default(false)
   shipLater           Boolean   @default(false)
   privateShipping     Boolean   @default(false)
+  /// Admin kill-switch for the live grid: a hidden seller's coin stops
+  /// appearing on the home page and browse, without unlinking anything. Built
+  /// for retiring test streams; reversible with the same button.
+  hiddenFromLive      Boolean   @default(false)
   // Launch "$100 to sell" promo: set once the seller's $100 bonus has been paid
   // out manually (off-platform). Enrollment is derived from createdAt vs the
   // promo window, so no flag is needed for that.

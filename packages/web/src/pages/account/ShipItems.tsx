@@ -206,7 +206,11 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
 
       <label className="ship-priv">
         <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
-        <span>Private secure shipping: the seller never sees your address. Adds a small privacy fee.</span>
+        <span>
+          <b>Private secure shipping</b>: the seller ships your item to BIDit, and we re-ship
+          it to you, so the seller never sees your name or address. Expect a longer wait
+          (two shipping legs) and a <b>$10</b> privacy fee on top of shipping.
+        </span>
       </label>
 
       {est && sel.size > 0 && (

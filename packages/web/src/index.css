@@ -2458,3 +2458,14 @@ img { display: block; max-width: 100%; }
 }
 .country-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .country-select:invalid, .country-select option[value=""] { color: var(--muted); }
+
+/* ---- package-type toggle on the confirm-size form ------------------------ */
+.ship-kind { display: flex; gap: 8px; margin-bottom: 10px; }
+.ship-kind__opt {
+  padding: 7px 16px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface-2); color: var(--muted);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.ship-kind__opt.on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.adm-row__acts { display: flex; gap: 8px; align-items: center; }

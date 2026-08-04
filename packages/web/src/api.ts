@@ -217,6 +217,9 @@ export interface AdminUser {
 export const adminFindUsers = (q: string) =>
   req<AdminUser[]>(`/admin/users?q=${encodeURIComponent(q)}`);
 
+export const adminSetSellerVisibility = (userId: string, hidden: boolean) =>
+  req<{ ok: boolean }>('/admin/seller/visibility', { method: 'POST', body: JSON.stringify({ userId, hidden }) });
+
 export const adminBanUser = (userId: string, reason: string | null) =>
   req<{ ok: boolean }>('/admin/ban', { method: 'POST', body: JSON.stringify({ userId, reason }) });
 
@@ -240,6 +243,7 @@ export interface SellerApplication {
   email: string | null;
   verified: boolean;
   verifiedBy: string | null;
+  hiddenFromLive: boolean;
   appliedAt: number | null;
   onboarded: boolean;
   fulfilledCount: number;
@@ -422,7 +426,7 @@ export const buyShopItem = (listingId: string) =>
     body: JSON.stringify({ listingId }),
   });
 
-export const saveShippingSettings = (s: ShippingSettings) =>
+export const saveShippingSettings = (s: Omit<ShippingSettings, 'weeklyBundling' | 'shipLater' | 'privateShipping'>) =>
   req<Session>('/seller/shipping-settings', { method: 'POST', body: JSON.stringify(s) });
 
 export const setWheel = (listingId: string, entries: WheelEntryInput[]) =>

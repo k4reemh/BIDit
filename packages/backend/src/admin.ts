@@ -32,6 +32,7 @@ export interface SellerRow {
   email: string | null;
   verified: boolean;
   verifiedBy: string | null;
+  hiddenFromLive: boolean;
   appliedAt: number | null;
   onboarded: boolean;
   fulfilledCount: number;
@@ -62,6 +63,7 @@ export async function listSellers(
       email: p.user.email,
       verified: p.verified,
       verifiedBy: p.verifiedBy,
+      hiddenFromLive: p.hiddenFromLive,
       appliedAt: p.appliedAt ? p.appliedAt.getTime() : null,
       onboarded: p.onboardedSeller,
       fulfilledCount: await sellerFulfilledCount(p.userId, prisma),
@@ -73,6 +75,19 @@ export async function listSellers(
       origin: { country: p.originCountry, region: p.originRegion, city: p.originCity, postal: p.originPostal },
     })),
   );
+}
+
+/** Show or hide a seller's stream everywhere it is discovered (home grid,
+ *  browse). Nothing is unlinked or deleted, so it is safe on live sellers and
+ *  fully reversible: built for retiring test streams. */
+export async function setSellerVisibility(
+  adminId: string,
+  sellerId: string,
+  hidden: boolean,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  await requireAdmin(adminId, prisma);
+  await prisma.sellerProfile.update({ where: { userId: sellerId }, data: { hiddenFromLive: hidden } });
 }
 
 export interface LedgerAudit {

@@ -188,6 +188,7 @@ function CardHead({ shipment, pill }: { shipment: Shipment; pill: React.ReactNod
 
 function ConfirmCard({ shipment, onDone }: { shipment: Shipment; onDone: () => void }) {
   const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<'polymailer' | 'box'>('polymailer');
   const [l, setL] = useState('10');
   const [w, setW] = useState('10');
   const [h, setH] = useState('2');
@@ -196,9 +197,14 @@ function ConfirmCard({ shipment, onDone }: { shipment: Shipment; onDone: () => v
   const [err, setErr] = useState('');
 
   const submit = async () => {
-    const dims = { lengthCm: Number(l), widthCm: Number(w), heightCm: Number(h), weightGrams: Number(g) };
+    // A polymailer has no height worth measuring; the label is priced on its
+    // loaded thickness, which is ~2cm for anything a mailer should hold.
+    const heightCm = kind === 'polymailer' ? 2 : Number(h);
+    const dims = { lengthCm: Number(l), widthCm: Number(w), heightCm, weightGrams: Number(g) };
     if (Object.values(dims).some((n) => !Number.isFinite(n) || n <= 0)) {
-      setErr('Enter a length, width, height, and weight greater than 0.');
+      setErr(kind === 'polymailer'
+        ? 'Enter a length, width, and weight greater than 0.'
+        : 'Enter a length, width, height, and weight greater than 0.');
       return;
     }
     setBusy(true); setErr('');
@@ -218,11 +224,19 @@ function ConfirmCard({ shipment, onDone }: { shipment: Shipment; onDone: () => v
         </div>
       ) : (
         <div className="ship-confirm">
-          <p className="muted ship-hint">Enter the packed box’s size and weight. Not sure? A single card in a bubble mailer is about <b>10 × 10 × 2 cm</b>, <b>~30 g</b>.</p>
+          <p className="muted ship-hint">
+            {kind === 'polymailer'
+              ? <>Enter the mailer’s size and packed weight. A single card in a bubble mailer is about <b>10 × 10 cm</b>, <b>~30 g</b>.</>
+              : <>Enter the packed box’s size and weight.</>}
+          </p>
+          <div className="ship-kind" role="radiogroup" aria-label="Package type">
+            <button type="button" className={`ship-kind__opt${kind === 'polymailer' ? ' on' : ''}`} onClick={() => setKind('polymailer')} aria-pressed={kind === 'polymailer'}>Polymailer</button>
+            <button type="button" className={`ship-kind__opt${kind === 'box' ? ' on' : ''}`} onClick={() => setKind('box')} aria-pressed={kind === 'box'}>Box</button>
+          </div>
           <div className="ship-dims">
             <Dim label="Length" unit="cm" value={l} onChange={setL} />
             <Dim label="Width" unit="cm" value={w} onChange={setW} />
-            <Dim label="Height" unit="cm" value={h} onChange={setH} />
+            {kind === 'box' && <Dim label="Height" unit="cm" value={h} onChange={setH} />}
             <Dim label="Weight" unit="g" value={g} onChange={setG} />
           </div>
           {err && <div className="auth__error">{err}</div>}

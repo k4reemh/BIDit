@@ -21,9 +21,6 @@ export default function ShippingSettingsCard({
   const [region, setRegion] = useState(s?.originRegion ?? '');
   const [city, setCity] = useState(s?.originCity ?? '');
   const [postal, setPostal] = useState(s?.originPostal ?? '');
-  const [weekly, setWeekly] = useState(s?.weeklyBundling ?? false);
-  const [shipLater, setShipLater] = useState(s?.shipLater ?? false);
-  const [priv, setPriv] = useState(s?.privateShipping ?? false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [check, setCheck] = useState<AddressCheck | null>(null);
@@ -40,9 +37,6 @@ export default function ShippingSettingsCard({
         originRegion: region.trim() || null,
         originCity: city.trim() || null,
         originPostal: postal.trim() || null,
-        weeklyBundling: weekly,
-        shipLater,
-        privateShipping: priv,
       });
       setSession(await refreshMe());
       setSaved(true);
@@ -89,20 +83,11 @@ export default function ShippingSettingsCard({
         }}
       />
 
-      <div className="ship-opts">
-        <label className="ship-priv">
-          <input type="checkbox" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} />
-          <span><b>Weekly bundling</b>: buyers pay shipping once a week and you ship their wins together.</span>
-        </label>
-        <label className="ship-priv">
-          <input type="checkbox" checked={shipLater} onChange={(e) => setShipLater(e.target.checked)} />
-          <span><b>Buy now, ship later</b>: hold buyers’ wins up to 14 days so they can bundle before shipping.</span>
-        </label>
-        <label className="ship-priv">
-          <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
-          <span><b>Private secure shipping</b>: buyers can hide their address; you ship to BIDit and we forward it.</span>
-        </label>
-      </div>
+      {/* The weekly-bundling / ship-later / private toggles lived here. Buyer
+          shipping modes are platform-run now (ship-later is everyone's default,
+          private is the buyer's choice at ship time, charge-on-win is gated
+          off), so a seller checkbox only promised behaviour the seller no
+          longer controls. */}
 
       <div className="acct-actions">
         <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save shipping'}</button>

@@ -81,7 +81,7 @@ import {
   removeRoomModerator,
 } from '../src/chat.js';
 import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
-import { verifySeller, listSellers, ledgerAudit } from '../src/admin.js';
+import { verifySeller, listSellers, setSellerVisibility, ledgerAudit } from '../src/admin.js';
 import { reconcileWallets } from '../src/audit.js';
 import { DevWalletEscrow, ProgramEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
@@ -1462,6 +1462,16 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         return send(res, 200, await listSellers(userId, prisma));
       }
+      // Admin: hide/show a seller's stream on every discovery surface.
+      if (req.method === 'POST' && p === '/admin/seller/visibility') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        await setSellerVisibility(userId, String(b.userId ?? ''), b.hidden === true, prisma);
+        // Drop the cached /live response so the change shows without the TTL wait.
+        liveCache = null;
+        return send(res, 200, { ok: true });
+      }
       // Admin: enrolled sellers + $ fulfilled, so you know who to pay the $100.
       // Admin: find an account to act on. Matches handle or email, so support
       // can work from whatever the reporter gave them.
@@ -2105,7 +2115,8 @@ async function liveCoinsCached(viewerCount: (room: string) => number): Promise<u
  */
 async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
-    where: { pumpCoinAddress: { not: null } },
+    // hiddenFromLive: the admin kill-switch for test streams.
+    where: { pumpCoinAddress: { not: null }, hiddenFromLive: false },
     include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
   if (profiles.length === 0) return [];

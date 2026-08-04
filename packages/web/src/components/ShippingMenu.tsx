@@ -24,7 +24,7 @@ const OPTIONS: {
     Icon: Shield,
     title: 'Private secure shipping',
     tag: 'Premium',
-    sub: 'A small premium for privacy: the seller ships to us without ever seeing your address, and we forward it on to you.',
+    sub: 'The seller ships to BIDit and we re-ship to you, so they never see your name or address. Slower (two shipping legs) and adds a $10 privacy fee.',
   },
   {
     // Shipping is only paid from Ready to ship for now, so the mode that charges
