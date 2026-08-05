@@ -13,6 +13,8 @@ import Home from './pages/Home';
 import Browse from './pages/Browse';
 import Docs from './pages/Docs';
 import Help from './pages/Help';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import Points from './pages/Points';
 import Leaderboard from './pages/Leaderboard';
 import AdminSellers from './pages/admin/Sellers';
@@ -113,6 +115,8 @@ export default function App() {
           <Route path="/browse" element={<Browse />} />
           <Route path="/docs" element={<Docs />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/points" element={<Points session={session} onAuth={() => setAuth('signup')} />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/admin" element={<Navigate to="/admin/shipments" replace />} />

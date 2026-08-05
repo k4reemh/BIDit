@@ -63,7 +63,9 @@ export default function Footer() {
         </div>
       </div>
       <div className="container footer__bar">
-        <span className="muted">© 2026 BIDit. All rights reserved.</span>
+        <span className="muted">
+          © 2026 BIDit. All rights reserved. · <Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy</Link>
+        </span>
         <span className="footer__chips">
           <span className="pill">◎ Built on Solana</span>
           <span className="pill"><span className="dot" /> Beta</span>

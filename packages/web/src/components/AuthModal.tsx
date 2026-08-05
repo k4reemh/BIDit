@@ -153,7 +153,9 @@ export default function AuthModal({
         )}
 
         <p className="auth__legal">
-          By continuing you agree to BIDit's <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.
+          By continuing you agree to BIDit's{' '}
+          <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and{' '}
+          <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
         </p>
       </div>
     </div>
