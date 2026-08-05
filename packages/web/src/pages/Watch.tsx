@@ -10,6 +10,7 @@ import { Bag, Verified, Theater, TheaterExit } from '../icons';
 // livekit-client is heavy, only load it on the watch page (and only this chunk).
 const PumpStream = lazy(() => import('../components/PumpStream'));
 import { resolveCoin, getPumpCoin, type ResolvedRoom, type PumpCoin, type Session } from '../api';
+import { mediaSrc } from '../config';
 
 /**
  * In-site watch + bid page for a pump.fun coin. Left: a stream "theater" showing
@@ -53,7 +54,11 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
   // home grid must land on a page that matches the card.
   const r = typeof resolved === 'object' && resolved !== null ? resolved : null;
   const title = r?.streamTitle || pump?.name || 'Live stream';
-  const offlineArt = r?.streamImage || pump?.image || null;
+  // streamImage arrives as a backend-relative /media/... path; mediaSrc prefixes
+  // the API origin. Raw, the browser resolved it against the WEB origin, which
+  // 404s in prod: that's why the offline background stayed black even with a
+  // cover set.
+  const offlineArt = mediaSrc(r?.streamImage) || pump?.image || null;
   const description = r?.description || pump?.description || null;
   const sellerHandle = resolved?.sellerHandle;
 

@@ -497,6 +497,7 @@ export const saveStreamSettings = (s: {
   streamCategory: string | null;
   streamImage?: string | null;
   chatCooldownMs?: number;
+  pitch?: string | null;
 }) => req<Session>('/seller/stream-settings', { method: 'POST', body: JSON.stringify(s) });
 
 // ---- giveaways -------------------------------------------------------------

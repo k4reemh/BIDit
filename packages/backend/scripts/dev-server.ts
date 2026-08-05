@@ -1158,6 +1158,11 @@ async function main() {
           streamCategory: clip(b.streamCategory, 40),
           streamImage,
           ...(chatCooldownMs !== undefined ? { chatCooldownMs } : {}),
+          // Stream description (stored as the seller's pitch, which the coin
+          // page shows under the address). Written only when the client sends
+          // the key, so an older cached bundle that doesn't know it can't wipe
+          // a description saved elsewhere.
+          ...('pitch' in b ? { pitch: clip(b.pitch, 500) } : {}),
         };
         await prisma.sellerProfile.upsert({
           where: { userId },

@@ -15,6 +15,7 @@ export default function Settings() {
   const [title, setTitle] = useState(session.streamTitle ?? '');
   const [category, setCategory] = useState(session.streamCategory ?? '');
   const [image, setImage] = useState(session.streamImage ?? '');
+  const [pitch, setPitch] = useState(session.pitch ?? '');
   const [cooldown, setCooldown] = useState(session.chatCooldownMs ?? 5000);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -31,6 +32,7 @@ export default function Settings() {
         streamCategory: category || null,
         streamImage: image || null,
         chatCooldownMs: cooldown,
+        pitch: pitch.trim() || null,
       });
       setSession(next); // fresh session reflects coin + title + category
       setSaved(true);
@@ -78,6 +80,17 @@ export default function Settings() {
           </div>
         </div>
         <p className="muted acct-note" style={{ marginTop: 0 }}>Leave the title blank to show your coin name instead.</p>
+        <div className="fld">
+          <label>Stream description</label>
+          <textarea
+            value={pitch}
+            onChange={(e) => setPitch(e.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="What you sell and how your stream runs, e.g. Graded slabs and vintage packs, $1 starts every Friday."
+          />
+          <p className="muted acct-note" style={{ marginTop: 6 }}>Shown on your coin page under the coin address. Without one we show the coin&rsquo;s pump.fun description.</p>
+        </div>
         <div className="fld">
           <ImageUpload
             value={image}
