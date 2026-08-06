@@ -1,16 +1,47 @@
 import { useState } from 'react';
-import { createListing, setWheel } from '../../api';
+import { createListing, updateListing, setWheel, type SellerListing, type WheelEntryInput } from '../../api';
 import ImageUpload from '../ImageUpload';
 import { Dice, Plus, Trash } from '../../icons';
 
-interface Prize { label: string; quantity: string; image: string }
+// `tier` isn't editable here, but a wheel made elsewhere may carry it; keeping
+// it on the row means an edit round-trips it instead of silently stripping it.
+interface Prize { label: string; quantity: string; image: string; tier?: string }
 const blank = (): Prize => ({ label: '', quantity: '1', image: '' });
 
-export default function AddWheelModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [title, setTitle] = useState('');
-  const [startingBid, setStartingBid] = useState('1');
-  const [cover, setCover] = useState(''); // the wheel's own photo, like an item's
-  const [prizes, setPrizes] = useState<Prize[]>([blank(), blank(), blank()]);
+/** One prize row -> the wire entry, normalized the same way for submit and for
+ *  comparing against what the listing already stores. */
+const toEntry = (p: { label: string; quantity?: string; weight?: number; image?: string; imageUrl?: string; tier?: string }): WheelEntryInput => ({
+  label: p.label.trim(),
+  weight: Math.max(1, (p.quantity !== undefined ? Number(p.quantity) : p.weight) || 1),
+  ...((p.image ?? p.imageUrl) ? { imageUrl: p.image ?? p.imageUrl } : {}),
+  ...(p.tier ? { tier: p.tier } : {}),
+});
+
+/** Create a randomizer wheel, or, given `existing`, edit it: same builder,
+ *  prefilled with the listing's current prizes (mirrors AddItemModal). */
+export default function AddWheelModal({
+  onClose,
+  onCreated,
+  existing,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+  existing?: SellerListing;
+}) {
+  const isEdit = !!existing;
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [startingBid, setStartingBid] = useState(existing?.startingBid ?? '1');
+  const [cover, setCover] = useState(existing?.imageUrl ?? ''); // the wheel's own photo, like an item's
+  const [prizes, setPrizes] = useState<Prize[]>(
+    existing?.wheel?.length
+      ? existing.wheel.map((w) => ({
+          label: w.label,
+          quantity: String(w.weight && w.weight > 0 ? w.weight : 1),
+          image: w.imageUrl ?? '',
+          ...(w.tier ? { tier: w.tier } : {}),
+        }))
+      : [blank(), blank(), blank()],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,25 +57,29 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
     setError('');
     // Quantity = how many of this prize are in the pool → its weight, so a prize
     // with quantity 10 is 10× more likely to be won than one with quantity 1.
-    const entries = prizes
-      .filter((p) => p.label.trim())
-      .map((p) => ({
-        label: p.label.trim(),
-        weight: Math.max(1, Number(p.quantity) || 1),
-        ...(p.image ? { imageUrl: p.image } : {}),
-      }));
+    const entries = prizes.filter((p) => p.label.trim()).map(toEntry);
     if (entries.length < 2) {
       setError('Add at least 2 prizes.');
       return;
     }
     setBusy(true);
     try {
-      const listing = await createListing({
-        title: title.trim(),
-        startingBid,
-        ...(cover ? { imageUrl: cover } : {}),
-      });
-      await setWheel(listing.id, entries);
+      if (existing) {
+        // The pool write is the guarded call (the server refuses it once a spin
+        // has sold, so odds can't be restocked mid-run). Send it only when the
+        // prizes actually changed, and first, so a refusal doesn't half-apply
+        // the edit; name/photo/bid edits alone stay possible on a selling wheel.
+        const before = JSON.stringify((existing.wheel ?? []).map(toEntry));
+        if (JSON.stringify(entries) !== before) await setWheel(existing.id, entries);
+        await updateListing(existing.id, { title: title.trim(), imageUrl: cover, startingBid });
+      } else {
+        const listing = await createListing({
+          title: title.trim(),
+          startingBid,
+          ...(cover ? { imageUrl: cover } : {}),
+        });
+        await setWheel(listing.id, entries);
+      }
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
@@ -57,8 +92,12 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="smodal__kicker smodal__kicker--wheel"><Dice width={15} height={15} /> Randomizer</div>
-        <h2 className="display modal__title">Add a randomizer wheel</h2>
-        <p className="muted modal__sub">Buyers bid for one roll. The wheel spins on close and picks their prize.</p>
+        <h2 className="display modal__title">{isEdit ? 'Edit randomizer' : 'Add a randomizer wheel'}</h2>
+        <p className="muted modal__sub">
+          {isEdit
+            ? 'Change the prizes, odds, name, or photo. Once a spin has sold, the prize pool is locked; the name, photo, and bid stay editable.'
+            : 'Buyers bid for one roll. The wheel spins on close and picks their prize.'}
+        </p>
         {error && <div className="auth__error">{error}</div>}
         <form onSubmit={submit} className="auth__form">
           <div className="wheel-row2">
@@ -101,7 +140,7 @@ export default function AddWheelModal({ onClose, onCreated }: { onClose: () => v
           <p className="muted" style={{ fontSize: 12.5, marginTop: -4 }}>Quantity is how many of that prize are in the pool. More copies means better odds of landing on it.</p>
 
           <button className="btn btn-primary btn-lg auth__submit" type="submit" disabled={!valid || busy}>
-            {busy ? 'Creating…' : 'Create wheel'}
+            {busy ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save changes' : 'Create wheel'}
           </button>
         </form>
       </div>

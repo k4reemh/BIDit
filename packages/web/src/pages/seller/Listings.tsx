@@ -137,7 +137,11 @@ export default function Listings() {
       )}
 
       {modal === 'item' && <AddItemModal onClose={() => setModal(null)} onCreated={onCreated} />}
-      {editing && <AddItemModal existing={editing} onClose={() => setEditing(null)} onCreated={onCreated} />}
+      {/* A wheel edit is a prize-pool edit, so it opens the wheel builder, not
+          the single-item form. */}
+      {editing && (editing.wheel
+        ? <AddWheelModal existing={editing} onClose={() => setEditing(null)} onCreated={onCreated} />
+        : <AddItemModal existing={editing} onClose={() => setEditing(null)} onCreated={onCreated} />)}
       {modal === 'wheel' && <AddWheelModal onClose={() => setModal(null)} onCreated={onCreated} />}
     </>
   );
