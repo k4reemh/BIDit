@@ -53,7 +53,7 @@ export default function Privacy() {
       <h2>4. Who we share data with</h2>
       <ul>
         <li><b>Shippo and shipping carriers</b> (USPS, UPS, and others): names, addresses, and parcel details, to quote rates and produce labels, including customs declarations on international shipments.</li>
-        <li><b>Resend:</b> your email address, to deliver transactional email.</li>
+        <li><b>Amazon SES</b> (Amazon Web Services): your email address, to deliver transactional email.</li>
         <li><b>Hosting and infrastructure</b> (Render, Vercel, and our database provider): all service data lives on their servers, which may be located in the United States.</li>
         <li><b>Solana RPC providers</b> (such as Helius): wallet addresses and transactions, to process deposits and withdrawals.</li>
         <li><b>pump.fun:</b> we read public stream and coin data from them; livestreams and chat happen under their own terms and privacy policy.</li>

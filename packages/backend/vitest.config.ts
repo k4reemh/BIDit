@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
+    setupFiles: ['test/scrub-env.ts'],
     // Test files share one embedded Postgres and reset tables between runs, so
     // they must not run in parallel against the same DB.
     fileParallelism: false,
