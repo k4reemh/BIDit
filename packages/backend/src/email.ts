@@ -1,9 +1,8 @@
 /**
- * Transactional email via Amazon SES. A thin seam: with AWS credentials set it
- * sends real mail; without them, it no-ops (logs) so every other environment:
- * tests, local, a friend's box without the keys: works unchanged. Never throws.
+ * Transactional email via Resend. A thin seam: with RESEND_API_KEY set it sends
+ * real mail; without it, it no-ops (logs) so every other environment: tests,
+ * local, a friend's box without the key: works unchanged. Never throws.
  */
-import { sesConfigured, sendViaSes } from './ses.js';
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -46,13 +45,12 @@ export function paragraph(text: string): string {
 
 /** Is real delivery configured? Used by the startup banner and /health so an
  *  operator can tell at a glance whether codes are being mailed or only logged. */
-export const emailEnabled = (): boolean => sesConfigured();
+export const emailEnabled = (): boolean => !!process.env.RESEND_API_KEY;
 
 /** The From address in force. Exposed for the startup banner: a wrong or
- *  unverified From is the single most common reason nothing arrives. The
- *  address (or its domain) must be a verified identity in SES. */
+ *  unverified From is the single most common reason nothing arrives. */
 export const emailFrom = (): string =>
-  process.env.BIDIT_EMAIL_FROM ?? 'BIDit <no-reply@biditsol.com>';
+  process.env.BIDIT_EMAIL_FROM ?? 'BIDit <onboarding@resend.dev>';
 
 export interface SendResult {
   ok: boolean;
@@ -68,21 +66,33 @@ export interface SendResult {
  * impossible to diagnose from outside the server logs.
  */
 export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
+  const key = process.env.RESEND_API_KEY;
   const from = emailFrom();
   const subject = cleanSubject(msg.subject);
   // Never let a code reach the logs. See EmailMessage.sensitive.
   const logSubject = msg.sensitive ? '(redacted: one-time code)' : JSON.stringify(subject);
-  if (!sesConfigured()) {
-    console.log(`[email:noop] to=${msg.to} subject=${logSubject} (set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY to send)`);
-    return { ok: false, error: 'AWS SES credentials are not set, so nothing was sent.' };
+  if (!key) {
+    console.log(`[email:noop] to=${msg.to} subject=${logSubject} (set RESEND_API_KEY to send)`);
+    return { ok: false, error: 'RESEND_API_KEY is not set, so nothing was sent.' };
   }
-  const result = await sendViaSes({ from, to: msg.to, subject, html: msg.html });
-  if (!result.ok) {
-    // SES's body says exactly what's wrong (unverified identity, sandbox
-    // recipient restriction, wrong region). Log it verbatim: it's the whole answer.
-    console.error(`[email] send FAILED from=${from} to=${msg.to} :: ${result.error}`);
-    return result;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ from, to: msg.to, subject, html: msg.html }),
+    });
+    const body = await res.text().catch(() => '');
+    if (!res.ok) {
+      // Resend's body says exactly what's wrong (unverified domain, bad From,
+      // sandbox-recipient restriction). Log it verbatim: it's the whole answer.
+      console.error(`[email] send FAILED ${res.status} from=${from} to=${msg.to} :: ${body}`);
+      return { ok: false, error: `Resend responded ${res.status}: ${body || '(empty body)'}` };
+    }
+    console.log(`[email] sent to=${msg.to} from=${from} subject=${logSubject}`);
+    return { ok: true };
+  } catch (err) {
+    const error = (err as Error)?.message ?? String(err);
+    console.error('[email] network error', error);
+    return { ok: false, error };
   }
-  console.log(`[email] sent to=${msg.to} from=${from} subject=${logSubject}`);
-  return result;
 }

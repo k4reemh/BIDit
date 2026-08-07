@@ -417,7 +417,7 @@ async function main() {
   if (emailEnabled()) {
     console.log(`[email] delivery ON · from=${emailFrom()}`);
   } else {
-    console.warn('[email] ⚠️  AWS SES credentials not set (AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY): verification and reset codes are LOGGED, not delivered.');
+    console.warn('[email] ⚠️  RESEND_API_KEY not set: verification and reset codes are LOGGED, not delivered.');
   }
   if (chain.cluster === 'mainnet-beta') {
     console.log('[chain] ⚠️  MAINNET: REAL USDC WILL MOVE. treasury:', chain.walletAddress('treasury'));

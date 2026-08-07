@@ -92,8 +92,8 @@ export function assertStartupConfig(cluster: string, env: NodeJS.ProcessEnv = pr
     // 6. Without a mail provider, sendEmail no-ops. Verification and reset codes
     //    would then exist only in the server log, which means signup is broken
     //    AND the only copy of every code sits somewhere log access can reach.
-    if (!env.AWS_ACCESS_KEY_ID?.trim() || !env.AWS_SECRET_ACCESS_KEY?.trim()) {
-      problems.push('AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (for SES) are missing: verification and password-reset codes could not be delivered, so nobody could complete signup.');
+    if (!env.RESEND_API_KEY || env.RESEND_API_KEY.trim() === '') {
+      problems.push('RESEND_API_KEY is missing: verification and password-reset codes could not be delivered, so nobody could complete signup.');
     }
   }
 
