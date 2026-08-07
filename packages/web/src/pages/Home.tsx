@@ -44,7 +44,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       {promo?.active && (
         <section className="container promo-wrap">
           <a href="/sell" className="promo-band">
-            <span className="promo-band__badge">Launch offer · first 3 days</span>
+            <span className="promo-band__badge">Launch offer · first day</span>
             <div className="promo-band__body">
               <b className="promo-band__title">Start selling on BIDit, earn a ${promo.bonusUsd} USDC bonus</b>
               <span className="promo-band__sub">

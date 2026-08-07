@@ -54,7 +54,7 @@ describe('launch $100 seller promo', () => {
     expect(s.fulfilledUsd).toBe('105');
   });
 
-  it('does NOT enroll a seller who joined after the 3-day window', async () => {
+  it('does NOT enroll a seller who joined after the enrollment window', async () => {
     process.env.BIDIT_PROMO_START = String(Date.now() - PROMO_WINDOW_MS - 60_000); // window closed
     const seller = await makeUser('buyer');
     await applyAsSeller(seller.userId, prisma);

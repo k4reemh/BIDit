@@ -55,7 +55,7 @@ export default function AdminSellers({ session }: { session: Session | null }) {
             Launch ${promo.bonusUsd} promo · {promo.sellers.length} enrolled {promo.active ? '· signups open' : '· signups closed'}
           </h2>
           <p className="muted" style={{ marginBottom: 10 }}>
-            Sellers who joined in the first 3 days. Once someone hits ${promo.bonusUsd} fulfilled, send the ${promo.bonusUsd} USDC bonus <b>manually to their wallet</b>, then mark it paid. This list moves no treasury funds.
+            Sellers who joined on the first day. Once someone hits ${promo.bonusUsd} fulfilled, send the ${promo.bonusUsd} USDC bonus <b>manually to their wallet</b>, then mark it paid. This list moves no treasury funds.
           </p>
           {promo.sellers.length === 0 && <p className="muted">No enrolled sellers yet.</p>}
           {promo.sellers.map((s) => (

@@ -1,7 +1,7 @@
 /**
  * Launch growth promo: "Start selling on BIDit, earn a $100 USDC bonus."
  *
- * A seller who *joins during the first 3 days of launch* and then fulfils $100 of
+ * A seller who *joins during the first day of launch* and then fulfils $100 of
  * orders earns a $100 USDC match. The match is paid **manually, off-platform**
  * (nothing here moves treasury funds): this module only tracks eligibility and
  * progress so you know who to pay.
@@ -14,7 +14,7 @@ import type { PrismaClient } from './db.js';
 import { formatUsdc, usdc } from '@bidit/shared';
 
 const DAY_MS = 86_400_000;
-export const PROMO_WINDOW_MS = 3 * DAY_MS; // enroll within the first 3 days
+export const PROMO_WINDOW_MS = 1 * DAY_MS; // enroll within the first day
 export const PROMO_BONUS_USD = 100; // the $100 match
 export const PROMO_THRESHOLD = usdc('100'); // fulfil $100 (micro-units)
 
