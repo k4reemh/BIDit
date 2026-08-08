@@ -1092,7 +1092,7 @@ img { display: block; max-width: 100%; }
 .watch--theater .theater { border-radius: 0; box-shadow: none; aspect-ratio: auto;
   /* Fill the viewport below the nav, leaving the meta line visible underneath. */
   height: calc(100vh - var(--nav-h) - 96px); min-height: 360px; }
-.watch--theater .watch__side { position: sticky; top: 0; padding: 0 16px; }
+.watch--theater .watch__side { position: sticky; top: 0; padding: 0 16px; max-height: 100vh; }
 .watch--theater .watch__meta { padding: 0 24px; }
 /* Second press: hand more width to the stream. */
 .watch--wide .watch__grid { grid-template-columns: minmax(0, 1fr) 300px; }
@@ -1113,7 +1113,14 @@ img { display: block; max-width: 100%; }
 .watch__desc { margin-top: 10px; font-size: 14.5px; line-height: 1.6; max-width: 640px; }
 
 /* ---- bid panel (sidebar) ---- */
-.watch__side { position: sticky; top: calc(var(--nav-h) + 16px); }
+/* The side column is bounded to the viewport and the chat flexes to fill
+   whatever the bid panel doesn't use: the chat input can never be pushed
+   below the fold by a busy auction. Scoped to the watch page's side column
+   only: the seller Live page's chat keeps its fixed-height feed. */
+.watch__side { position: sticky; top: calc(var(--nav-h) + 16px); display: flex; flex-direction: column; max-height: calc(100vh - var(--nav-h) - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.watch__side > * { flex-shrink: 0; }
+.watch__side .chat { flex: 1 1 auto; min-height: 210px; }
+.watch__side .chat .chat__feed { height: auto; flex: 1; min-height: 90px; }
 .bp { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
 
 /* ---- live chat ---- */
@@ -1199,7 +1206,9 @@ img { display: block; max-width: 100%; }
 .bp__min { padding: 8px 16px 0; font-size: 12px; color: var(--muted); }
 .bp__reject { margin: 10px 16px 0; padding: 8px 11px; border-radius: 9px; background: #fdecec; color: var(--red); font-size: 12.5px; font-weight: 600; }
 
-.bp__feed { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 2px; }
+/* Newest bid is prepended, so capping the height keeps the fresh bids visible
+   and stops a hot auction from growing the panel and shoving the chat down. */
+.bp__feed { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 2px; max-height: 118px; overflow-y: auto; overscroll-behavior: contain; }
 .bp__feedrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--line-2); }
 .bp__feedrow:last-child { border-bottom: 0; }
 .bp__feedrow b { flex: 1; font-weight: 600; }
@@ -1243,7 +1252,10 @@ img { display: block; max-width: 100%; }
 
 @media (max-width: 900px) {
   .watch__grid { grid-template-columns: 1fr; }
-  .watch__side { position: static; }
+  /* Stacked layout: the column scrolls with the page, so undo the viewport
+     bound and give the chat back its fixed-height feed. */
+  .watch__side { position: static; display: block; max-height: none; }
+  .watch__side .chat .chat__feed { height: 340px; flex: none; }
 }
 
 /* giveaway reveal: retuned proportions so the spotlight frames the avatar, not the name */

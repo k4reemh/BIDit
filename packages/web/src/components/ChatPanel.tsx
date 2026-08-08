@@ -54,12 +54,22 @@ export default function ChatPanel({
     return () => c.close();
   }, [room, session?.userId]);
 
-  // Keep the newest message in view by scrolling the feed itself, never
-  // scrollIntoView, which scrolls every ancestor and yanks the whole page.
+  // Stick-to-bottom: follow new messages only while the reader is AT the
+  // bottom, so scrolling up to read history isn't yanked away. Tracked in a
+  // ref updated on every scroll, BEFORE the new message changes scrollHeight.
+  // (This used to key on msgs.length, which stops changing once the history
+  // cap trims the array — busy streams lost auto-scroll exactly when it
+  // mattered.) Scrolls the feed itself, never scrollIntoView, which scrolls
+  // every ancestor and yanks the whole page.
+  const stickRef = useRef(true);
+  const onFeedScroll = () => {
+    const el = feedRef.current;
+    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
   useEffect(() => {
     const el = feedRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs.length]);
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [msgs]);
 
   // Tick the cooldown countdown.
   useEffect(() => {
@@ -86,7 +96,7 @@ export default function ChatPanel({
     <aside className="chat card">
       <div className="chat__head"><Chat width={16} height={16} /> Live chat</div>
 
-      <div className="chat__feed" ref={feedRef}>
+      <div className="chat__feed" ref={feedRef} onScroll={onFeedScroll}>
         {msgs.length === 0 && <p className="chat__empty">No messages yet. Say hi.</p>}
         {msgs.map((m) => (
           <div key={m.id} className="chat__msg">
