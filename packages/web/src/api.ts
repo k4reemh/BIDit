@@ -226,6 +226,24 @@ export const adminBanUser = (userId: string, reason: string | null) =>
 export const adminUnbanUser = (userId: string) =>
   req<{ ok: boolean }>('/admin/unban', { method: 'POST', body: JSON.stringify({ userId }) });
 
+export interface StatsPoint { t: number; n: number }
+export interface AdminStats {
+  users: {
+    total: number; lastHour: number; lastDay: number; last7d: number;
+    sellers: number; verifiedSellers: number;
+    hourly: StatsPoint[]; daily: StatsPoint[];
+  };
+  money: {
+    gmvUsd: string; orders: number;
+    feesUsd: string; releasedOrders: number;
+    refundedUsd: string; refundedOrders: number;
+    buybackUsd: string; buybacks: number;
+    depositedUsd: string; withdrawnUsd: string;
+  };
+}
+
+export const adminStats = () => req<AdminStats>('/admin/stats');
+
 export const applySeller = () => req<Session>('/seller/apply', { method: 'POST', body: '{}' });
 
 export const submitSellerOnboarding = (payload: {

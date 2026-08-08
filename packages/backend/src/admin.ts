@@ -121,3 +121,136 @@ export async function ledgerAudit(
     buybackPending: formatUsdc(await getBuybackPending(prisma)),
   };
 }
+
+export interface StatsPoint {
+  /** Bucket start, ms since epoch (UTC hour/day boundary). */
+  t: number;
+  n: number;
+}
+
+export interface AdminStats {
+  users: {
+    total: number;
+    lastHour: number;
+    lastDay: number;
+    last7d: number;
+    sellers: number;
+    verifiedSellers: number;
+    /** Signups per hour for the trailing 24 hours (oldest first, zero-filled). */
+    hourly: StatsPoint[];
+    /** Signups per day for the trailing 14 days (oldest first, zero-filled). */
+    daily: StatsPoint[];
+  };
+  money: {
+    /** Order volume (all orders except refunded/canceled), human USDC. */
+    gmvUsd: string;
+    orders: number;
+    /** Realized platform fees: released orders only. */
+    feesUsd: string;
+    releasedOrders: number;
+    refundedUsd: string;
+    refundedOrders: number;
+    /** Executed $BID buybacks. */
+    buybackUsd: string;
+    buybacks: number;
+    /** Real money in/out, from the ledger's credit/debit legs. */
+    depositedUsd: string;
+    withdrawnUsd: string;
+  };
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+/** Zero-fill a bucketed count series so quiet periods show as 0, not gaps. */
+function fillSeries(
+  raw: Array<{ bucket: Date; n: bigint }>,
+  stepMs: number,
+  buckets: number,
+  now: number,
+): StatsPoint[] {
+  const startOfCurrent = Math.floor(now / stepMs) * stepMs;
+  const byBucket = new Map(raw.map((r) => [r.bucket.getTime(), Number(r.n)]));
+  const out: StatsPoint[] = [];
+  for (let i = buckets - 1; i >= 0; i -= 1) {
+    const t = startOfCurrent - i * stepMs;
+    out.push({ t, n: byBucket.get(t) ?? 0 });
+  }
+  return out;
+}
+
+/** Launch dashboard numbers: signups, volume, fees, buybacks, money in/out. */
+export async function adminStats(
+  adminId: string,
+  prisma: PrismaClient = defaultPrisma,
+  now = Date.now(),
+): Promise<AdminStats> {
+  await requireAdmin(adminId, prisma);
+
+  const [total, lastHour, lastDay, last7d, sellers, verifiedSellers] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { createdAt: { gte: new Date(now - HOUR_MS) } } }),
+    prisma.user.count({ where: { createdAt: { gte: new Date(now - DAY_MS) } } }),
+    prisma.user.count({ where: { createdAt: { gte: new Date(now - 7 * DAY_MS) } } }),
+    prisma.sellerProfile.count(),
+    prisma.sellerProfile.count({ where: { verified: true } }),
+  ]);
+
+  // Bucketed signup counts (UTC). Empty buckets are filled with zeros so the
+  // chart shows a quiet hour as quiet instead of skipping it.
+  const [hourlyRaw, dailyRaw] = await Promise.all([
+    prisma.$queryRaw<Array<{ bucket: Date; n: bigint }>>`
+      SELECT date_trunc('hour', "createdAt") AS bucket, count(*)::bigint AS n
+      FROM "User" WHERE "createdAt" >= ${new Date(now - 24 * HOUR_MS)}
+      GROUP BY 1 ORDER BY 1`,
+    prisma.$queryRaw<Array<{ bucket: Date; n: bigint }>>`
+      SELECT date_trunc('day', "createdAt") AS bucket, count(*)::bigint AS n
+      FROM "User" WHERE "createdAt" >= ${new Date(now - 14 * DAY_MS)}
+      GROUP BY 1 ORDER BY 1`,
+  ]);
+
+  const [gmv, released, refunded, buyback] = await Promise.all([
+    prisma.order.aggregate({
+      _sum: { amount: true },
+      _count: true,
+      where: { status: { notIn: ['REFUNDED', 'CANCELED'] } },
+    }),
+    prisma.order.aggregate({ _sum: { platformFee: true }, _count: true, where: { status: 'RELEASED' } }),
+    prisma.order.aggregate({ _sum: { amount: true }, _count: true, where: { status: 'REFUNDED' } }),
+    prisma.buyback.aggregate({ _sum: { amount: true }, _count: true, where: { status: 'EXECUTED' } }),
+  ]);
+
+  // Double-entry: each deposit/withdrawal writes a credit and a matching debit
+  // (they sum to zero across accounts), so total real money moved is the sum of
+  // one side only. Deposits: the positive (user-credit) legs. Withdrawals: the
+  // negative (user-debit) legs, reported as a positive "money out" number.
+  const [deposited, withdrawn] = await Promise.all([
+    prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'DEPOSIT', amount: { gt: 0n } } }),
+    prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'WITHDRAWAL', amount: { lt: 0n } } }),
+  ]);
+
+  return {
+    users: {
+      total,
+      lastHour,
+      lastDay,
+      last7d,
+      sellers,
+      verifiedSellers,
+      hourly: fillSeries(hourlyRaw, HOUR_MS, 24, now),
+      daily: fillSeries(dailyRaw, DAY_MS, 14, now),
+    },
+    money: {
+      gmvUsd: formatUsdc(gmv._sum.amount ?? 0n),
+      orders: gmv._count,
+      feesUsd: formatUsdc(released._sum.platformFee ?? 0n),
+      releasedOrders: released._count,
+      refundedUsd: formatUsdc(refunded._sum.amount ?? 0n),
+      refundedOrders: refunded._count,
+      buybackUsd: formatUsdc(buyback._sum.amount ?? 0n),
+      buybacks: buyback._count,
+      depositedUsd: formatUsdc(deposited._sum.amount ?? 0n),
+      withdrawnUsd: formatUsdc(-(withdrawn._sum.amount ?? 0n)),
+    },
+  };
+}

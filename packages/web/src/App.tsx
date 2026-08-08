@@ -18,6 +18,7 @@ import Privacy from './pages/Privacy';
 import Points from './pages/Points';
 import Leaderboard from './pages/Leaderboard';
 import AdminSellers from './pages/admin/Sellers';
+import AdminStats from './pages/admin/Stats';
 import AdminOrders from './pages/admin/Orders';
 import AdminShipments from './pages/admin/Shipments';
 import AdminUsers from './pages/admin/Users';
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/points" element={<Points session={session} onAuth={() => setAuth('signup')} />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/admin" element={<Navigate to="/admin/shipments" replace />} />
+          <Route path="/admin/stats" element={<AdminStats session={session} />} />
           <Route path="/admin/sellers" element={<AdminSellers session={session} />} />
           <Route path="/admin/orders" element={<AdminOrders session={session} />} />
           <Route path="/admin/users" element={<AdminUsers session={session} />} />

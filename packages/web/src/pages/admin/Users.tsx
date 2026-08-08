@@ -68,6 +68,7 @@ export default function AdminUsers({ session }: { session: Session | null }) {
         <h1 className="display acct-title">Accounts</h1>
         <p className="muted">Search by username or email. With the box empty this lists everyone currently suspended.</p>
         <div className="adm-nav">
+          <Link to="/admin/stats">Stats</Link> <span>·</span>
           <Link to="/admin/sellers">Sellers</Link> <span>·</span>
           <Link to="/admin/orders">Orders</Link> <span>·</span>
           <Link to="/admin/shipments">Shipping</Link> <span>·</span>

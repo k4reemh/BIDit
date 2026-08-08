@@ -42,9 +42,11 @@ export default function AdminShipments({ session }: { session: Session | null })
     <main className="admin">
       <div className="acct-head">
         <div className="adm-nav">
+          <Link to="/admin/stats">Stats</Link> <span>·</span>{' '}
           <Link to="/admin/sellers">Sellers</Link> <span>·</span>{' '}
           <Link to="/admin/orders">Orders</Link> <span>·</span>{' '}
-          <Link to="/admin/shipments" className="active">Shipping</Link>
+          <Link to="/admin/shipments" className="active">Shipping</Link> <span>·</span>{' '}
+          <Link to="/admin/users">Accounts</Link>
         </div>
         <h1 className="display acct-title">Shipping labels</h1>
         <p className="muted">Packages a seller has confirmed and that need a label. Buy the carrier label (seller&nbsp;→&nbsp;buyer, at the size shown), paste its link and tracking number, and save. The seller gets an email to print and ship it.</p>

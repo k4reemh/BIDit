@@ -81,7 +81,7 @@ import {
   removeRoomModerator,
 } from '../src/chat.js';
 import { getPointsSummary, claimMission, getLeaderboard, PointsError } from '../src/points.js';
-import { verifySeller, listSellers, setSellerVisibility, ledgerAudit } from '../src/admin.js';
+import { verifySeller, listSellers, setSellerVisibility, ledgerAudit, adminStats } from '../src/admin.js';
 import { reconcileWallets } from '../src/audit.js';
 import { DevWalletEscrow, ProgramEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
@@ -1831,6 +1831,13 @@ async function main() {
           from: emailFrom(),
           configured: emailEnabled(),
         });
+      }
+      // Launch dashboard: signups (with hourly/daily series), volume, fees,
+      // buybacks, money in/out. Read-only aggregates; admin-gated in adminStats.
+      if (req.method === 'GET' && p === '/admin/stats') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await adminStats(userId, prisma));
       }
       if (req.method === 'GET' && p === '/admin/orders') {
         const userId = authUser(req);
