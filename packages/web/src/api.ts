@@ -392,6 +392,30 @@ export const getWalletAudit = () => req<WalletAudit>('/admin/wallet-audit');
 export const getListings = () => req<SellerListing[]>('/seller/listings');
 export const getSellerOrders = () => req<SellerOrder[]>('/seller/orders');
 
+export interface SaleRow extends SellerOrder {
+  kind: 'auction' | 'store' | 'giveaway';
+}
+export interface SalesPage { rows: SaleRow[]; total: number }
+
+/** Full sales history: every order plus drawn giveaways, filtered + paginated. */
+export const getSellerSales = (opts: {
+  q?: string;
+  kind?: 'auction' | 'store' | 'giveaway' | 'all';
+  fromMs?: number;
+  toMs?: number;
+  skip?: number;
+  take?: number;
+} = {}) => {
+  const p = new URLSearchParams({ v: '2' });
+  if (opts.q) p.set('q', opts.q);
+  if (opts.kind && opts.kind !== 'all') p.set('kind', opts.kind);
+  if (opts.fromMs !== undefined) p.set('from', String(opts.fromMs));
+  if (opts.toMs !== undefined) p.set('to', String(opts.toMs));
+  if (opts.skip) p.set('skip', String(opts.skip));
+  if (opts.take) p.set('take', String(opts.take));
+  return req<SalesPage>(`/seller/orders?${p.toString()}`);
+};
+
 export const createListing = (body: {
   title: string;
   imageUrl?: string;

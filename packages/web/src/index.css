@@ -720,6 +720,21 @@ img { display: block; max-width: 100%; }
 .ord__status { text-transform: capitalize; }
 .ord__status--locked { color: var(--amber); background: #fbf1d8; }
 .ord__status--shipped, .ord__status--delivered, .ord__status--released { color: var(--accent-strong); background: var(--accent-soft); }
+.ord__status--giveaway { color: #8f76ff; background: rgba(124, 92, 255, 0.14); }
+
+/* ---- seller sales history: filter bar + load-more footer ---- */
+.salesbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+.salesbar__q { flex: 1 1 220px; max-width: 300px; height: 42px; border-radius: 11px; background: var(--surface-2);
+  border: 1px solid var(--line); padding: 0 14px; font-size: 14.5px; color: var(--ink); font-family: inherit; }
+.salesbar__q:focus { outline: none; border-color: rgba(255, 106, 0, 0.6); box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.12); }
+.salesbar__kinds { display: flex; gap: 8px; }
+.salesbar__dates { display: flex; align-items: center; gap: 8px; }
+.salesbar__dates input { height: 42px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--line);
+  padding: 0 10px; font-size: 14px; color: var(--ink); font-family: inherit; }
+.salesbar__clear { background: none; border: none; color: var(--accent-strong); font-weight: 700; font-size: 13.5px;
+  cursor: pointer; font-family: inherit; }
+.salesbar__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; }
+@media (max-width: 700px) { .salesbar__q { max-width: none; } }
 .ord__proceeds { font-size: 12.5px; }
 .ord__act { display: flex; align-items: center; gap: 8px; flex: none; }
 .ord__track { width: 118px; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); padding: 0 10px; font-size: 13.5px; color: var(--ink); }

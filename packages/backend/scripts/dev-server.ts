@@ -61,6 +61,7 @@ import {
 } from '../src/email-verify.js';
 import { sellerFulfilledCount, VERIFY_THRESHOLD } from '../src/seller-verify.js';
 import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '../src/promo.js';
+import { listSellerSales } from '../src/seller-sales.js';
 import {
   resolveRoomByCoin,
   linkCoinToSeller,
@@ -1041,6 +1042,27 @@ async function main() {
       if (req.method === 'GET' && p === '/seller/orders') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        // v=2: the full filterable/paginated sales history ({rows,total}),
+        // including drawn giveaways. Without it, the legacy 50-row array, so a
+        // web bundle loaded before this deploy keeps working until refreshed.
+        if (url.searchParams.get('v') === '2') {
+          const num = (name: string) => {
+            const raw = url.searchParams.get(name);
+            if (raw === null || raw === '') return undefined;
+            const n = Number(raw);
+            return Number.isFinite(n) ? n : undefined;
+          };
+          const kindRaw = url.searchParams.get('kind') ?? 'all';
+          const kind = (['auction', 'store', 'giveaway', 'all'] as const).find((k) => k === kindRaw) ?? 'all';
+          return send(res, 200, await listSellerSales(userId, {
+            q: (url.searchParams.get('q') ?? '').slice(0, 80),
+            kind,
+            fromMs: num('from'),
+            toMs: num('to'),
+            skip: num('skip'),
+            take: num('take'),
+          }, prisma));
+        }
         return send(res, 200, await sellerOrdersDto(userId));
       }
       // Public: launch "$100 to sell" promo state (drives the homepage banner).
