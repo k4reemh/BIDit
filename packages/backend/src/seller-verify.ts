@@ -10,9 +10,11 @@ import { notify } from './notifications.js';
 export const VERIFY_THRESHOLD = 10;
 
 /** Orders a seller has fulfilled: items that have shipped (or been delivered).
- *  This is the metric that earns the badge. */
+ *  This is the metric that earns the badge. PAID items only: giveaway prizes
+ *  are amount-0 fulfillment items, and counting them would let a seller farm
+ *  Verified by "giving away" ten worthless prizes to friends. */
 export function sellerFulfilledCount(sellerId: string, prisma: PrismaClient = defaultPrisma): Promise<number> {
-  return prisma.fulfillmentItem.count({ where: { sellerId, status: { in: ['SHIPPED', 'DELIVERED'] } } });
+  return prisma.fulfillmentItem.count({ where: { sellerId, status: { in: ['SHIPPED', 'DELIVERED'] }, amount: { gt: 0 } } });
 }
 
 /** Auto-verify a seller once they've fulfilled VERIFY_THRESHOLD orders. Idempotent

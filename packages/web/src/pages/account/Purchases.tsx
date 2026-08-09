@@ -17,8 +17,8 @@ function Row({ p }: { p: Purchase }) {
     <div className="ship-row">
       <Thumb src={p.image} />
       <div className="ship-meta">
-        <b>{p.title}</b>
-        <span className="muted">${p.amount}</span>
+        <b>{p.title}{p.giveaway && <span className="gw-pill">🎁 Giveaway</span>}</b>
+        <span className="muted">{p.giveaway ? 'Free · you only cover shipping' : `$${p.amount}`}</span>
       </div>
       {p.stage === 'to_ship' && <Link className="btn btn-primary btn-sm" to="/ship">Ship item</Link>}
       {p.stage === 'in_transit' && (
@@ -58,13 +58,18 @@ export default function Purchases() {
   useAccount();
   const [items, setItems] = useState<Purchase[] | null>(null);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'all' | 'purchases' | 'giveaways'>('all');
   useEffect(() => {
     getPurchases().then(setItems).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your purchases.'));
   }, []);
 
-  const toShip = (items ?? []).filter((p) => p.stage === 'to_ship');
-  const inTransit = (items ?? []).filter((p) => p.stage === 'in_transit');
-  const delivered = (items ?? []).filter((p) => p.stage === 'delivered');
+  const visible = (items ?? []).filter((p) =>
+    tab === 'all' ? true : tab === 'giveaways' ? p.giveaway : !p.giveaway,
+  );
+  const giveawayCount = (items ?? []).filter((p) => p.giveaway).length;
+  const toShip = visible.filter((p) => p.stage === 'to_ship');
+  const inTransit = visible.filter((p) => p.stage === 'in_transit');
+  const delivered = visible.filter((p) => p.stage === 'delivered');
   const empty = items && items.length === 0;
 
   return (
@@ -73,6 +78,16 @@ export default function Purchases() {
         <h1 className="display acct-title">Purchases</h1>
         <p className="muted">Everything you win, from the buzzer to your doorstep.</p>
       </div>
+
+      {giveawayCount > 0 && (
+        <div className="salesbar" style={{ marginBottom: 14 }}>
+          {([['all', 'All'], ['purchases', 'Purchases'], ['giveaways', `🎁 Giveaways (${giveawayCount})`]] as const).map(([k, label]) => (
+            <button key={k} className={`chip${tab === k ? ' on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <div className="auth__error">{error}</div>}
       {empty && (

@@ -73,7 +73,7 @@ import {
 } from '../src/sellers.js';
 import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
-import { openGiveaway, getOpenGiveaway } from '../src/giveaways.js';
+import { openGiveaway, getOpenGiveaway, ensureGiveawayFulfillment } from '../src/giveaways.js';
 import {
   CHAT_COOLDOWN_MS,
   canModerateRoom,
@@ -320,6 +320,8 @@ async function main() {
   }
   // Register existing users so their deposits are watched across restarts.
   await registerAllDeposits(chain, prisma).catch((e) => console.error('[deposits] register', e));
+  // Prizes drawn before giveaway fulfillment existed become Ready-to-Ship items.
+  await ensureGiveawayFulfillment(prisma).catch((e) => console.error('[giveaways] backfill', e));
   // Accounts that predate email verification are trusted (see the function's
   // note), without this, everyone who already signed up would be locked out.
   await backfillLegacyVerified(prisma)
@@ -2294,6 +2296,7 @@ async function buyerFulfillmentDto(buyerId: string) {
       sellerId: it.sellerId,
       status: it.status,
       heldUntil: it.heldUntil ? it.heldUntil.getTime() : null,
+      giveaway: it.orderId.startsWith('gw_'),
     })),
     shipments: (await Promise.all(shipments.map((s) => shipmentDto(s.id)))).filter(Boolean),
   };
@@ -2317,6 +2320,7 @@ async function buyerPurchasesDto(buyerId: string) {
       amount: formatUsdc(r.amount),
       stage,
       won: r.won,
+      giveaway: r.orderId.startsWith('gw_'),
       tracking: r.shipment?.trackingNumber ?? null,
       carrier: r.shipment?.carrier ?? null,
       deliveredAt: r.shipment?.deliveredAt ? r.shipment.deliveredAt.getTime() : null,

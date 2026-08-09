@@ -635,6 +635,8 @@ export interface FulfillmentItem {
   sellerId: string;
   status: string;
   heldUntil: number | null;
+  /** A giveaway prize (free item): shipping is the only cost. */
+  giveaway?: boolean;
 }
 export interface ShipmentItem {
   id: string;
@@ -702,6 +704,8 @@ export interface Purchase {
   stage: 'to_ship' | 'in_transit' | 'delivered';
   /** Won at auction (as opposed to bought outright): gates "I just won" sharing. */
   won?: boolean;
+  /** A giveaway prize the user won (free, ships like any item). */
+  giveaway?: boolean;
   tracking: string | null;
   carrier: string | null;
   deliveredAt: number | null;

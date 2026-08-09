@@ -20,6 +20,8 @@ import {
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { systemClock, type Clock } from './clock.js';
+import { createFulfillmentItem } from './fulfillment.js';
+import { notify } from './notifications.js';
 
 export type GiveawayEnterReason = 'NOT_ELIGIBLE' | 'CLOSED' | 'NOT_OPEN';
 
@@ -175,11 +177,44 @@ export async function drawGiveaway(
 
   const winnerIndex = pickWinnerIndex(entrants.length, g.seed);
   const winner = entrants[winnerIndex]!;
-  if (g.status !== 'CLOSED' || !g.winnerUserId) {
+  const newlyDrawn = g.status !== 'CLOSED' || !g.winnerUserId;
+  if (newlyDrawn) {
     await prisma.giveaway.update({
       where: { id: giveawayId },
       data: { status: 'CLOSED', winnerUserId: winner.userId, drawnAt: clock.now() },
     });
+  }
+  // The prize becomes a Ready-to-Ship item for the winner (amount 0), so it
+  // rides the SAME rails as a paid win: address, shipping quote (the winner
+  // covers shipping), the seller's confirm-size queue, labels, tracking.
+  // Idempotent per giveaway; repeated draws re-derive the same winner and the
+  // unique orderId dedupes the item. Never for the seller's own account.
+  if (winner.userId !== g.sellerId) {
+    await createFulfillmentItem(
+      {
+        orderId: `gw_${giveawayId}`,
+        buyerId: winner.userId,
+        sellerId: g.sellerId,
+        listingId: `gw_${giveawayId}`,
+        title: g.prize,
+        photo: g.image ?? null,
+        amount: 0n,
+      },
+      clock,
+      prisma,
+    );
+    if (newlyDrawn) {
+      await notify(
+        {
+          userId: winner.userId,
+          kind: 'giveaway_won',
+          title: `You won: ${g.prize} 🎁`,
+          body: 'It’s in your Ready to ship. Add it to a shipment whenever you like — the prize is free, you only cover shipping.',
+          href: '/ship',
+        },
+        prisma,
+      ).catch(() => {}); // a failed notification must never fail the draw
+    }
   }
   return {
     ok: true,
@@ -203,4 +238,40 @@ export async function getOpenGiveaway(
     where: { sellerId, status: 'OPEN' },
     orderBy: { createdAt: 'desc' },
   });
+}
+
+/**
+ * Backfill: Ready-to-Ship items for giveaways drawn BEFORE fulfillment existed.
+ * Runs once at startup; createFulfillmentItem is idempotent per giveaway, so
+ * re-running is free. Covers prizes from streams that finished before this
+ * feature shipped.
+ */
+export async function ensureGiveawayFulfillment(prisma: PrismaClient = defaultPrisma): Promise<number> {
+  const drawn = await prisma.giveaway.findMany({
+    where: { status: 'CLOSED', winnerUserId: { not: null } },
+    orderBy: { drawnAt: 'desc' },
+    take: 1000,
+  });
+  let created = 0;
+  for (const g of drawn) {
+    if (g.winnerUserId === g.sellerId) continue;
+    const exists = await prisma.fulfillmentItem.findUnique({ where: { orderId: `gw_${g.id}` }, select: { id: true } });
+    if (exists) continue;
+    await createFulfillmentItem(
+      {
+        orderId: `gw_${g.id}`,
+        buyerId: g.winnerUserId!,
+        sellerId: g.sellerId,
+        listingId: `gw_${g.id}`,
+        title: g.prize,
+        photo: g.image ?? null,
+        amount: 0n,
+      },
+      systemClock,
+      prisma,
+    );
+    created += 1;
+  }
+  if (created > 0) console.log(`[giveaways] backfilled ${created} prize(s) into Ready to ship`);
+  return created;
 }

@@ -197,7 +197,7 @@ function SellerGroup({ items, onChanged, defaultPrivate = false }: { items: Fulf
             {it.image ? <img className="ship-thumb" src={it.image} alt="" /> : <div className="ship-thumb ship-thumb--ph" />}
             <div className="ship-meta">
               <b>{it.title}</b>
-              <span className="muted">Paid ${money2(it.amount)}{it.weightGrams ? ` · ~${it.weightGrams}g` : ''}</span>
+              <span className="muted">{it.giveaway ? 'Giveaway prize · free' : `Paid $${money2(it.amount)}`}{it.weightGrams ? ` · ~${it.weightGrams}g` : ''}</span>
             </div>
             <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => discard(it.id, it.title)}>Discard</button>
           </label>
