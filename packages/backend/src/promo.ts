@@ -8,6 +8,9 @@
  *
  * Enrollment window is driven by BIDIT_PROMO_START (set at launch). Unset ⇒ the
  * promo is inactive everywhere (banners hidden, nobody enrolled).
+ * BIDIT_PROMO_END (optional) overrides the window end, so the offer can be
+ * extended or re-opened from the dashboard without a code change — earlier
+ * sellers stay enrolled because the start never moves.
  */
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
@@ -27,6 +30,19 @@ export function promoStartMs(): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/** Enrollment window end (ms). BIDIT_PROMO_END (ISO-8601 or raw ms) overrides
+ *  the default start + PROMO_WINDOW_MS; ignored if unparseable or not after
+ *  the start. Null iff the promo is unconfigured. */
+export function promoEndMs(startMs: number | null = promoStartMs()): number | null {
+  if (startMs === null) return null;
+  const raw = process.env.BIDIT_PROMO_END?.trim();
+  if (raw) {
+    const ms = /^\d+$/.test(raw) ? Number(raw) : Date.parse(raw);
+    if (Number.isFinite(ms) && ms > startMs) return ms;
+  }
+  return startMs + PROMO_WINDOW_MS;
+}
+
 export interface PromoState {
   active: boolean; // enrollment window open right now
   bonusUsd: number;
@@ -37,14 +53,14 @@ export interface PromoState {
 
 export function promoState(now = Date.now()): PromoState {
   const startMs = promoStartMs();
-  const enrollEndsMs = startMs === null ? null : startMs + PROMO_WINDOW_MS;
+  const enrollEndsMs = promoEndMs(startMs);
   const active = startMs !== null && now >= startMs && now < enrollEndsMs!;
   return { active, bonusUsd: PROMO_BONUS_USD, thresholdUsd: PROMO_BONUS_USD, startMs, enrollEndsMs };
 }
 
 /** True if a seller who joined at `joinedMs` falls inside the enrollment window. */
 export function isEnrolled(joinedMs: number, startMs = promoStartMs()): boolean {
-  return startMs !== null && joinedMs >= startMs && joinedMs < startMs + PROMO_WINDOW_MS;
+  return startMs !== null && joinedMs >= startMs && joinedMs < promoEndMs(startMs)!;
 }
 
 /** Fulfilled sale value (micro-units) for a seller: items shipped or delivered.
@@ -103,8 +119,9 @@ export interface PromoSellerRow {
 export async function listPromoSellers(prisma: PrismaClient = defaultPrisma) {
   const startMs = promoStartMs();
   if (startMs === null) return { configured: false, startMs: null, enrollEndsMs: null, bonusUsd: PROMO_BONUS_USD, active: false, sellers: [] as PromoSellerRow[] };
+  const endMs = promoEndMs(startMs)!;
   const profiles = await prisma.sellerProfile.findMany({
-    where: { createdAt: { gte: new Date(startMs), lt: new Date(startMs + PROMO_WINDOW_MS) } },
+    where: { createdAt: { gte: new Date(startMs), lt: new Date(endMs) } },
     include: { user: { select: { handle: true, email: true } } },
     orderBy: { createdAt: 'asc' },
   });
@@ -123,7 +140,7 @@ export async function listPromoSellers(prisma: PrismaClient = defaultPrisma) {
       };
     }),
   );
-  return { configured: true, startMs, enrollEndsMs: startMs + PROMO_WINDOW_MS, bonusUsd: PROMO_BONUS_USD, active: promoState().active, sellers };
+  return { configured: true, startMs, enrollEndsMs: endMs, bonusUsd: PROMO_BONUS_USD, active: promoState().active, sellers };
 }
 
 /** Admin: record that a seller's $100 bonus was paid out (manually). Idempotent. */

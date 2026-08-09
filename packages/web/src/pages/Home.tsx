@@ -24,6 +24,14 @@ const HOW = [
   },
 ];
 
+/** Badge for the promo band: live countdown from the server's window end. */
+function promoBadge(endsMs: number | null): string {
+  if (!endsMs) return 'Launch offer';
+  const daysLeft = Math.ceil((endsMs - Date.now()) / 86_400_000);
+  if (daysLeft <= 1) return 'Launch offer · last day';
+  return `Launch offer · ${daysLeft} days left`;
+}
+
 export default function Home({ onAuth }: { onAuth: () => void }) {
   const [live, setLive] = useState<LiveCoin[] | null>(null);
   const [promo, setPromo] = useState<PromoState | null>(null);
@@ -44,7 +52,7 @@ export default function Home({ onAuth }: { onAuth: () => void }) {
       {promo?.active && (
         <section className="container promo-wrap">
           <a href="/sell" className="promo-band">
-            <span className="promo-band__badge">Launch offer · first day</span>
+            <span className="promo-band__badge">{promoBadge(promo.enrollEndsMs)}</span>
             <div className="promo-band__body">
               <b className="promo-band__title">Start selling on BIDit, earn a ${promo.bonusUsd} USDC bonus</b>
               <span className="promo-band__sub">
