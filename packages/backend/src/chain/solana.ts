@@ -11,7 +11,7 @@
  * address is swept to treasury after crediting); a production deploy would use a
  * webhook/indexer (e.g. Helius) instead of polling.
  */
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction, VersionedTransaction } from '@solana/web3.js';
 import {
   getOrCreateAssociatedTokenAccount,
   getAssociatedTokenAddress,
@@ -20,7 +20,7 @@ import {
   transfer as splTransfer,
 } from '@solana/spl-token';
 import bs58 from 'bs58';
-import type { ChainClient, DepositEvent, SendResult, TransferStatus, WalletName } from './types.js';
+import type { ChainClient, DepositEvent, SendResult, SolDepositEvent, SwapResult, TransferStatus, WalletName } from './types.js';
 import { deriveDepositKeypair as walletDeriveDepositKeypair } from '../wallet.js';
 
 function loadKeypair(envVar: string): Keypair {
@@ -139,6 +139,63 @@ export class SolanaChain implements ChainClient {
     } catch {
       return true;
     }
+  }
+
+  /** Native SOL balance (lamports) of a named wallet or raw address. */
+  async solBalanceLamports(target: WalletName | string): Promise<bigint> {
+    const pubkey = (this.wallets as Record<string, Keypair>)[target]?.publicKey ?? new PublicKey(target);
+    return BigInt(await this.conn.getBalance(pubkey, 'confirmed'));
+  }
+
+  /**
+   * Swap `lamports` of treasury SOL into USDC via Jupiter (mainnet aggregator).
+   * The auto-swap worker calls this so deposited SOL becomes the USDC that backs
+   * user balances. Actual USDC received is measured by the treasury USDC balance
+   * delta (not the quote), so the audit record reflects reality after slippage.
+   * Throws on any failure — the worker retries next tick and no record is written.
+   */
+  async swapSolToUsdc(lamports: bigint): Promise<SwapResult> {
+    if (lamports <= 0n) throw new Error('swap amount must be positive');
+    const SOL_MINT = 'So11111111111111111111111111111111111111112';
+    const slippageBps = Number(process.env.BIDIT_SWAP_SLIPPAGE_BPS ?? 100);
+    const treasury = this.wallets.treasury;
+
+    // 1. Quote.
+    const quoteUrl =
+      `https://quote-api.jup.ag/v6/quote?inputMint=${SOL_MINT}&outputMint=${this.usdcMint.toBase58()}` +
+      `&amount=${lamports.toString()}&slippageBps=${slippageBps}`;
+    const quoteRes = await fetch(quoteUrl, { signal: AbortSignal.timeout(8000) });
+    if (!quoteRes.ok) throw new Error(`jupiter quote → ${quoteRes.status}`);
+    const quote = (await quoteRes.json()) as { outAmount?: string };
+    if (!quote?.outAmount) throw new Error('jupiter quote: no route');
+
+    // 2. Build the swap tx (Jupiter returns a signed-by-nobody versioned tx).
+    const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        quoteResponse: quote,
+        userPublicKey: treasury.publicKey.toBase58(),
+        wrapAndUnwrapSol: true, // pull native SOL, deliver native USDC
+        dynamicComputeUnitLimit: true,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!swapRes.ok) throw new Error(`jupiter swap → ${swapRes.status}`);
+    const { swapTransaction } = (await swapRes.json()) as { swapTransaction?: string };
+    if (!swapTransaction) throw new Error('jupiter swap: no transaction');
+
+    // 3. Measure the real USDC received via a balance delta around the swap.
+    const usdcBefore = await this.balance('treasury');
+    const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, 'base64'));
+    tx.sign([treasury]);
+    const sig = await this.conn.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 5 });
+    const { blockhash, lastValidBlockHeight } = await this.conn.getLatestBlockhash('confirmed');
+    await this.conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+    const usdcAfter = await this.balance('treasury');
+    const usdcMicrosOut = usdcAfter - usdcBefore;
+    if (usdcMicrosOut <= 0n) throw new Error(`swap ${sig} confirmed but treasury USDC did not increase`);
+    return { lamportsIn: lamports, usdcMicrosOut, txSig: sig };
   }
 
   async transfer(from: WalletName, to: string, amountMicros: bigint): Promise<string> {
@@ -275,5 +332,72 @@ export class SolanaChain implements ChainClient {
       }
     }
     return { events, cursor: null };
+  }
+
+  /**
+   * Sweep native SOL sitting at users' deposit addresses into treasury, and
+   * report the lamports moved so the ledger can credit a USDC-denominated amount
+   * at the oracle price. Sweep-and-report like pollDeposits: an event exists only
+   * after the lamports are confirmed in treasury, and the sweep signature is the
+   * idempotency key. Balances under `minLamports` are left as dust (not worth the
+   * fee) and count toward the user's next deposit.
+   *
+   * The deposit address is a plain system account, so its whole balance is swept
+   * to zero. Treasury is the fee payer (so the account can drain completely) and
+   * the deposit keypair signs to authorize the debit.
+   */
+  async pollSolDeposits(minLamports: bigint): Promise<SolDepositEvent[]> {
+    const events: SolDepositEvent[] = [];
+    const treasury = this.wallets.treasury;
+    const owners = [...this.depositOwners.entries()];
+    if (owners.length === 0) return events;
+
+    // 1. Read native lamports of every deposit owner account, batched.
+    const funded: { userId: string; depositKp: Keypair; lamports: bigint }[] = [];
+    const BATCH = 100;
+    for (let i = 0; i < owners.length; i += BATCH) {
+      const slice = owners.slice(i, i + BATCH).map(([, kp]) => kp.publicKey);
+      let infos: (Awaited<ReturnType<Connection['getMultipleAccountsInfo']>>[number])[] = [];
+      try {
+        infos = await this.conn.getMultipleAccountsInfo(slice);
+      } catch (err) {
+        console.error('[sol-sweep] balance batch failed (will retry):', (err as Error)?.message ?? err);
+        continue;
+      }
+      infos.forEach((info, j) => {
+        const lamports = info ? BigInt(info.lamports) : 0n;
+        if (lamports >= minLamports) {
+          const [userId, depositKp] = owners[i + j]!;
+          funded.push({ userId, depositKp, lamports });
+        }
+      });
+    }
+    if (funded.length === 0) return events;
+
+    // 2. Sweep each funded address to zero. Re-read the balance immediately
+    //    before building the tx so we move exactly what's there right now.
+    for (const { userId, depositKp } of funded) {
+      try {
+        const lamports = BigInt(await this.conn.getBalance(depositKp.publicKey, 'confirmed'));
+        if (lamports < minLamports) continue;
+        const { blockhash, lastValidBlockHeight } = await this.conn.getLatestBlockhash('confirmed');
+        const tx = new Transaction({ feePayer: treasury.publicKey, blockhash, lastValidBlockHeight });
+        tx.add(
+          SystemProgram.transfer({
+            fromPubkey: depositKp.publicKey,
+            toPubkey: treasury.publicKey,
+            lamports, // drain fully; treasury pays the fee so this can hit zero
+          }),
+        );
+        // treasury signs as fee payer, the deposit keypair authorizes the debit.
+        const sig = await sendAndConfirmTransaction(this.conn, tx, [treasury, depositKp], {
+          commitment: 'confirmed',
+        });
+        events.push({ userId, lamports, txSig: sig });
+      } catch (err) {
+        console.error(`[sol-sweep] userId=${userId} failed (will retry next poll):`, (err as Error)?.message ?? err);
+      }
+    }
+    return events;
   }
 }

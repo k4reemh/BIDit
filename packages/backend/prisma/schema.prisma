@@ -706,13 +706,37 @@ model PointsEvent {
 model DepositReceipt {
   id           String    @id @default(cuid())
   userId       String
+  /// USDC micro-units credited. For SOL receipts this stays 0 until the oracle
+  /// prices the sweep (priceUsdMicro null = not yet priced).
   amountMicros BigInt
   txSig        String    @unique
   sweptAt      DateTime  @default(now())
   creditedAt   DateTime?
+  /// "USDC" (default) or "SOL". SOL receipts carry the conversion audit trail:
+  /// raw lamports, the oracle price used (micro-USD per SOL), the spread taken,
+  /// and which source(s) vouched for the price.
+  asset         String  @default("USDC")
+  lamports      BigInt?
+  priceUsdMicro BigInt?
+  spreadBps     Int?
+  priceSource   String?
 
   @@index([creditedAt])
   @@index([userId])
+}
+
+/// Audit record of a treasury SOL→USDC auto-swap. Deposited SOL is swept into
+/// treasury, then this worker converts it to USDC so treasury USDC keeps backing
+/// user balances (and the ~1.5% deposit spread is realized as USDC profit).
+/// txSig is unique so a resumed/retried swap is never double-recorded.
+model TreasurySwap {
+  id            String   @id @default(cuid())
+  lamportsIn    BigInt
+  usdcMicrosOut BigInt
+  txSig         String   @unique
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 /// A live-chat message in a seller's room (roomId = seller's userId). handle is a

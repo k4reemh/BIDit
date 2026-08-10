@@ -2112,6 +2112,29 @@ img { display: block; max-width: 100%; }
 .dep-sweep { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-2); line-height: 1.6; }
 .dep-sweep b { color: var(--ink); font-weight: 600; }
 
+/* USDC / SOL asset toggle */
+.dep-asset { display: inline-flex; gap: 4px; padding: 4px; margin: 2px 0 14px; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 12px; }
+.dep-asset__opt { display: flex; align-items: baseline; gap: 6px; padding: 7px 16px; border: 0; border-radius: 9px;
+  background: none; color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.dep-asset__opt span { font-size: 11px; font-weight: 500; color: var(--faint); }
+.dep-asset__opt.is-on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.dep-asset__opt.is-on span { color: var(--accent); }
+
+/* live SOL rate box */
+.dep-rate { margin: 2px 0 14px; padding: 13px 15px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
+.dep-rate__row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; padding: 3px 0; }
+.dep-rate__row span { color: var(--muted); }
+.dep-rate__row b { color: var(--ink); font-weight: 700; }
+.dep-rate__note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; }
+.dep-rate__note b { color: var(--ink); font-weight: 600; }
+
+/* fund-with-a-card guide */
+.dep-card-guide { margin-top: 16px; }
+.dep-steps { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 9px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.dep-steps li b { color: var(--ink); font-weight: 600; }
+.dep-steps__note { margin-top: 12px; font-size: 12.5px; font-style: italic; }
+
 /* ===== withdrawal beta cap notice ======================================== */
 .beta-cap { display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 14px; padding: 11px 13px; border-radius: 12px;
   background: rgba(240, 180, 41, 0.08); border: 1px solid rgba(240, 180, 41, 0.3); color: var(--ink-2); font-size: 13px; line-height: 1.5; }

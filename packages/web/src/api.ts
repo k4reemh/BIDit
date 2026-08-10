@@ -799,6 +799,18 @@ export const markNotificationsRead = () => req<Notifs>('/me/notifications/read',
 export const refreshMe = () => req<Session>('/me');
 export const simulateDeposit = (amount: string) =>
   req<{ available: string }>('/dev/simulate-deposit', { method: 'POST', body: JSON.stringify({ amount }) });
+export const simulateSolDeposit = (sol: string) =>
+  req<{ available: string }>('/dev/simulate-sol-deposit', { method: 'POST', body: JSON.stringify({ sol }) });
+
+export interface SolRate {
+  enabled: boolean;
+  unavailable?: boolean;
+  usdPerSol?: string;
+  creditPerSol?: string; // USD credited per 1 SOL, after the conversion fee
+  spreadBps?: number;
+  source?: string;
+}
+export const getSolRate = () => req<SolRate>('/deposit/sol-rate');
 export const withdraw = (amount: string, toAddress: string) =>
   req<{ status: string; txSig?: string; available: string }>('/withdraw', {
     method: 'POST',

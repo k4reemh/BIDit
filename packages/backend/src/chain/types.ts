@@ -16,6 +16,16 @@ export interface DepositEvent {
   txSig: string;
 }
 
+/** A native-SOL deposit swept from a user's deposit address. Carries raw
+ *  lamports: the USDC credit is computed later at the oracle price (prices.ts),
+ *  so the chain layer never knows about prices. */
+export interface SolDepositEvent {
+  userId: string;
+  lamports: bigint;
+  /** Signature of the sweep transfer: the idempotency key, like USDC. */
+  txSig: string;
+}
+
 /**
  * The fate of a broadcast transfer, as the chain currently sees it:
  *  - `confirmed`: finalized on-chain, the funds moved.
@@ -26,6 +36,14 @@ export interface DepositEvent {
  *    NOT reverse on this: doing so is exactly the double-spend bug we prevent.
  */
 export type TransferStatus = 'confirmed' | 'failed' | 'unknown';
+
+/** Result of a treasury SOL→USDC swap. Amounts are what actually moved on-chain
+ *  (post-slippage), so the ledger/audit record reflects reality, not the quote. */
+export interface SwapResult {
+  lamportsIn: bigint;
+  usdcMicrosOut: bigint;
+  txSig: string;
+}
 
 /** Result of broadcasting a transfer (before it is confirmed). */
 export interface SendResult {
@@ -47,6 +65,11 @@ export interface ChainClient {
   depositAddress(userId: string): Promise<string>;
   /** Confirmed inbound USDC since `cursor`. Returns events + the next cursor. */
   pollDeposits(cursor: string | null): Promise<{ events: DepositEvent[]; cursor: string | null }>;
+  /** Detect + sweep native SOL sitting at deposit addresses. Balances below
+   *  `minLamports` are left alone (dust: not worth a sweep fee; it counts toward
+   *  the user's next deposit). Sweep-and-report like pollDeposits: an event
+   *  exists only once its lamports are safely in treasury. */
+  pollSolDeposits(minLamports: bigint): Promise<SolDepositEvent[]>;
   /** Transfer USDC from a backend wallet to an address. Returns the tx signature
    *  only after it confirms. Fine for internal moves (sweeps, escrow) where an
    *  ambiguous timeout is recoverable; the WITHDRAWAL path uses the split
@@ -70,6 +93,15 @@ export interface ChainClient {
   isValidAddress(address: string): boolean;
   /** USDC balance (micro-units) of a named wallet or a raw address. */
   balance(target: WalletName | string): Promise<bigint>;
+  /** Native SOL balance (lamports) of a named wallet or raw address. Treasury
+   *  accumulates swept SOL against the USDC it credited for it, so the wallet
+   *  reconciliation values this to check the books still balance. */
+  solBalanceLamports(target: WalletName | string): Promise<bigint>;
+  /** Market-swap `lamports` of treasury SOL into USDC (Jupiter on mainnet). Used
+   *  by the auto-swap worker so deposited SOL becomes the USDC that backs user
+   *  balances; withdrawals always pay USDC and never touch this. Throws if the
+   *  swap can't be built/confirmed (the worker just retries next tick). */
+  swapSolToUsdc(lamports: bigint): Promise<SwapResult>;
   /**
    * True when paying `address` would require opening a USDC token account for it,
    * which costs the SENDER a rent deposit (~0.00204 SOL on Solana) rather than the

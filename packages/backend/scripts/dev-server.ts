@@ -88,7 +88,9 @@ import { DevWalletEscrow, ProgramEscrow } from '../src/escrow.js';
 import { getChainClient, MockChain } from '../src/chain/index.js';
 import { getPumpCreateProvider } from '../src/chain/pump-provider.js';
 import { prepareCoinCreate, submitCoinCreate, getCoinCreateStatus } from '../src/pump-create.js';
-import { ensureDepositAddress, DepositWatcher, registerAllDeposits } from '../src/deposits.js';
+import { ensureDepositAddress, DepositWatcher, registerAllDeposits, solDepositsEnabled } from '../src/deposits.js';
+import { TreasurySwapWorker, autoSwapEnabled } from '../src/treasury-swap.js';
+import { getSolUsdPrice, solSpreadBps, lamportsToUsdcMicros } from '../src/prices.js';
 import { requestWithdrawal, WithdrawalError, WithdrawalReconciler } from '../src/withdrawals.js';
 import {
   markShipped,
@@ -356,6 +358,16 @@ async function main() {
     (e) => console.error('[deposits] startup reconcile failed:', e),
   );
   depositWatcher.start();
+  // Convert treasury SOL (from native-SOL deposits) into USDC so it keeps backing
+  // user balances and the deposit spread is realized in USDC. Off by default
+  // (trades real funds): enable with BIDIT_AUTO_SWAP=yes. Withdrawals stay USDC.
+  const autoSwapWorker = new TreasurySwapWorker(chain, prisma, chain.cluster === 'mock' ? 5000 : 60_000);
+  if (autoSwapEnabled()) {
+    autoSwapWorker.start();
+    console.log('[auto-swap] treasury SOL→USDC auto-swap enabled');
+  } else if (solDepositsEnabled() && chain.cluster === 'mainnet-beta') {
+    console.warn('[auto-swap] ⚠️  SOL deposits are on but BIDIT_AUTO_SWAP is off: treasury will accumulate SOL. Convert it manually or set BIDIT_AUTO_SWAP=yes.');
+  }
   // Finalize any withdrawal left mid-flight (SUBMITTED) by a prior crash/restart:
   // confirm it, or reverse the debit if the chain proves it never landed. Then
   // keep polling so in-flight withdrawals settle durably out of band. On each
@@ -538,6 +550,26 @@ async function main() {
         production: isProd,
         time: new Date().toISOString(),
       });
+    }
+    // Public: current SOL deposit rate so the deposit page can show what a SOL
+    // transfer will be credited (spot minus the conversion spread). Best-effort:
+    // returns enabled:false when SOL deposits are off or no price is available.
+    if (req.method === 'GET' && p === '/deposit/sol-rate') {
+      if (!solDepositsEnabled()) return send(res, 200, { enabled: false });
+      try {
+        const price = await getSolUsdPrice();
+        const spread = solSpreadBps();
+        const creditPerSol = lamportsToUsdcMicros(1_000_000_000n, price.usdMicro, spread);
+        return send(res, 200, {
+          enabled: true,
+          usdPerSol: formatUsdc(price.usdMicro),
+          creditPerSol: formatUsdc(creditPerSol),
+          spreadBps: Number(spread),
+          source: price.source,
+        });
+      } catch {
+        return send(res, 200, { enabled: true, unavailable: true });
+      }
     }
     // SECURITY: dev conveniences (password-less /dev/login, /dev/deposit that
     // mints free balance, seeders, etc.) are DISABLED on a real chain unless
@@ -801,6 +833,29 @@ async function main() {
         await realtime.notifyBalance(userId);
         const accountId = await getOrCreateUserAccount(userId, prisma);
         return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
+      }
+      // Dev only: simulate native SOL landing at the deposit address, then run the
+      // watcher so it's swept + credited (at the oracle price minus spread) now.
+      if (req.method === 'POST' && p === '/dev/simulate-sol-deposit') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(chain instanceof MockChain)) return send(res, 400, { error: 'simulation is disabled on a real chain' });
+        const b = await readJson(req);
+        await ensureDepositAddress(userId, chain, prisma);
+        const lamports = BigInt(Math.floor(Number(b.sol ?? 1) * 1_000_000_000));
+        chain.simulateSolDeposit(userId, lamports);
+        await depositWatcher.tick(); // sweep + record + price + credit now
+        await realtime.notifyBalance(userId);
+        const accountId = await getOrCreateUserAccount(userId, prisma);
+        return send(res, 200, { available: formatUsdc(await getAvailableBalance(accountId, prisma)) });
+      }
+      // Dev only: run one auto-swap pass (convert treasury SOL → USDC) on demand.
+      if (req.method === 'POST' && p === '/dev/run-auto-swap') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(chain instanceof MockChain)) return send(res, 400, { error: 'disabled on a real chain' });
+        const usdcOut = await autoSwapWorker.tick();
+        return send(res, 200, { swappedUsdcMicros: usdcOut.toString(), swappedUsd: formatUsdc(usdcOut) });
       }
 
       // ---- notifications ----

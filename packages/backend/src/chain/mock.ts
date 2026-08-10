@@ -4,7 +4,7 @@
  * full deposit -> escrow -> release -> buyback flow can be exercised exactly like
  * the real Solana path.
  */
-import type { ChainClient, DepositEvent, SendResult, TransferStatus, WalletName } from './types.js';
+import type { ChainClient, DepositEvent, SendResult, SolDepositEvent, SwapResult, TransferStatus, WalletName } from './types.js';
 
 /** Internal bookkeeping for a broadcast (but not necessarily settled) transfer. */
 interface PendingTransfer {
@@ -28,6 +28,10 @@ export class MockChain implements ChainClient {
   private readonly bal = new Map<string, bigint>();
   private readonly userAddr = new Map<string, string>();
   private queue: DepositEvent[] = [];
+  /** Unswept native SOL sitting at deposit addresses (lamports), keyed by userId. */
+  private readonly solPending = new Map<string, bigint>();
+  /** Treasury's swept lamports: lets tests assert the sweep really moved SOL. */
+  private treasuryLamports = 0n;
   private txN = 0;
   /** Default false so existing tests aren't all charged against the ATA budget. */
   private destsNeedFunding = false;
@@ -51,6 +55,19 @@ export class MockChain implements ChainClient {
     const events = this.queue;
     this.queue = [];
     return { events, cursor: String(this.txN) };
+  }
+
+  /** Sweep-and-report simulated native SOL, mirroring the Solana path: balances
+   *  under minLamports stay put (dust accumulates toward the next deposit). */
+  async pollSolDeposits(minLamports: bigint): Promise<SolDepositEvent[]> {
+    const events: SolDepositEvent[] = [];
+    for (const [userId, lamports] of this.solPending) {
+      if (lamports < minLamports) continue;
+      this.solPending.delete(userId);
+      this.treasuryLamports += lamports;
+      events.push({ userId, lamports, txSig: `solsweep_${++this.txN}` });
+    }
+    return events;
   }
 
   async transfer(from: WalletName, to: string, amountMicros: bigint): Promise<string> {
@@ -138,6 +155,17 @@ export class MockChain implements ChainClient {
     this.credit(this.wallets.treasury, amountMicros);
   }
 
+  /** Simulate native SOL landing at a user's deposit address. It sits there
+   *  (accumulating across calls) until pollSolDeposits sweeps it. */
+  simulateSolDeposit(userId: string, lamports: bigint): void {
+    this.solPending.set(userId, (this.solPending.get(userId) ?? 0n) + lamports);
+  }
+
+  /** Lamports the mock treasury has swept in (test assertion helper). */
+  sweptLamports(): bigint {
+    return this.treasuryLamports;
+  }
+
   private moveFunds(from: WalletName, to: string, amt: bigint): void {
     this.debit(this.wallets[from], amt);
     this.credit(to, amt);
@@ -154,5 +182,38 @@ export class MockChain implements ChainClient {
   async balance(target: WalletName | string): Promise<bigint> {
     const addr = (this.wallets as Record<string, string>)[target] ?? target;
     return this.bal.get(addr) ?? 0n;
+  }
+
+  /** Only treasury holds swept SOL in the mock; everything else reads 0. */
+  async solBalanceLamports(target: WalletName | string): Promise<bigint> {
+    return target === 'treasury' ? this.treasuryLamports : 0n;
+  }
+
+  // ---- auto-swap modelling -------------------------------------------------
+  /** Simulated market rate: micro-USDC out per lamport in. Default ≈ $76.52/SOL
+   *  (76_520_000 micro-USD / 1e9 lamports). Tests can move it to model slippage. */
+  private swapRateMicroPerLamport = 76_520_000 / 1_000_000_000;
+  private swapFailNext = false;
+
+  /** Set the simulated SOL→USDC rate in whole USD per SOL (test helper). */
+  setSwapPrice(usdPerSol: number): void {
+    this.swapRateMicroPerLamport = (usdPerSol * 1_000_000) / 1_000_000_000;
+  }
+  /** Make the next swap throw (models a failed/again-later swap). */
+  failNextSwap(): void {
+    this.swapFailNext = true;
+  }
+
+  async swapSolToUsdc(lamports: bigint): Promise<SwapResult> {
+    if (this.swapFailNext) {
+      this.swapFailNext = false;
+      throw new Error('mock: swap failed (no funds moved)');
+    }
+    if (lamports <= 0n) throw new Error('mock: swap amount must be positive');
+    if (lamports > this.treasuryLamports) throw new Error('mock: swap exceeds treasury SOL');
+    const usdcMicrosOut = BigInt(Math.floor(Number(lamports) * this.swapRateMicroPerLamport));
+    this.treasuryLamports -= lamports;
+    this.credit(this.wallets.treasury, usdcMicrosOut);
+    return { lamportsIn: lamports, usdcMicrosOut, txSig: `mockswap_${++this.txN}` };
   }
 }
