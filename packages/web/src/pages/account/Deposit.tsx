@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAccount } from '../../components/AccountLayout';
-import { simulateDeposit, simulateSolDeposit, getSolRate, withdraw, refreshMe, money2, type SolRate } from '../../api';
+import { simulateDeposit, simulateSolDeposit, withdraw, refreshMe, money2 } from '../../api';
 import { Copy, Check, Wallet, Shield } from '../../icons';
 
 export default function Deposit() {
@@ -11,18 +11,10 @@ export default function Deposit() {
   const isReal = cluster === 'mainnet-beta' || cluster === 'devnet';
   const netLabel = cluster === 'mainnet-beta' ? 'Mainnet' : cluster === 'devnet' ? 'Devnet' : 'Devnet';
 
-  // Which asset the user intends to send. Same address for both.
-  const [asset, setAsset] = useState<'USDC' | 'SOL'>('USDC');
-  const [solRate, setSolRate] = useState<SolRate | null>(null);
-  useEffect(() => {
-    getSolRate().then(setSolRate).catch(() => setSolRate(null));
-  }, []);
-  const solOn = solRate?.enabled !== false;
-
   const [depAmt, setDepAmt] = useState('25');
+  const [solAmt, setSolAmt] = useState('1');
   const [depBusy, setDepBusy] = useState(false);
   const [depMsg, setDepMsg] = useState('');
-  const [solAmt, setSolAmt] = useState('1');
 
   const [wAmt, setWAmt] = useState('');
   const [wTo, setWTo] = useState('');
@@ -38,14 +30,14 @@ export default function Deposit() {
       setTimeout(() => setCopied(false), 1800);
     });
 
-  const doSimulate = async () => {
+  const simulate = async (kind: 'USDC' | 'SOL') => {
     setDepBusy(true);
     setDepMsg('');
     try {
-      if (asset === 'SOL') {
+      if (kind === 'SOL') {
         await simulateSolDeposit(solAmt);
         await refresh();
-        setDepMsg(`Detected ${solAmt} SOL, converted and credited to your balance.`);
+        setDepMsg(`Detected ${solAmt} SOL, credited to your balance.`);
       } else {
         await simulateDeposit(depAmt);
         await refresh();
@@ -79,7 +71,7 @@ export default function Deposit() {
     <>
       <div className="acct-head">
         <h1 className="display acct-title">Deposit &amp; withdraw</h1>
-        <p className="muted">Fund your balance with USDC. Cash out anytime.</p>
+        <p className="muted">Fund your balance with SOL or USDC. Cash out anytime.</p>
       </div>
 
       <div className="bal-grid bal-grid--one">
@@ -89,63 +81,19 @@ export default function Deposit() {
 
       <div className="card acct-card">
         <h3 className="acct-sub">Your deposit address <span className={`soon-tag${cluster === 'mainnet-beta' ? ' soon-tag--mainnet' : ''}`}>{netLabel}</span></h3>
-
-        {solOn && (
-          <div className="dep-asset" role="tablist" aria-label="Deposit asset">
-            <button role="tab" aria-selected={asset === 'USDC'} className={`dep-asset__opt${asset === 'USDC' ? ' is-on' : ''}`} onClick={() => setAsset('USDC')}>
-              USDC <span>1:1</span>
-            </button>
-            <button role="tab" aria-selected={asset === 'SOL'} className={`dep-asset__opt${asset === 'SOL' ? ' is-on' : ''}`} onClick={() => setAsset('SOL')}>
-              SOL <span>auto-converts</span>
-            </button>
-          </div>
-        )}
-
-        {asset === 'USDC' ? (
-          <p className="muted acct-note">
-            Send <b>USDC (SPL)</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this address from any wallet (Phantom, Solflare) or straight from an exchange.
-            It’s credited 1:1. You never need SOL for gas: BIDit covers the network fees.
-          </p>
-        ) : (
-          <>
-            <p className="muted acct-note">
-              Send <b>SOL</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this same address. We convert it to USDC
-              and credit your balance automatically. SOL is the easy one to buy with a card — grab it in Coinbase, Phantom, or any exchange, then send it here.
-            </p>
-            <div className="dep-rate">
-              {solRate?.unavailable ? (
-                <span className="muted">Live SOL rate is briefly unavailable. Your deposit is still credited at the rate when it lands.</span>
-              ) : solRate?.creditPerSol ? (
-                <>
-                  <div className="dep-rate__row">
-                    <span>Current rate</span>
-                    <b>1 SOL ≈ ${solRate.usdPerSol}</b>
-                  </div>
-                  <div className="dep-rate__row">
-                    <span>You’re credited</span>
-                    <b>≈ ${solRate.creditPerSol} per SOL</b>
-                  </div>
-                  <p className="muted dep-rate__note">
-                    Includes a {((solRate.spreadBps ?? 150) / 100).toFixed(2)}% conversion fee. You’re credited at the rate when your SOL <b>arrives</b> (usually within a minute), not right now, so the final amount can move a little with the market.
-                  </p>
-                </>
-              ) : (
-                <span className="muted">Loading live SOL rate…</span>
-              )}
-            </div>
-          </>
-        )}
-
+        <p className="muted acct-note">
+          Deposit <b>SOL or USDC</b> on Solana {cluster === 'mainnet-beta' ? 'mainnet' : 'devnet'} to this address from any wallet (Phantom, Solflare) or an exchange. BIDit covers the network fees.
+        </p>
         <div className="dep-usdc">
           <Shield width={16} height={16} />
-          <span><b>USDC or SOL only.</b> This address takes USDC or SOL on Solana. Any other token, or a different network, may be lost for good.</span>
+          <span><b>SOL or USDC only.</b> This address takes SOL or USDC on Solana. Any other token, or a different network, may be lost for good.</span>
         </div>
         <div className="addr">
           <code>{addr}</code>
           <button className="addr__copy" onClick={copy}>{copied ? <Check width={16} height={16} /> : <Copy width={16} height={16} />}{copied ? 'Copied' : 'Copy'}</button>
         </div>
         <p className="muted acct-note dep-sweep">
-          <b>What happens next.</b> Your deposit is detected on-chain, then swept into the BIDit treasury{asset === 'SOL' ? ' (SOL is converted to USDC)' : ''} and credited to
+          <b>What happens next.</b> Your deposit is detected on-chain, then swept into the BIDit treasury and credited to
           your account balance, usually within a minute. This address is a one-way inbox, not a wallet to hold funds in: it is
           emptied every time something arrives. Your balance is held in USDC, and you can <b>withdraw it to any Solana address at any
           time</b> from the Withdraw section below.
@@ -153,33 +101,17 @@ export default function Deposit() {
 
         {!isReal && (
           <div className="dep-sim">
-            <span className="dep-sim__label">Devnet demo. Simulate an incoming {asset} deposit:</span>
+            <span className="dep-sim__label">Devnet demo. Simulate an incoming deposit:</span>
             <div className="dep-sim__row">
-              {asset === 'SOL' ? (
-                <div className="dep-amt"><input type="number" min="0.01" step="0.5" value={solAmt} onChange={(e) => setSolAmt(e.target.value)} /><span style={{ paddingLeft: 6 }}>SOL</span></div>
-              ) : (
-                <div className="dep-amt"><span>$</span><input type="number" min="1" step="1" value={depAmt} onChange={(e) => setDepAmt(e.target.value)} /></div>
-              )}
-              <button className="btn btn-ghost btn-sm" onClick={doSimulate} disabled={depBusy}>{depBusy ? 'Detecting…' : 'Simulate deposit'}</button>
+              <div className="dep-amt"><span>$</span><input type="number" min="1" step="1" value={depAmt} onChange={(e) => setDepAmt(e.target.value)} /></div>
+              <button className="btn btn-ghost btn-sm" onClick={() => simulate('USDC')} disabled={depBusy}>{depBusy ? 'Detecting…' : 'Simulate USDC'}</button>
+              <div className="dep-amt"><input type="number" min="0.01" step="0.5" value={solAmt} onChange={(e) => setSolAmt(e.target.value)} /><span style={{ paddingLeft: 6 }}>SOL</span></div>
+              <button className="btn btn-ghost btn-sm" onClick={() => simulate('SOL')} disabled={depBusy}>{depBusy ? 'Detecting…' : 'Simulate SOL'}</button>
               {depMsg && <span className="acct-saved"><Check width={15} height={15} /> {depMsg}</span>}
             </div>
           </div>
         )}
       </div>
-
-      {solOn && (
-        <div className="card acct-card dep-card-guide">
-          <h3 className="acct-sub">New to crypto? Fund with a card</h3>
-          <p className="muted acct-note">The quickest way to bid if you’ve never held crypto — buy SOL with a debit/credit card, then send it to your address above. It lands as USDC in about a minute.</p>
-          <ol className="dep-steps">
-            <li><b>Get a wallet or exchange</b> that sells SOL with a card — <b>Coinbase</b>, <b>Phantom</b> (the “Buy” tab), or Kraken. In Canada, Shakepay and Newton take Interac e-transfer.</li>
-            <li><b>Buy SOL</b> with your card for the amount you want to bid with.</li>
-            <li><b>Send the SOL</b> to your BIDit deposit address above (copy it in).</li>
-            <li><b>Bid.</b> Your USD balance appears here automatically, usually within a minute.</li>
-          </ol>
-          <p className="muted dep-steps__note">One-tap card checkout right here on BIDit is coming soon.</p>
-        </div>
-      )}
 
       <div className="card acct-card">
         <h3 className="acct-sub">Withdraw</h3>
