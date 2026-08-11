@@ -1,6 +1,9 @@
-/** Popup UI: email/password login + connection status + wallet balance. Talks
- *  only to the service worker over a port; does no networking itself. */
+/** Popup UI: email/password login + connection status + wallet balance, with
+ *  links out to the BIDit website for the things the extension deliberately does
+ *  not do itself (sign up, add funds, reset password, verify email). Talks only
+ *  to the service worker over a port; does no networking itself. */
 import { PORT_NAME, type SwToUi } from './messages.js';
+import { WEB_ORIGIN } from './config.js';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -12,6 +15,13 @@ const loginError = $('loginError');
 const dot = $('dot');
 const connText = $('connText');
 const settled = $('settled');
+const verifyNotice = $('verifyNotice');
+
+// Point the outbound links at the configured website (prod by default).
+($('signupLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/?signup=1`;
+($('forgotLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/forgot`;
+($('addFundsLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/deposit`;
+($('verifyLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/`;
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
 
@@ -24,6 +34,8 @@ port.onMessage.addListener((msg: SwToUi) => {
     connText.textContent = loggedIn
       ? `${msg.handle} · ${msg.connected ? 'connected' : 'connecting…'}`
       : 'not signed in';
+    // Unverified email → bids are rejected server-side; prompt them to verify.
+    verifyNotice.classList.toggle('hidden', !loggedIn || msg.emailVerified);
     if (loggedIn) loginError.classList.add('hidden');
   } else if (msg.evt === 'AUTH_ERROR') {
     loginError.textContent = msg.message;

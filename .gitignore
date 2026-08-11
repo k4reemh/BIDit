@@ -27,3 +27,4 @@ docs/MAINNET-TEST.md
 # Marketing landing page: not deployed anywhere yet, kept out of the
 # public repo until it ships. Deletes nothing on disk — just not tracked.
 packages/landing/
+packages/extension/*.zip

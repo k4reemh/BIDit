@@ -13,6 +13,10 @@ const subscribed = new Set<string>(); // rooms we've asked the server to join
 let token: string | null = null;
 let handle: string | null = null;
 let userId: string | null = null;
+/** Whether the signed-in account can bid. False when the account has an email it
+ *  hasn't confirmed: the server rejects its bids (EMAIL_UNVERIFIED), so the UI
+ *  surfaces a "verify your email" prompt instead of a dead bid button. */
+let emailVerified = true;
 let ws: WebSocket | null = null;
 let connected = false;
 let lastBalance: BalanceUpdateMessage | null = null;
@@ -21,10 +25,11 @@ let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 const ready = loadAuth();
 
 async function loadAuth(): Promise<void> {
-  const got = await chrome.storage.local.get(['biditToken', 'biditHandle', 'biditUserId']);
+  const got = await chrome.storage.local.get(['biditToken', 'biditHandle', 'biditUserId', 'biditEmailVerified']);
   token = (got.biditToken as string | undefined) ?? null;
   handle = (got.biditHandle as string | undefined) ?? null;
   userId = (got.biditUserId as string | undefined) ?? null;
+  emailVerified = got.biditEmailVerified !== false;
 }
 
 function broadcast(msg: SwToUi): void {
@@ -37,24 +42,63 @@ function broadcast(msg: SwToUi): void {
   }
 }
 
-const statusMsg = (): SwToUi => ({ evt: 'STATUS', connected, handle });
+const statusMsg = (): SwToUi => ({ evt: 'STATUS', connected, handle, emailVerified: handle ? emailVerified : true });
 
 // ---- WebSocket -----------------------------------------------------------
+
+let connecting = false;
+let backoff = 0;
 
 function sendWs(obj: unknown): void {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
-function connectWs(): void {
-  if (!token) return;
+/**
+ * Mint a short-lived, single-use WS ticket. This is the backend's intended
+ * handshake: it keeps the 30-day session token out of the socket URL (and out of
+ * any proxy/access logs). A 401/403 means the stored session is dead (expired, or
+ * revoked by a web logout / ban / data-erasure), so we sign the user out rather
+ * than reconnect forever against a token that will never work again.
+ */
+async function mintTicket(): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const res = await fetch(`${BACKEND_HTTP}/realtime/ticket`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: '{}',
+    });
+    if (res.status === 401 || res.status === 403) {
+      handleSessionExpired();
+      return null;
+    }
+    if (!res.ok) return null; // transient (5xx): caller retries with backoff
+    const data = (await res.json().catch(() => null)) as { ticket?: unknown } | null;
+    return typeof data?.ticket === 'string' ? data.ticket : null;
+  } catch {
+    return null; // offline / server asleep: caller retries
+  }
+}
+
+async function connectWs(): Promise<void> {
+  if (!token || connecting) return;
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-  ws = new WebSocket(`${BACKEND_WS}?token=${encodeURIComponent(token)}`);
-  ws.addEventListener('open', () => {
+  connecting = true;
+  const ticket = await mintTicket();
+  connecting = false;
+  if (!ticket) {
+    if (token) scheduleReconnect(); // still signed in but no ticket yet → retry
+    return;
+  }
+  const sock = new WebSocket(`${BACKEND_WS}?ticket=${encodeURIComponent(ticket)}`);
+  ws = sock;
+  sock.addEventListener('open', () => {
     connected = true;
+    backoff = 0; // healthy connection: reset the reconnect delay
     broadcast(statusMsg());
     for (const room of subscribed) sendWs({ type: 'SUBSCRIBE', room });
   });
-  ws.addEventListener('message', (ev) => {
+  sock.addEventListener('message', (ev) => {
     let message: ServerMessage;
     try {
       message = JSON.parse(String(ev.data));
@@ -64,15 +108,18 @@ function connectWs(): void {
     if (message.type === 'BALANCE_UPDATE') lastBalance = message;
     broadcast({ evt: 'SERVER', message });
   });
-  ws.addEventListener('close', () => {
+  sock.addEventListener('close', (ev) => {
     connected = false;
-    ws = null;
+    if (ws === sock) ws = null;
     broadcast(statusMsg());
-    if (token) scheduleReconnect();
+    // 4001 = unauthorized / unknown user / session revoked (server-side close).
+    // Any other code is a transient drop (SW nap, network) → reconnect.
+    if (ev.code === 4001) handleSessionExpired();
+    else if (token) scheduleReconnect();
   });
-  ws.addEventListener('error', () => {
+  sock.addEventListener('error', () => {
     try {
-      ws?.close();
+      sock.close();
     } catch {
       /* noop */
     }
@@ -80,11 +127,15 @@ function connectWs(): void {
 }
 
 function scheduleReconnect(): void {
-  if (reconnectTimer) return;
+  if (reconnectTimer || !token) return;
+  // Exponential backoff (1.5s → ~15s) so a sleeping Render dyno or a flaky
+  // network isn't hammered; reset to 0 on a successful open.
+  const delay = Math.min(15_000, 1_500 * Math.pow(1.7, backoff));
+  backoff = Math.min(backoff + 1, 6);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = undefined;
-    connectWs();
-  }, 2000);
+    void connectWs();
+  }, delay);
 }
 
 function closeWs(): void {
@@ -99,10 +150,32 @@ function closeWs(): void {
   connected = false;
 }
 
+/**
+ * The stored session is no longer usable (30-day token expired, or revoked by a
+ * web logout / ban / erasure). Clear it and tell the UI to prompt a fresh sign-in
+ * instead of looping reconnects against a dead token.
+ */
+function handleSessionExpired(): void {
+  const wasSignedIn = token !== null;
+  token = null;
+  handle = null;
+  userId = null;
+  lastBalance = null;
+  subscribed.clear();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+  void chrome.storage.local.remove(['biditToken', 'biditHandle', 'biditUserId']);
+  closeWs();
+  if (wasSignedIn) broadcast({ evt: 'AUTH_ERROR', message: 'Your session expired. Please sign in again.' });
+  broadcast(statusMsg());
+}
+
 function ensureSubscribed(room: string): void {
   subscribed.add(room);
   if (ws && ws.readyState === WebSocket.OPEN) sendWs({ type: 'SUBSCRIBE', room });
-  else connectWs();
+  else void connectWs();
 }
 
 /**
@@ -115,23 +188,12 @@ function resync(): void {
   if (ws && ws.readyState === WebSocket.OPEN) {
     for (const room of subscribed) sendWs({ type: 'SUBSCRIBE', room });
   } else if (token) {
-    connectWs();
+    void connectWs();
   }
 }
 setInterval(resync, 12_000);
 
 // ---- REST ----------------------------------------------------------------
-
-async function postJson(path: string, body: unknown): Promise<any> {
-  const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`${BACKEND_HTTP}${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  return res.ok ? res.json() : null;
-}
 
 async function resolveCoin(coin: string): Promise<{ room: string; sellerHandle: string } | null> {
   try {
@@ -155,30 +217,66 @@ async function handleHello(coin: string): Promise<void> {
 }
 
 /** Real email/password login, same account as the BIDit website, so the
- *  extension bids from the same deposited balance. */
+ *  extension bids from the same deposited balance. Surfaces the server's actual
+ *  error (rate limit, suspended, unverified) rather than a blanket "wrong
+ *  password", and remembers whether the email is verified so the UI can prompt. */
 async function handleEmailLogin(email: string, password: string): Promise<void> {
-  const data = await postJson('/auth/login', { email, password });
-  if (!data || !data.token) {
-    broadcast({ evt: 'AUTH_ERROR', message: 'Wrong email or password.' });
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_HTTP}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    broadcast({ evt: 'AUTH_ERROR', message: 'Can’t reach BIDit right now. Check your connection.' });
+    return;
+  }
+  const data = (await res.json().catch(() => null)) as
+    | { token?: string; handle?: string; userId?: string; emailVerified?: boolean; error?: string }
+    | null;
+  if (!res.ok || !data?.token) {
+    const msg =
+      res.status === 429
+        ? 'Too many attempts. Wait a minute and try again.'
+        : res.status === 403
+          ? (data?.error ?? 'This account isn’t available.')
+          : (data?.error ?? 'Wrong email or password.');
+    broadcast({ evt: 'AUTH_ERROR', message: msg });
     return;
   }
   token = data.token;
-  handle = data.handle;
-  userId = data.userId;
-  await chrome.storage.local.set({ biditToken: token, biditHandle: handle, biditUserId: userId });
+  handle = data.handle ?? null;
+  userId = data.userId ?? null;
+  emailVerified = data.emailVerified !== false;
+  backoff = 0;
+  await chrome.storage.local.set({
+    biditToken: token,
+    biditHandle: handle,
+    biditUserId: userId,
+    biditEmailVerified: emailVerified,
+  });
   closeWs();
-  connectWs();
+  void connectWs();
   broadcast(statusMsg());
 }
 
-/** Used by the popup's wallet sign-in: it does the signing and hands us a session. */
+/** Used by the popup's wallet sign-in: it does the signing and hands us a session.
+ *  Wallet accounts have no email, so they're never gated on verification. */
 async function handleSetSession(t: string, h: string, uid: string): Promise<void> {
   token = t;
   handle = h;
   userId = uid;
-  await chrome.storage.local.set({ biditToken: token, biditHandle: handle, biditUserId: userId });
+  emailVerified = true;
+  backoff = 0;
+  await chrome.storage.local.set({
+    biditToken: token,
+    biditHandle: handle,
+    biditUserId: userId,
+    biditEmailVerified: true,
+  });
   closeWs();
-  connectWs();
+  void connectWs();
   broadcast(statusMsg());
 }
 
@@ -186,8 +284,10 @@ async function handleLogout(): Promise<void> {
   token = null;
   handle = null;
   userId = null;
+  emailVerified = true;
   lastBalance = null;
-  await chrome.storage.local.remove(['biditToken', 'biditHandle', 'biditUserId']);
+  backoff = 0;
+  await chrome.storage.local.remove(['biditToken', 'biditHandle', 'biditUserId', 'biditEmailVerified']);
   subscribed.clear();
   closeWs();
   broadcast(statusMsg());
@@ -227,7 +327,7 @@ chrome.runtime.onConnect.addListener((port) => {
   void ready.then(() => {
     port.postMessage(statusMsg());
     if (lastBalance) port.postMessage({ evt: 'SERVER', message: lastBalance } satisfies SwToUi);
-    if (token && !connected) connectWs();
+    if (token && !connected) void connectWs();
   });
   port.onMessage.addListener((m: UiToSw) => void handleUi(m, port));
   port.onDisconnect.addListener(() => ports.delete(port));

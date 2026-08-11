@@ -18,7 +18,7 @@ export interface PanelHandlers {
 
 export interface PanelHandle {
   root: HTMLElement;
-  setConnected(connected: boolean, handle: string | null): void;
+  setConnected(connected: boolean, handle: string | null, emailVerified?: boolean): void;
   setBalance(available: string | null, settled: string | null): void;
   applyState(s: AuctionStateMessage): void;
   applyClosed(c: AuctionClosedMessage): void;
@@ -309,7 +309,12 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
   const customBtn = el('button', 'custombtn', 'Bid');
   customRow.append(amount, customBtn);
 
-  body.append(stage, prizes, clockrow, progressWrap, ext, banner, feed, bidBtn, customRow);
+  // Auth gate: a persistent bar shown when the viewer can't bid yet (not signed
+  // in, or an unconfirmed email). Sits above the bid controls, which are disabled
+  // while it's visible, so a click never silently no-ops.
+  const authbar = el('div', 'authbar hidden');
+
+  body.append(stage, prizes, clockrow, progressWrap, ext, banner, feed, authbar, bidBtn, customRow);
 
   // Empty state
   const empty = el('div', 'empty hidden');
@@ -334,6 +339,23 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
   let durationMs = 20_000;
   let closed = false;
   let lastAuctionId: string | null = null;
+  let signedIn = false;
+  let emailOk = true;
+  let running = false;
+  const canBid = (): boolean => running && signedIn && emailOk;
+
+  /** Show/hide the "sign in" / "verify email" bar and gate the bid controls. */
+  const refreshAuthGate = (): void => {
+    let msg = '';
+    if (!signedIn) msg = 'Open the BIDit icon in your toolbar to sign in and bid.';
+    else if (!emailOk) msg = 'Confirm your email on BIDit to place bids.';
+    authbar.textContent = msg;
+    authbar.classList.toggle('hidden', msg === '');
+    const blocked = !canBid();
+    bidBtn.disabled = blocked;
+    customBtn.disabled = blocked;
+    amount.disabled = blocked;
+  };
 
   const tick = (): void => {
     if (endsAt === null) return;
@@ -437,10 +459,13 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
 
   return {
     root,
-    setConnected(connected, handle) {
+    setConnected(connected, handle, emailVerified = true) {
       myHandle = handle;
+      signedIn = handle !== null;
+      emailOk = emailVerified;
       dot.className = `dot ${connected ? 'on' : 'off'}`;
-      connText.textContent = connected ? (handle ?? 'connected') : 'connecting…';
+      connText.textContent = connected ? (handle ?? 'connected') : signedIn ? 'connecting…' : 'signed out';
+      refreshAuthGate();
     },
     setBalance(available) {
       availEl.textContent = available !== null ? `$${available}` : '-';
@@ -478,7 +503,7 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
         prizes.classList.add('hidden');
       }
       showBody(true);
-      const running = s.status === 'RUNNING';
+      running = s.status === 'RUNNING';
       live.classList.toggle('hidden', !running);
       title.textContent = s.title;
       if (s.imageUrl) {
@@ -535,9 +560,9 @@ export function createPanel(handlers: PanelHandlers): PanelHandle {
           s.status === 'SETTLING' ? 'SOLD' : s.status === 'CLOSED' ? 'Auction ended' : 'Auction over';
         bidBtnAmt.textContent = '';
       }
-      bidBtn.disabled = !running;
-      customBtn.disabled = !running;
-      amount.disabled = !running;
+      bidBtn.disabled = !canBid();
+      customBtn.disabled = !canBid();
+      amount.disabled = !canBid();
       if (document.activeElement !== amount) amount.value = s.minNextBid;
 
       durationMs = s.durationSeconds * 1000;

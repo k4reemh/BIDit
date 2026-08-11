@@ -16,7 +16,7 @@ export type UiToSw =
 
 /** Service worker -> UI. */
 export type SwToUi =
-  | { evt: 'STATUS'; connected: boolean; handle: string | null }
+  | { evt: 'STATUS'; connected: boolean; handle: string | null; emailVerified: boolean }
   | { evt: 'ROOM'; coin: string; room: string | null; sellerHandle?: string }
   | { evt: 'SERVER'; message: ServerMessage } // authoritative server message, passed through
   | { evt: 'AUTH_ERROR'; message: string } // login failed (shown in the popup)

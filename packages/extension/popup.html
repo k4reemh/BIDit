@@ -34,6 +34,15 @@
       .bal { display: flex; justify-content: space-between; margin-top: 10px; font-variant-numeric: tabular-nums; }
       .bal b { font-size: 16px; color: #0b2447; }
       .hidden { display: none; }
+      .links { display: flex; justify-content: space-between; margin-top: 10px; }
+      a.link { color: #ff6a00; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; }
+      a.link:hover { text-decoration: underline; }
+      .addfunds { display: block; width: 100%; margin-top: 10px; text-align: center; text-decoration: none;
+        background: #ff6a00; color: #fff; border-radius: 8px; padding: 9px 13px; font-size: 14px; font-weight: 700; }
+      .addfunds:hover { background: #e85d00; }
+      .notice { margin-top: 10px; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; line-height: 1.4;
+        background: #fff4e5; border: 1px solid #ffd6a0; color: #8a4b00; }
+      .notice a { color: #b45309; font-weight: 700; }
     </style>
   </head>
   <body>
@@ -47,16 +56,24 @@
         <button id="loginBtn">Sign in</button>
       </div>
       <div id="loginError" class="hidden" style="color:#f87171;font-size:12px;margin-top:8px"></div>
-      <div class="muted" style="margin-top:8px">Use the same account you made on the BIDit website. Sign up & add funds there first.</div>
+      <div class="links">
+        <a id="signupLink" class="link" target="_blank" rel="noopener">Create an account</a>
+        <a id="forgotLink" class="link" target="_blank" rel="noopener">Forgot password?</a>
+      </div>
+      <div class="muted" style="margin-top:10px">Same account as the BIDit website. New here? Create one, then add funds.</div>
     </div>
 
     <div id="accountView" class="hidden">
       <div class="card">
         <div class="conn"><span id="dot" class="dot"></span> <span id="connText">…</span></div>
         <div class="bal"><span class="muted">Wallet balance</span> <b id="settled">-</b></div>
+        <a id="addFundsLink" class="addfunds" target="_blank" rel="noopener">Add funds</a>
         <div class="row">
           <button id="logoutBtn" class="secondary">Log out</button>
         </div>
+      </div>
+      <div id="verifyNotice" class="notice hidden">
+        Confirm your email to place bids. <a id="verifyLink" target="_blank" rel="noopener">Verify on BIDit &rarr;</a>
       </div>
       <div class="muted" style="margin-top:10px">
         Open a Pump.fun coin page to see the auction panel and bid.

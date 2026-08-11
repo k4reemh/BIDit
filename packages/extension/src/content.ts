@@ -169,7 +169,7 @@ function connect(coin: string): void {
     switch (msg.evt) {
       case 'STATUS':
         myHandle = msg.handle;
-        panel?.setConnected(msg.connected, msg.handle);
+        panel?.setConnected(msg.connected, msg.handle, msg.emailVerified);
         break;
       case 'ROOM':
         if (msg.coin !== coin) return;

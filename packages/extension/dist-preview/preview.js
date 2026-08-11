@@ -29,12 +29,13 @@
 
   // src/panel.ts
   var REJECT_TEXT = {
-    INSUFFICIENT_BALANCE: ["Not enough balance \u2014 add funds", "error"],
-    BID_TOO_LOW: ["Too low \u2014 try the suggested bid", "error"],
-    ALREADY_LEADING: ["You're already winning \u{1F525}", "leading"],
+    INSUFFICIENT_BALANCE: ["Not enough balance, add funds", "error"],
+    BID_TOO_LOW: ["Too low, try the suggested bid", "error"],
+    ALREADY_LEADING: ["You're already winning", "leading"],
     AUCTION_ENDED: ["Auction has ended", "info"],
     AUCTION_NOT_FOUND: ["Auction not found", "error"],
-    RATE_LIMITED: ["Slow down \u2014 too many bids", "error"]
+    RATE_LIMITED: ["Slow down, too many bids", "error"],
+    EMAIL_UNVERIFIED: ["Confirm your email on BIDit first", "error"]
   };
   function el(tag, cls, text) {
     const node = document.createElement(tag);
@@ -219,10 +220,10 @@
     stage.append(thumbWrap, info);
     const clockrow = el("div", "clockrow");
     const bidBlock = el("div", "block");
-    const currentBidEl = el("div", "bid", "\u2014");
+    const currentBidEl = el("div", "bid", "-");
     bidBlock.append(el("div", "label", "Current bid"), currentBidEl);
     const timerBlock = el("div", "block right");
-    const timerEl = el("div", "timer", "\u2014");
+    const timerEl = el("div", "timer", "-");
     const timerLabel = el("div", "label", "remaining");
     timerBlock.append(timerEl, timerLabel);
     clockrow.append(bidBlock, timerBlock);
@@ -254,12 +255,13 @@
     amount.placeholder = "custom amount";
     const customBtn = el("button", "custombtn", "Bid");
     customRow.append(amount, customBtn);
-    body.append(stage, prizes, clockrow, progressWrap, ext, banner, feed, bidBtn, customRow);
+    const authbar = el("div", "authbar hidden");
+    body.append(stage, prizes, clockrow, progressWrap, ext, banner, feed, authbar, bidBtn, customRow);
     const empty = el("div", "empty hidden");
     const emptyText = el("div", "emptytext", "");
     empty.append(emptyText);
     const footer = el("div", "footer");
-    const availEl = el("b", "avail", "\u2014");
+    const availEl = el("b", "avail", "-");
     footer.append(el("span", "flabel", "Balance"), availEl);
     root.append(head, body, empty, footer);
     let myHandle = null;
@@ -272,6 +274,21 @@
     let durationMs = 2e4;
     let closed = false;
     let lastAuctionId = null;
+    let signedIn = false;
+    let emailOk = true;
+    let running = false;
+    const canBid = () => running && signedIn && emailOk;
+    const refreshAuthGate = () => {
+      let msg = "";
+      if (!signedIn) msg = "Open the BIDit icon in your toolbar to sign in and bid.";
+      else if (!emailOk) msg = "Confirm your email on BIDit to place bids.";
+      authbar.textContent = msg;
+      authbar.classList.toggle("hidden", msg === "");
+      const blocked = !canBid();
+      bidBtn.disabled = blocked;
+      customBtn.disabled = blocked;
+      amount.disabled = blocked;
+    };
     const tick = () => {
       if (endsAt === null) return;
       const remaining = Math.max(0, endsAt - (Date.now() + serverOffset));
@@ -362,13 +379,16 @@
     };
     return {
       root,
-      setConnected(connected, handle) {
+      setConnected(connected, handle, emailVerified = true) {
         myHandle = handle;
+        signedIn = handle !== null;
+        emailOk = emailVerified;
         dot.className = `dot ${connected ? "on" : "off"}`;
-        connText.textContent = connected ? handle ?? "connected" : "connecting\u2026";
+        connText.textContent = connected ? handle ?? "connected" : signedIn ? "connecting\u2026" : "signed out";
+        refreshAuthGate();
       },
       setBalance(available) {
-        availEl.textContent = available !== null ? `$${available}` : "\u2014";
+        availEl.textContent = available !== null ? `$${available}` : "-";
       },
       applyState(s) {
         if (s.status === "RUNNING") closed = false;
@@ -381,7 +401,7 @@
         const wheel = s.wheel ?? [];
         if (wheel.length > 0) {
           prizes.classList.remove("hidden");
-          prizesToggle.textContent = `\u{1F3A1} ${wheel.length} prizes on the wheel`;
+          prizesToggle.textContent = `${wheel.length} prizes on the wheel`;
           if (prizesList.dataset.for !== s.auctionId) {
             prizesList.dataset.for = s.auctionId;
             prizesList.replaceChildren();
@@ -399,7 +419,7 @@
           prizes.classList.add("hidden");
         }
         showBody(true);
-        const running = s.status === "RUNNING";
+        running = s.status === "RUNNING";
         live.classList.toggle("hidden", !running);
         title.textContent = s.title;
         if (s.imageUrl) {
@@ -417,7 +437,7 @@
           }
           lastBidNum = toNum;
         } else {
-          currentBidEl.textContent = "\u2014";
+          currentBidEl.textContent = "-";
           lastBidNum = 0;
         }
         lastBid = s.currentBid;
@@ -426,9 +446,9 @@
         if (leadingMe && lastLeader !== myHandle) pulse(bidBtn, "win");
         leaderAv.replaceChildren();
         if (s.leaderHandle) leaderAv.append(makeAvatar(s.leaderHandle, 20));
-        leaderText.textContent = leadingMe ? "You're winning \u{1F525}" : s.leaderHandle ? `${s.leaderHandle} is winning` : "No bids yet \u2014 take the lead";
+        leaderText.textContent = leadingMe ? "You're winning" : s.leaderHandle ? `${s.leaderHandle} is winning` : "No bids yet, take the lead";
         if (leadingMe) {
-          setStatus("You're winning \u{1F525}", "leading");
+          setStatus("You're winning", "leading");
         } else if (lastLeader === myHandle && myHandle !== null && s.leaderHandle !== null) {
           setStatus("Outbid! Bid again", "outbid");
         } else {
@@ -443,12 +463,12 @@
           else bidBtnAmt.textContent = `$${s.minNextBid}`;
           lastMinNum = toMin;
         } else {
-          bidBtnLbl.textContent = s.status === "SETTLING" ? "SOLD \u2713" : s.status === "CLOSED" ? "Auction ended" : "Auction over";
+          bidBtnLbl.textContent = s.status === "SETTLING" ? "SOLD" : s.status === "CLOSED" ? "Auction ended" : "Auction over";
           bidBtnAmt.textContent = "";
         }
-        bidBtn.disabled = !running;
-        customBtn.disabled = !running;
-        amount.disabled = !running;
+        bidBtn.disabled = !canBid();
+        customBtn.disabled = !canBid();
+        amount.disabled = !canBid();
         if (document.activeElement !== amount) amount.value = s.minNextBid;
         durationMs = s.durationSeconds * 1e3;
         endsAt = s.endsAt;
@@ -470,7 +490,7 @@
         amount.disabled = true;
         const won = c.winnerHandle === myHandle && myHandle !== null;
         setStatus(
-          c.winnerHandle ? won ? `You won for $${c.amount}! \u{1F389}` : `Sold to ${c.winnerHandle} \xB7 $${c.amount}` : "Ended \u2014 no sale",
+          c.winnerHandle ? won ? `You won for $${c.amount}!` : `Sold to ${c.winnerHandle} \xB7 $${c.amount}` : "Ended, no sale",
           won ? "leading" : "info"
         );
       },
@@ -572,7 +592,7 @@
     const kicker = el2("div", "kicker");
     kicker.textContent = opts.isMe ? "You won" : "Sold";
     const headline = el2("div", "headline");
-    headline.textContent = opts.isMe ? "WINNER! \u{1F389}" : `${opts.winnerHandle} won`;
+    headline.textContent = opts.isMe ? "WINNER!" : `${opts.winnerHandle} won`;
     const item = el2("div", "item");
     if (opts.imageUrl) {
       const img = document.createElement("img");
@@ -586,7 +606,7 @@
     price.textContent = `$${opts.amount}`;
     const buyback = el2("div", "buyback");
     const pumped = (parseFloat(opts.amount) * 0.05 || 0).toFixed(2);
-    buyback.textContent = `+$${pumped} \u2192 $BID buyback \u{1F4C8}`;
+    buyback.textContent = `+$${pumped} \u2192 $BID buyback`;
     card.append(av, kicker, headline, item, price, buyback);
     scrim.append(canvas, card);
     shadow2.append(scrim);
@@ -759,7 +779,7 @@
       strip.style.transform = `translateY(${endY}px)`;
       band.classList.add("land");
       prizeEl.style.color = tierColor(prize.tier);
-      prizeEl.textContent = `\u{1F389} ${prize.label}`;
+      prizeEl.textContent = `${prize.label}`;
       prizeEl.classList.add("show");
       window.setTimeout(() => opts.onLand(prize), 850);
       window.setTimeout(() => card.classList.add("out"), 1500);
@@ -898,7 +918,7 @@
     const meta = KIND_META[opts.kind];
     const top = el4("div", "top");
     const brand = el4("div", "brand");
-    brand.innerHTML = '<span class="g">\u{1F381}</span> <span class="b">BID</span>it giveaway';
+    brand.innerHTML = '<span class="b">BID</span>it giveaway';
     const kind = el4("span", "kind");
     kind.style.color = meta.color;
     kind.style.background = `${meta.color}22`;
@@ -924,7 +944,7 @@
     entered.append(avs, tally);
     const enterBtn = document.createElement("button");
     enterBtn.className = opts.eligible ? "enter" : "enter blocked";
-    enterBtn.textContent = opts.eligible ? "Enter giveaway" : "Buyers only \u2014 purchase to enter";
+    enterBtn.textContent = opts.eligible ? "Enter giveaway" : "Buyers only, purchase to enter";
     let entered_ = false;
     enterBtn.onclick = () => {
       if (entered_ || !opts.eligible) return;
@@ -1018,9 +1038,11 @@
         const wkick = el4("div", "wkick");
         wkick.textContent = r.isMe ? "You won!" : "Winner";
         const whead = el4("div", "whead");
-        whead.textContent = r.isMe ? "\u{1F389} YOU WON! \u{1F389}" : `@${r.winnerHandle}`;
+        whead.textContent = r.isMe ? "YOU WON!" : `@${r.winnerHandle}`;
         const wprize = el4("div", "wprize");
-        wprize.innerHTML = `wins <b>${r.prize}</b>`;
+        const wprizeName = el4("b");
+        wprizeName.textContent = r.prize;
+        wprize.append("wins ", wprizeName);
         const fair = el4("div", "fair");
         fair.innerHTML = `<i></i> Provably fair \xB7 seed <code>${r.seedHash.slice(0, 10)}\u2026</code>`;
         winWrap.append(wbig, wkick, whead, wprize, fair);
@@ -1051,11 +1073,11 @@
       markEntered: () => {
         entered_ = true;
         enterBtn.className = "enter done";
-        enterBtn.textContent = "You're in \u2713";
+        enterBtn.textContent = "You're in";
       },
       markRejected: (reason) => {
         enterBtn.className = "enter blocked";
-        enterBtn.textContent = reason === "NOT_ELIGIBLE" ? "Buyers only \u2014 purchase to enter" : "Entry closed";
+        enterBtn.textContent = reason === "NOT_ELIGIBLE" ? "Buyers only: purchase to enter" : "Entry closed";
       },
       reveal,
       close: () => {
@@ -1211,7 +1233,6 @@
       for (const e of entries) {
         const slot = { label: e.label };
         if (e.tier) slot.tier = e.tier;
-        if (e.imageUrl) slot.imageUrl = e.imageUrl;
         reel.push(slot);
       }
     }
@@ -1230,15 +1251,120 @@
     return { roll, targetIndex };
   }
 
+  // ../shared/src/parcels.ts
+  var MM_PER_INCH = 25.4;
+  var mm = (inches) => Math.round(inches * MM_PER_INCH);
+  function preset(id, label, kind, length, width, height, typicalGrams, hint) {
+    return {
+      id,
+      label,
+      kind,
+      inches: { length, width, height },
+      lengthMm: mm(length),
+      widthMm: mm(width),
+      heightMm: mm(height),
+      typicalGrams,
+      hint
+    };
+  }
+  var PARCEL_PRESETS = [
+    preset("poly_6x9", "Small polymailer", "polymailer", 6, 9, 0.5, 60, "A few sleeved cards or one toploader"),
+    preset("poly_9x12", "Medium polymailer", "polymailer", 9, 12, 0.75, 150, "A stack of cards, a graded slab"),
+    preset("poly_10x13", "Large polymailer", "polymailer", 10, 13, 1, 300, "Several slabs, a small sealed pack"),
+    preset("box_6x4x2", "Small box", "box", 6, 4, 2, 250, "One or two slabs, boxed"),
+    preset("box_9x6x3", "Medium box", "box", 9, 6, 3, 700, "A booster box, a bundle"),
+    preset("box_12x9x4", "Large box", "box", 12, 9, 4, 1500, "Multiple sealed products"),
+    preset("box_14x12x6", "Extra large box", "box", 14, 12, 6, 3500, "A sealed case, bulk lots")
+  ];
+
+  // ../shared/src/countries.ts
+  var COUNTRIES = [
+    { code: "US", name: "United States" },
+    { code: "CA", name: "Canada" },
+    { code: "AU", name: "Australia" },
+    { code: "AT", name: "Austria" },
+    { code: "BE", name: "Belgium" },
+    { code: "BR", name: "Brazil" },
+    { code: "CL", name: "Chile" },
+    { code: "CO", name: "Colombia" },
+    { code: "CZ", name: "Czechia" },
+    { code: "DK", name: "Denmark" },
+    { code: "EG", name: "Egypt" },
+    { code: "FI", name: "Finland" },
+    { code: "FR", name: "France" },
+    { code: "DE", name: "Germany" },
+    { code: "GR", name: "Greece" },
+    { code: "HK", name: "Hong Kong" },
+    { code: "HU", name: "Hungary" },
+    { code: "IN", name: "India" },
+    { code: "ID", name: "Indonesia" },
+    { code: "IE", name: "Ireland" },
+    { code: "IL", name: "Israel" },
+    { code: "IT", name: "Italy" },
+    { code: "JP", name: "Japan" },
+    { code: "MY", name: "Malaysia" },
+    { code: "MX", name: "Mexico" },
+    { code: "NL", name: "Netherlands" },
+    { code: "NZ", name: "New Zealand" },
+    { code: "NG", name: "Nigeria" },
+    { code: "NO", name: "Norway" },
+    { code: "PE", name: "Peru" },
+    { code: "PH", name: "Philippines" },
+    { code: "PL", name: "Poland" },
+    { code: "PT", name: "Portugal" },
+    { code: "QA", name: "Qatar" },
+    { code: "RO", name: "Romania" },
+    { code: "SA", name: "Saudi Arabia" },
+    { code: "SG", name: "Singapore" },
+    { code: "ZA", name: "South Africa" },
+    { code: "KR", name: "South Korea" },
+    { code: "ES", name: "Spain" },
+    { code: "SE", name: "Sweden" },
+    { code: "CH", name: "Switzerland" },
+    { code: "TW", name: "Taiwan" },
+    { code: "TH", name: "Thailand" },
+    { code: "TR", name: "T\xFCrkiye" },
+    { code: "UA", name: "Ukraine" },
+    { code: "AE", name: "United Arab Emirates" },
+    { code: "GB", name: "United Kingdom" },
+    { code: "VN", name: "Vietnam" }
+  ];
+  var EXTRA_ALIASES = {
+    CAN: "CA",
+    "UNITED STATES OF AMERICA": "US",
+    USA: "US",
+    AMERICA: "US",
+    UK: "GB",
+    "GREAT BRITAIN": "GB",
+    BRITAIN: "GB",
+    ENGLAND: "GB",
+    SCOTLAND: "GB",
+    WALES: "GB",
+    "NORTHERN IRELAND": "GB",
+    "THE NETHERLANDS": "NL",
+    HOLLAND: "NL",
+    "CZECH REPUBLIC": "CZ",
+    KOREA: "KR",
+    TURKEY: "TR",
+    UAE: "AE"
+  };
+  var CODE_BY_NAME = Object.fromEntries([
+    ...COUNTRIES.map((c) => [c.name.toUpperCase(), c.code]),
+    ...Object.entries(EXTRA_ALIASES)
+  ]);
+  var VALID_CODES = new Set(COUNTRIES.map((c) => c.code));
+
   // ../shared/src/protocol.ts
   var RealtimeRejectReason = {
     ...BidRejectReason,
-    RATE_LIMITED: "RATE_LIMITED"
+    RATE_LIMITED: "RATE_LIMITED",
+    /** The account has an email address it hasn't confirmed yet. */
+    EMAIL_UNVERIFIED: "EMAIL_UNVERIFIED"
   };
 
   // src/panel.css
-  var panel_default = `/* Scoped inside the panel's shadow root \u2014 class names can't collide with Pump's.
-   Theme: White Clean \u2014 white panel, navy text, orange CTA. */
+  var panel_default = `/* Scoped inside the panel's shadow root: class names can't collide with Pump's.
+   Theme: White Clean, white panel, navy text, orange CTA. */
 :host {
   all: initial;
   position: fixed;
@@ -1375,7 +1501,7 @@
   background: linear-gradient(90deg, var(--red), #ff7a45);
   box-shadow: 0 0 10px rgba(239, 59, 78, 0.5);
 }
-/* Spark layer \u2014 sits over the bar, sparks fly up out of it. Pointer-transparent. */
+/* Spark layer: sits over the bar, sparks fly up out of it. Pointer-transparent. */
 .sparks {
   position: absolute; left: 0; bottom: -1px; width: 100%; height: 40px;
   pointer-events: none;
@@ -1383,7 +1509,7 @@
 /* Anti-snipe refill: a quick glow sweep when the deadline jumps forward. */
 .bar.refill { animation: refill 0.6s ease; }
 
-/* "EXTENDED!" badge \u2014 collapsed by default, pops on flashExtended(). */
+/* "EXTENDED!" badge: collapsed by default, pops on flashExtended(). */
 .ext {
   height: 0; opacity: 0; overflow: hidden; transform: scale(0.8);
   margin: 0 auto; width: max-content;
@@ -1404,6 +1530,15 @@
 .banner.outbid { background: rgba(239, 59, 78, 0.12); color: var(--red); }
 .banner.error { background: rgba(239, 59, 78, 0.10); color: var(--red); }
 .banner.info { background: rgba(11, 36, 71, 0.07); color: var(--navy); }
+
+/* Auth gate bar: shown when the viewer isn't signed in / email unverified. */
+.authbar {
+  margin: 11px 0 0; padding: 9px 12px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.4; text-align: center;
+  background: rgba(255, 106, 0, 0.10); color: var(--accent, #ff6a00);
+  border: 1px solid rgba(255, 106, 0, 0.28);
+}
+.authbar.hidden { display: none; }
 
 .bidbtn {
   display: flex; align-items: center; justify-content: center; gap: 7px;
@@ -1428,7 +1563,7 @@
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
 }
 .bidbtn:not(:disabled) .shine { animation: shine 3.6s ease-in-out infinite; }
-/* Tap ripple \u2014 sized + positioned inline in JS, expands then fades. */
+/* Tap ripple: sized + positioned inline in JS, expands then fades. */
 .ripple {
   position: absolute; border-radius: 50%; pointer-events: none;
   background: rgba(255, 255, 255, 0.45);
@@ -1531,7 +1666,7 @@
   0% { filter: brightness(1.6); box-shadow: 0 0 16px rgba(255, 138, 60, 0.85); }
   100% { filter: brightness(1); box-shadow: none; }
 }
-/* "EXTENDED!" badge: pop in, hold, collapse \u2014 one-shot, self-hiding. */
+/* "EXTENDED!" badge: pop in, hold, collapse, one-shot, self-hiding. */
 @keyframes extpop {
   0% { height: 0; opacity: 0; transform: scale(0.8); margin-top: 0; padding: 0 14px; }
   12% { height: 30px; opacity: 1; transform: scale(1.08); margin-top: 11px; padding: 7px 14px; }
@@ -1575,7 +1710,8 @@
       type: "AUCTION_STATE",
       room: "demo",
       auctionId: "demo-auction",
-      title: "Charizard \u2014 Base Set Holo",
+      listingId: "demo-listing",
+      title: "Charizard, Base Set Holo",
       imageUrl: IMG,
       status: "RUNNING",
       currentBid: String(bid),
@@ -1608,7 +1744,7 @@
     300,
     "#22e0a1",
     () => showWinner(
-      { winnerHandle: "nadimnah", amount: "42", title: "Charizard \u2014 Base Set Holo", imageUrl: IMG, isMe: true },
+      { winnerHandle: "nadimnah", amount: "42", title: "Charizard, Base Set Holo", imageUrl: IMG, isMe: true },
       6e5
       // hold open for the screenshot
     )
@@ -1616,9 +1752,9 @@
   var WHEEL = [
     { label: "Destined Rivals ETB", tier: "Box" },
     { label: "Sealed Booster Box", tier: "Box" },
-    { label: "Charizard ex \u2014 Alt Art", tier: "Chase" },
-    { label: "Pikachu ex \u2014 SIR", tier: "SIR" },
-    { label: "Umbreon ex \u2014 SIR", tier: "SIR" },
+    { label: "Charizard ex, Alt Art", tier: "Chase" },
+    { label: "Pikachu ex, SIR", tier: "SIR" },
+    { label: "Umbreon ex, SIR", tier: "SIR" },
     { label: "Sleeved Booster \xD74", tier: "Pack" },
     { label: "Single Booster Pack", tier: "Pack" },
     { label: "Mystery Slab", tier: "Slab" }
@@ -1655,7 +1791,7 @@
     "chase_queen",
     "mint_maxi"
   ];
-  var GA_PRIZE = "Charizard ex \u2014 Alt Art Slab";
+  var GA_PRIZE = "Charizard ex: Alt Art Slab";
   var ga = null;
   var gaFill;
   function openGiveaway(kind = "PUBLIC", durationMs = 2e4) {

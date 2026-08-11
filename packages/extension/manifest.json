@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "BIDit",
-  "version": "1.0.0",
-  "description": "Live trading-card auctions on Pump.fun streams. Bid in USDC, settle on-chain.",
+  "name": "BIDit — Live card auctions on Pump.fun",
+  "version": "1.1.0",
+  "description": "Bid on live trading-card auctions right on Pump.fun streams. Settle in USDC, held in escrow until it ships.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": ["storage"],
   "host_permissions": [
     "https://bidit-backend-fekn.onrender.com/*",
@@ -22,6 +27,11 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BIDit"
+    "default_title": "BIDit",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   }
 }
