@@ -9,6 +9,7 @@ import {
   type StreamCredentials,
 } from '../../api';
 import { Check, Copy } from '../../icons';
+import { WEBRTC_ICE, waitForIceGathering } from '../../lib/webrtc';
 
 /**
  * "Go live on BIDit" panel: pick where the seller's video comes from (pump.fun or
@@ -99,12 +100,13 @@ export default function GoLive({ session, setSession }: { session: Session; setS
       setCreds(c);
       // Mock provider has no real ingest endpoint: streaming isn't configured here.
       if (c.whipUrl.includes('mockcf')) throw new Error('NOT_CONFIGURED');
-      const pc = new RTCPeerConnection();
+      const pc = new RTCPeerConnection(WEBRTC_ICE);
       pcRef.current = pc;
       media.getTracks().forEach((t) => pc.addTrack(t, media));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const res = await fetch(c.whipUrl, { method: 'POST', headers: { 'content-type': 'application/sdp' }, body: offer.sdp ?? '' });
+      await waitForIceGathering(pc); // non-trickle WHIP: send a complete offer
+      const res = await fetch(c.whipUrl, { method: 'POST', headers: { 'content-type': 'application/sdp' }, body: pc.localDescription?.sdp ?? offer.sdp ?? '' });
       if (!res.ok) throw new Error(`whip ${res.status}`);
       await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
       setBroadcasting(true);

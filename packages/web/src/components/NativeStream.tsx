@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getStreamStatus } from '../api';
+import { WEBRTC_ICE, waitForIceGathering } from '../lib/webrtc';
 
 /**
  * Player for a BIDit-hosted (Cloudflare Stream Live) seller. Polls the room's
@@ -63,7 +64,7 @@ export default function NativeStream({
   useEffect(() => {
     if (!useWhep || !whep) return;
     let cancelled = false;
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection(WEBRTC_ICE);
     pcRef.current = pc;
     // Receive-only: we only pull the seller's audio + video.
     pc.addTransceiver('video', { direction: 'recvonly' });
@@ -79,10 +80,11 @@ export default function NativeStream({
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        await waitForIceGathering(pc); // non-trickle WHEP: send a complete offer
         const res = await fetch(whep, {
           method: 'POST',
           headers: { 'content-type': 'application/sdp' },
-          body: offer.sdp ?? '',
+          body: pc.localDescription?.sdp ?? offer.sdp ?? '',
         });
         if (!res.ok) throw new Error(`whep ${res.status}`);
         const answer = await res.text();
