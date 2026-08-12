@@ -76,24 +76,45 @@ export default function GoLive({ session, setSession }: { session: Session; setS
 
   const goLiveBrowser = async () => {
     setErr('');
+    // 1) Camera + mic. Distinguish the common failures so the seller knows what to fix.
+    let media: MediaStream;
     try {
-      const media = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: true });
-      mediaRef.current = media;
-      if (videoRef.current) videoRef.current.srcObject = media;
+      media = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: true });
+    } catch (e) {
+      const name = (e as DOMException)?.name;
+      setErr(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'Camera and mic are blocked. Click the camera icon in your browser’s address bar, choose Allow, then try again.'
+          : name === 'NotFoundError' || name === 'OverconstrainedError'
+            ? 'No camera or mic was found. Connect one (or use OBS with the key below) and try again.'
+            : 'Could not access your camera and mic. Check the browser’s camera permission, or use OBS with the key below.',
+      );
+      return;
+    }
+    mediaRef.current = media;
+    if (videoRef.current) videoRef.current.srcObject = media;
+    // 2) Publish over WebRTC (WHIP) to Cloudflare.
+    try {
       const c = creds ?? (await getStreamCredentials());
       setCreds(c);
+      // Mock provider has no real ingest endpoint: streaming isn't configured here.
+      if (c.whipUrl.includes('mockcf')) throw new Error('NOT_CONFIGURED');
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
       media.getTracks().forEach((t) => pc.addTrack(t, media));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       const res = await fetch(c.whipUrl, { method: 'POST', headers: { 'content-type': 'application/sdp' }, body: offer.sdp ?? '' });
-      if (!res.ok) throw new Error('publish rejected');
+      if (!res.ok) throw new Error(`whip ${res.status}`);
       await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
       setBroadcasting(true);
-    } catch {
+    } catch (e) {
       stopBroadcast();
-      setErr('Could not start the browser broadcast. Make sure camera access is allowed, or stream with OBS using the key below.');
+      setErr(
+        (e as Error)?.message === 'NOT_CONFIGURED'
+          ? 'Browser go-live needs BIDit’s streaming to be connected to Cloudflare, which isn’t set up on this environment yet. Finish the Cloudflare setup (or use OBS once it is).'
+          : 'Your camera is on, but the stream server rejected the broadcast. Try again in a moment, or stream with OBS using the key below.',
+      );
     }
   };
 
