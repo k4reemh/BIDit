@@ -9,6 +9,7 @@ import { Bag, Verified, Theater, TheaterExit } from '../icons';
 
 // livekit-client is heavy, only load it on the watch page (and only this chunk).
 const PumpStream = lazy(() => import('../components/PumpStream'));
+import NativeStream from '../components/NativeStream';
 import { resolveCoin, getPumpCoin, type ResolvedRoom, type PumpCoin, type Session } from '../api';
 import { mediaSrc } from '../config';
 
@@ -44,11 +45,16 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
     setResolved(undefined);
     setPump(null);
     resolveCoin(coin).then((r) => alive && setResolved(r));
-    getPumpCoin(coin).then((p) => alive && setPump(p)).catch(() => {});
+    // pump.fun metadata only applies to a coin (not an @handle native stream).
+    if (!coin.startsWith('@')) getPumpCoin(coin).then((p) => alive && setPump(p)).catch(() => {});
     return () => { alive = false; };
   }, [coin]);
 
-  const pumpUrl = `https://pump.fun/coin/${coin}`;
+  const isNative = typeof resolved === 'object' && resolved?.streamSource === 'native';
+  // For a native seller reached by @handle there's no coin; pump players/links use
+  // the resolved coin when present.
+  const pumpCoin = (typeof resolved === 'object' && resolved?.coin) || (coin.startsWith('@') ? '' : coin);
+  const pumpUrl = `https://pump.fun/coin/${pumpCoin}`;
   // The seller's card settings win everywhere they exist; the coin's pump.fun
   // metadata is the fallback, not the source of truth. Clicking a card on the
   // home grid must land on a page that matches the card.
@@ -68,8 +74,27 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
         <section className="watch__stage">
           <div className="theater">
             <Suspense fallback={<div className="pstream__cover"><span className="muted">Loading stream…</span></div>}>
+            {isNative && r ? (
+              <NativeStream
+                room={r.room}
+                initialLive={r.isLiveNow}
+                initialIframe={r.streamIframeUrl ?? null}
+                offline={
+                  <>
+                    {offlineArt
+                      ? <img className="theater__art" src={offlineArt} alt="" />
+                      : <div className="theater__art theater__art--ph" />}
+                    <div className="theater__scrim" />
+                    <div className="theater__center">
+                      <div className="theater__eyebrow">{sellerHandle ? `@${sellerHandle} isn’t live right now` : 'Not live right now'}</div>
+                      <p className="theater__note">When they go live on BIDit, the stream plays here automatically. Bidding happens in the panel →</p>
+                    </div>
+                  </>
+                }
+              />
+            ) : (
             <PumpStream
-              mint={coin}
+              mint={pumpCoin}
               offline={
                 <>
                   {offlineArt
@@ -79,11 +104,12 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
                   <div className="theater__center">
                     <div className="theater__eyebrow">{sellerHandle ? `@${sellerHandle} isn’t streaming here right now` : 'Not streaming right now'}</div>
                     <p className="theater__note">When they go live on pump.fun, the stream plays here automatically. No extension needed. Bidding happens in the panel →</p>
-                    <a className="btn btn-ghost" href={pumpUrl} target="_blank" rel="noreferrer">Open on pump.fun ↗</a>
+                    {pumpCoin && <a className="btn btn-ghost" href={pumpUrl} target="_blank" rel="noreferrer">Open on pump.fun ↗</a>}
                   </div>
                 </>
               }
             />
+            )}
             </Suspense>
             <div className="theater__top">
               {sellerHandle && (

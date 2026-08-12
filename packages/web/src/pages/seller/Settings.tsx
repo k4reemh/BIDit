@@ -5,6 +5,7 @@ import { setSellerCoin, saveStreamSettings, type Session } from '../../api';
 import { Check, ArrowRight, Verified } from '../../icons';
 import ShippingSettingsCard from '../../components/seller/ShippingSettingsCard';
 import CreateCoinCard from '../../components/seller/CreateCoinCard';
+import GoLive from '../../components/seller/GoLive';
 import ImageUpload from '../../components/ImageUpload';
 import ModeratorsCard from '../../components/seller/ModeratorsCard';
 import { CATEGORIES } from '../../data';
@@ -115,6 +116,8 @@ export default function Settings() {
           {saved && <span className="acct-saved"><Check width={16} height={16} /> Saved</span>}
         </div>
       </div>
+
+      <GoLive session={session} setSession={setSession} />
 
       <ModeratorsCard />
 

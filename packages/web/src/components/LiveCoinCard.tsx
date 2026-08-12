@@ -13,7 +13,7 @@ export default function LiveCoinCard({ c }: { c: LiveCoin }) {
   const heading = c.streamTitle || c.title || c.prize || c.coinName || 'Live auctions';
   const flag = countryFlag(c.country);
   return (
-    <Link className="live-card" to={`/live/${c.coin}`}>
+    <Link className="live-card" to={c.streamSource === 'native' || !c.coin ? `/live/@${c.sellerHandle}` : `/live/${c.coin}`}>
       <div className="live-card__thumb">
         {c.image ? <img src={mediaSrc(c.image)} alt="" loading="lazy" /> : <div className="live-card__ph" />}
         <div className="live-card__overlay" />

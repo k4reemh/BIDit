@@ -183,6 +183,22 @@ model SellerProfile {
   // downscaled JPEG data URL, size-capped at the endpoint). When null the card
   // falls back to the running auction's photo, then the coin's pump.fun image.
   streamImage         String?
+  // Where this seller's video comes from. "pumpfun" (default): the linked coin's
+  // pump.fun stream. "native": BIDit hosts the stream via Cloudflare Stream Live
+  // (see streaming.ts). "twitch": reserved. The auction/bid/chat system is
+  // independent of this; only the watch-page video slot reads it.
+  streamSource        String    @default("pumpfun")
+  // Cloudflare Stream Live input for native streaming. `liveInputId` is the input
+  // UID (playback + status); `streamCustomerCode` is the account's customer
+  // subdomain code used to build playback URLs. The RTMP key / WHIP URL are NOT
+  // stored: they're fetched from Cloudflare on demand and only shown to the owner.
+  liveInputId         String?   @unique
+  streamCustomerCode  String?
+  // Native live status, driven by Cloudflare webhooks (connect/disconnect) with a
+  // poller fallback. The watch page + live grid read this instead of hitting
+  // Cloudflare per view.
+  isLiveNow           Boolean   @default(false)
+  liveStartedAt       DateTime?
   // Per-room live-chat cooldown (ms between messages from one viewer). null = the
   // default (CHAT_COOLDOWN_MS); 0 = off. Seller-set in Settings.
   chatCooldownMs      Int?

@@ -2627,3 +2627,26 @@ img { display: block; max-width: 100%; }
   .ext-feat-grid { grid-template-columns: 1fr; }
   .ext-how__arrow { transform: rotate(90deg); }
 }
+
+/* --- Seller "Go live on BIDit" panel --- */
+.src-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.src-opt { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--r); background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s; }
+.src-opt:hover { border-color: var(--line-2); }
+.src-opt b { font-size: 15px; color: var(--ink); }
+.src-opt span { font-size: 12.5px; color: var(--muted); }
+.src-opt.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.src-opt.is-on b { color: var(--accent-strong); }
+.src-opt:disabled { opacity: .6; cursor: default; }
+
+.golive { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 16px; }
+.golive__url { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.golive__url code { font-family: var(--font-display, monospace); font-size: 12.5px; color: var(--ink); background: var(--surface-2); padding: 4px 9px; border-radius: 7px; word-break: break-all; }
+.golive__browser { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.golive__preview { width: 100%; max-width: 340px; aspect-ratio: 16/9; border-radius: var(--r); background: #000; border: 1px solid var(--line); object-fit: cover; display: none; }
+.golive__preview.is-on { display: block; }
+.golive__obs { display: flex; flex-direction: column; gap: 12px; }
+.golive__field { display: flex; flex-direction: column; gap: 5px; }
+.golive__field > span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.golive__val { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.golive__val code { flex: 1; font-family: var(--font-display, monospace); font-size: 12.5px; color: var(--ink); word-break: break-all; }
+.linklike { background: none; border: 0; padding: 0; color: var(--accent-strong); font-size: 12px; cursor: pointer; text-decoration: underline; }

@@ -52,6 +52,9 @@ export interface Session {
   fulfilledCount?: number;
   verifyThreshold?: number;
   pumpCoinAddress: string | null;
+  /** Video source for this seller's stream, and whether native is provisioned. */
+  streamSource?: 'pumpfun' | 'native';
+  nativeEnabled?: boolean;
   /** False only when the account has an email it hasn't confirmed yet. */
   emailVerified?: boolean;
   streamTitle?: string | null;
@@ -565,7 +568,10 @@ export const drawGiveaway = (giveawayId: string) =>
 
 // ---- live / watch page -----------------------------------------------------
 export interface LiveCoin {
-  coin: string;
+  coin: string | null;
+  /** 'pumpfun' (linked coin's stream) or 'native' (BIDit-hosted). Native cards
+   *  link to /live/@handle since they may have no coin. */
+  streamSource: 'pumpfun' | 'native';
   sellerHandle: string;
   /** Seller's profile photo, if set; null falls back to the generated avatar. */
   sellerAvatar: string | null;
@@ -603,7 +609,36 @@ export interface ResolvedRoom {
   streamTitle?: string | null;
   streamImage?: string | null;
   description?: string | null;
+  /** Video source: 'pumpfun' (play the coin's pump.fun stream) or 'native'
+   *  (BIDit-hosted). Drives which player the watch page mounts. */
+  streamSource: 'pumpfun' | 'native';
+  /** The linked pump.fun coin, if any (needed by the pump.fun player + link). */
+  coin?: string | null;
+  /** Native only: currently broadcasting + the Cloudflare iframe player URL. */
+  isLiveNow: boolean;
+  streamIframeUrl?: string | null;
 }
+
+/** Native-stream status for a room; the watch page polls this to notice go-live. */
+export interface StreamStatus {
+  source: 'pumpfun' | 'native';
+  live: boolean;
+  iframeUrl: string | null;
+  hlsUrl: string | null;
+  mock: boolean;
+}
+export const getStreamStatus = (room: string) =>
+  req<StreamStatus>(`/stream/status?room=${encodeURIComponent(room)}`);
+
+// ---- seller: native streaming (BIDit-hosted) ----
+export const enableNativeStreaming = () =>
+  req<{ source: string; liveInputId: string; mock: boolean }>('/seller/stream/enable-native', { method: 'POST' });
+export const setStreamSource = (source: 'pumpfun' | 'native') =>
+  req<{ source: string }>('/seller/stream/source', { method: 'POST', body: JSON.stringify({ source }) });
+export interface StreamCredentials { rtmpsUrl: string; streamKey: string; whipUrl: string }
+export const getStreamCredentials = () => req<StreamCredentials>('/seller/stream/credentials');
+export interface Health { nativeStreaming: boolean }
+export const getHealth = () => req<Health>('/health');
 export const getLive = () => req<LiveCoin[]>('/live');
 export const getPumpCoin = (mint: string) => req<PumpCoin>(`/pump/coin?mint=${encodeURIComponent(mint)}`);
 
@@ -616,10 +651,15 @@ export interface PumpStream {
   token?: string;
 }
 export const getPumpStream = (mint: string) => req<PumpStream>(`/pump/stream?mint=${encodeURIComponent(mint)}`);
-/** Resolve a coin -> seller room. Returns null if no seller has linked it (404). */
-export async function resolveCoin(coin: string): Promise<ResolvedRoom | null> {
+/** Resolve a watch-page identifier to a seller room. Accepts a pump.fun coin, or
+ *  a handle (with a leading @) for native streamers who have no coin. Returns
+ *  null if nothing resolves (404). */
+export async function resolveCoin(idOrHandle: string): Promise<ResolvedRoom | null> {
+  const q = idOrHandle.startsWith('@')
+    ? `handle=${encodeURIComponent(idOrHandle.slice(1))}`
+    : `coin=${encodeURIComponent(idOrHandle)}`;
   try {
-    return await req<ResolvedRoom>(`/resolve?coin=${encodeURIComponent(coin)}`);
+    return await req<ResolvedRoom>(`/resolve?${q}`);
   } catch {
     return null;
   }

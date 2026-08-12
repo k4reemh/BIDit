@@ -64,6 +64,7 @@ import { promoState, sellerPromoStatus, listPromoSellers, markPromoPaid } from '
 import { listSellerSales } from '../src/seller-sales.js';
 import {
   resolveRoomByCoin,
+  resolveRoomByHandle,
   linkCoinToSeller,
   seedRunningAuction,
   setSellerCoin,
@@ -71,6 +72,15 @@ import {
   backfillRenamedCategories,
   startAuctionFromListing,
 } from '../src/sellers.js';
+import { getStreamProvider, MockStreamProvider } from '../src/streaming/provider.js';
+import {
+  enableNativeStreaming,
+  setStreamSource,
+  goLiveCredentials,
+  applyLiveStatus,
+  streamStatusForRoom,
+  pollLiveStatuses,
+} from '../src/streaming.js';
 import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway, ensureGiveawayFulfillment } from '../src/giveaways.js';
@@ -244,6 +254,19 @@ const MAX_BODY_BYTES = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 4_000_000;
 })();
 
+/** Raw request body as a string (size-capped). Needed where the exact bytes
+ *  matter, e.g. verifying a webhook signature over the raw payload. */
+async function readRawBody(req: http.IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += (chunk as Buffer).length;
+    if (total > MAX_BODY_BYTES) throw new RequestBodyError(413, 'Request body too large.');
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString();
+}
+
 async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   const declared = Number(req.headers['content-length']);
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
@@ -288,6 +311,9 @@ async function main() {
   // Seller coin auto-create ("<handle>'s BIDit Livestream"): PumpPortal on
   // mainnet, mock elsewhere; BIDIT_PUMP_PROVIDER overrides for spikes.
   const pumpCreate = getPumpCreateProvider(chain.cluster);
+  // Native streaming (Cloudflare Stream Live). Real when CLOUDFLARE_* is set,
+  // else a mock so the go-live -> watch -> bid flow works locally with no account.
+  const stream = await getStreamProvider();
   // In escrow mode use the chain-backed ProgramEscrow (durable ChainTransfer outbox
   // → real wallet segregation); in direct mode nothing calls escrow for settlement,
   // so the ledger-only DevWalletEscrow suffices.
@@ -296,6 +322,11 @@ async function main() {
   // AUTH_SECRET, a mock chain in prod, force-enabled dev endpoints, missing
   // custody secrets). Throws → main().catch → process.exit(1).
   const { isProd } = assertStartupConfig(chain.cluster);
+  // Native streaming is offerable when Cloudflare is really configured, or on any
+  // non-prod build (so the mock is usable for local testing). In prod without
+  // Cloudflare the seller UI hides it and the enable endpoint refuses, so nobody
+  // ends up "live" on a stream that plays nothing.
+  const nativeStreamingAvailable = stream.mode === 'cloudflare' || !isProd;
   // Escrow mode moves real USDC between segregated wallets: refuse to boot if any
   // of escrow/buyback/fee collapses onto treasury (a missing *_SECRET falls back to
   // treasury), which would silently commingle held funds and fees.
@@ -412,6 +443,15 @@ async function main() {
     void processFulfillmentTimers(systemClock, prisma).catch((e) => console.error('[fulfillment-timer]', e));
   }, 10 * 60_000);
   fulfillmentTimer.unref?.();
+  // Native-stream live-status poller: reconciles any connect/disconnect the
+  // Cloudflare webhook missed. Off on the mock provider (webhook/dev toggle drive
+  // status there); every 30s on the real provider.
+  if (stream.mode === 'cloudflare') {
+    const streamPoll = setInterval(() => {
+      void pollLiveStatuses(stream, prisma).catch((e) => console.error('[stream-poll]', e));
+    }, 30_000);
+    streamPoll.unref?.();
+  }
   // Escrow order timers: release funds once the dispute window passes, and refund
   // if a seller never ships. Harmless no-op in direct-payout mode (no held orders).
   const orderTimer = setInterval(() => {
@@ -469,6 +509,8 @@ async function main() {
       fulfilledCount: profile ? await sellerFulfilledCount(userId, prisma) : 0,
       verifyThreshold: VERIFY_THRESHOLD,
       pumpCoinAddress: profile?.pumpCoinAddress ?? null,
+      streamSource: (profile?.streamSource === 'native' ? 'native' : 'pumpfun') as 'pumpfun' | 'native',
+      nativeEnabled: !!profile?.liveInputId,
       streamTitle: profile?.streamTitle ?? null,
       streamCategory: profile?.streamCategory ?? null,
       streamImage: profile?.streamImage ?? null,
@@ -548,6 +590,10 @@ async function main() {
         // never the key or the From address.
         email: emailEnabled(),
         production: isProd,
+        // Whether sellers can host their stream on BIDit (Cloudflare configured,
+        // or any non-prod build for local testing). The seller UI hides the
+        // "Go live on BIDit" option when this is false.
+        nativeStreaming: nativeStreamingAvailable,
         time: new Date().toISOString(),
       });
     }
@@ -857,6 +903,20 @@ async function main() {
         const usdcOut = await autoSwapWorker.tick();
         return send(res, 200, { swappedUsdcMicros: usdcOut.toString(), swappedUsd: formatUsdc(usdcOut) });
       }
+      // Dev only: toggle a native seller's live status locally (no Cloudflare),
+      // so the go-live -> watch -> auction flow is testable end to end.
+      if (req.method === 'POST' && p === '/dev/stream-live') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        const room = String(b.room ?? userId);
+        const live = b.live !== false;
+        const profile = await prisma.sellerProfile.findUnique({ where: { userId: room } });
+        if (!profile?.liveInputId) return send(res, 400, { error: 'native streaming not enabled for that seller' });
+        if (stream instanceof MockStreamProvider) stream.setLive(profile.liveInputId, live);
+        const applied = await applyLiveStatus(profile.liveInputId, live, prisma);
+        return send(res, 200, { room, live, changed: applied?.changed ?? false });
+      }
 
       // ---- notifications ----
       if (req.method === 'GET' && p === '/me/notifications') {
@@ -1139,6 +1199,39 @@ async function main() {
         const b = await readJson(req);
         await setSellerCoin(userId, String(b.coinAddress ?? '').trim(), prisma);
         return send(res, 200, { ok: true });
+      }
+      // ---- native streaming (BIDit-hosted via Cloudflare Stream Live) --------
+      // Turn on native streaming: provisions the seller's live input and makes it
+      // their active video source. Returns the playback + a flag for the UI.
+      if (req.method === 'POST' && p === '/seller/stream/enable-native') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        if (!nativeStreamingAvailable) return send(res, 503, { error: 'native streaming is not available yet' });
+        const r = await enableNativeStreaming(userId, stream, prisma);
+        return send(res, 200, { source: 'native', liveInputId: r.liveInputId, mock: stream.mode === 'mock' });
+      }
+      // Switch a seller's video source between pump.fun and native.
+      if (req.method === 'POST' && p === '/seller/stream/source') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        const b = await readJson(req);
+        const source = await setStreamSource(userId, String(b.source ?? 'pumpfun'), stream, prisma);
+        return send(res, 200, { source });
+      }
+      // Owner-only broadcast credentials (RTMP key + WHIP URL). Secret, so only
+      // ever returned to the authenticated seller for their own input.
+      if (req.method === 'GET' && p === '/seller/stream/credentials') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireSeller(userId, prisma);
+        try {
+          const creds = await goLiveCredentials(userId, stream, prisma);
+          return send(res, 200, creds);
+        } catch {
+          return send(res, 409, { error: 'enable native streaming first' });
+        }
       }
       // ---- seller coin auto-create ("<handle>'s BIDit Livestream") ----------
       // The seller's wallet is the creator either way, because pump.fun only
@@ -1953,9 +2046,31 @@ async function main() {
 
       // ---- coin resolution (used by the extension) ----
       if (req.method === 'GET' && p === '/resolve') {
-        const resolved = await resolveRoomByCoin(url.searchParams.get('coin') ?? '', prisma);
-        if (!resolved) return send(res, 404, { error: 'no seller linked to this coin' });
+        // Reach a room by pump.fun coin (pump sellers) or by @handle (native).
+        const handle = url.searchParams.get('handle');
+        const resolved = handle
+          ? await resolveRoomByHandle(handle, prisma)
+          : await resolveRoomByCoin(url.searchParams.get('coin') ?? '', prisma);
+        if (!resolved) return send(res, 404, { error: 'no seller here' });
         return send(res, 200, resolved);
+      }
+      // Native-stream status for a room (seller userId): source, live, iframe URL.
+      // The watch page polls this to notice a seller going live, like it polls
+      // /pump/stream for pump.fun.
+      if (req.method === 'GET' && p === '/stream/status') {
+        const room = url.searchParams.get('room') ?? '';
+        if (!room) return send(res, 400, { error: 'room required' });
+        return send(res, 200, await streamStatusForRoom(room, prisma));
+      }
+      // Cloudflare Stream Live webhook: flip a seller's live status on
+      // connect/disconnect. Signature-verified inside the provider; a bad
+      // signature is ignored (200 so Cloudflare does not retry-storm).
+      if (req.method === 'POST' && p === '/stream/webhook') {
+        const raw = await readRawBody(req);
+        const evt = stream.verifyWebhook(req.headers as Record<string, string | undefined>, raw);
+        if (!evt) return send(res, 200, { ok: false });
+        const applied = await applyLiveStatus(evt.liveInputId, evt.live, prisma);
+        return send(res, 200, { ok: true, changed: applied?.changed ?? false });
       }
       // Coins a seller has linked: powers the site's "Live right now" section.
       // "live" here = a BIDit auction or giveaway is currently running on it.
@@ -2206,8 +2321,9 @@ async function liveCoinsCached(viewerCount: (room: string) => number): Promise<u
  */
 async function liveCoins(viewerCount: (room: string) => number) {
   const profiles = await prisma.sellerProfile.findMany({
-    // hiddenFromLive: the admin kill-switch for test streams.
-    where: { pumpCoinAddress: { not: null }, hiddenFromLive: false },
+    // hiddenFromLive: the admin kill-switch for test streams. Include pump.fun
+    // sellers (by coin) AND native streamers (who may have no coin at all).
+    where: { hiddenFromLive: false, OR: [{ pumpCoinAddress: { not: null } }, { streamSource: 'native' }] },
     include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
   if (profiles.length === 0) return [];
@@ -2233,7 +2349,9 @@ async function liveCoins(viewerCount: (room: string) => number) {
   // only remaining fan-out, and the response cache keeps it off the hot path.
   const pumps = await Promise.all(
     profiles.map((pf) =>
-      pumpCoinInfo(pf.pumpCoinAddress!) as Promise<{ name?: string | null; image?: string | null; isLive?: boolean }>,
+      (pf.pumpCoinAddress
+        ? pumpCoinInfo(pf.pumpCoinAddress)
+        : Promise.resolve({})) as Promise<{ name?: string | null; image?: string | null; isLive?: boolean }>,
     ),
   );
 
@@ -2248,14 +2366,17 @@ async function liveCoins(viewerCount: (room: string) => number) {
       (auction ? mediaUrl('listing', auction.listingId, auction.listing.photos[0]) : null) ??
       pump?.image ??
       null;
+    const native = pf.streamSource === 'native';
     return {
-      coin: pf.pumpCoinAddress!,
+      coin: pf.pumpCoinAddress ?? null,
+      streamSource: native ? 'native' : 'pumpfun',
       sellerHandle: pf.user.handle,
       sellerAvatar: mediaUrl('avatar', pf.userId, pf.user.avatarUrl),
       room: pf.userId,
       hasAuction: auction !== null,
       hasGiveaway: giveaway !== null,
-      streamLive: pump?.isLive === true,
+      // Live when pump.fun says so, OR a native seller is broadcasting.
+      streamLive: pump?.isLive === true || (native && pf.isLiveNow),
       viewers: viewerCount(pf.userId),
       verified: pf.verified,
       coinName: pump?.name ?? null,

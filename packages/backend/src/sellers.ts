@@ -12,6 +12,8 @@ import { requireSeller } from './authz.js';
 import { isValidWalletAddress } from './auth.js';
 import { systemClock, type Clock } from './clock.js';
 import { mediaUrl } from './media.js';
+import { asStreamSource, type StreamSource } from './streaming.js';
+import { nativePlaybackUrls } from './streaming/provider.js';
 
 export const DEMO_TITLE = 'Charizard: Base Set Holo';
 export const DEMO_IMAGE = 'https://images.pokemontcg.io/base1/4_hires.png';
@@ -40,6 +42,45 @@ export interface ResolvedRoom {
   streamImage?: string | null;
   /** The seller's own words (their pitch), shown under the coin address. */
   description?: string | null;
+  /** Where the video comes from: 'pumpfun' (the linked coin's pump.fun stream) or
+   *  'native' (BIDit-hosted via Cloudflare). Drives which player the watch page uses. */
+  streamSource: StreamSource;
+  /** The linked pump.fun coin, if any (needed by the pump.fun player + link). */
+  coin?: string | null;
+  /** Native only: currently broadcasting, and the iframe player URL. */
+  isLiveNow: boolean;
+  streamIframeUrl?: string | null;
+}
+
+/** Shared mapping from a SellerProfile (with its user) to a ResolvedRoom. */
+function toResolvedRoom(profile: {
+  userId?: string;
+  pumpCoinAddress: string | null;
+  streamTitle: string | null;
+  streamImage: string | null;
+  pitch: string | null;
+  verified: boolean;
+  streamSource: string;
+  liveInputId: string | null;
+  streamCustomerCode: string | null;
+  isLiveNow: boolean;
+  user: { id: string; handle: string; avatarUrl: string | null };
+}): ResolvedRoom {
+  const source = asStreamSource(profile.streamSource);
+  const native = source === 'native' && profile.liveInputId && profile.streamCustomerCode;
+  return {
+    room: profile.user.id,
+    sellerHandle: profile.user.handle,
+    verified: profile.verified,
+    sellerAvatar: mediaUrl('avatar', profile.user.id, profile.user.avatarUrl),
+    streamTitle: profile.streamTitle ?? null,
+    streamImage: mediaUrl('cover', profile.user.id, profile.streamImage),
+    description: profile.pitch ?? null,
+    streamSource: source,
+    coin: profile.pumpCoinAddress ?? null,
+    isLiveNow: native ? profile.isLiveNow : false,
+    streamIframeUrl: native ? nativePlaybackUrls(profile.liveInputId!, profile.streamCustomerCode!).iframeUrl : null,
+  };
 }
 
 /** Map a Pump.fun coin address -> the seller's room, if a seller has linked it.
@@ -58,15 +99,25 @@ export async function resolveRoomByCoin(
     include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
   });
   if (!profile) return null;
-  return {
-    room: profile.user.id,
-    sellerHandle: profile.user.handle,
-    verified: profile.verified,
-    sellerAvatar: mediaUrl('avatar', profile.user.id, profile.user.avatarUrl),
-    streamTitle: profile.streamTitle ?? null,
-    streamImage: mediaUrl('cover', profile.user.id, profile.streamImage),
-    description: profile.pitch ?? null,
-  };
+  return toResolvedRoom(profile);
+}
+
+/** Map a seller handle -> their room. Used by native streamers who have no coin;
+ *  the watch page reaches them at /live/@handle. Handle match is case-insensitive. */
+export async function resolveRoomByHandle(
+  handle: string,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<ResolvedRoom | null> {
+  const h = handle.trim().replace(/^@/, '').toLowerCase();
+  if (!h) return null;
+  const user = await prisma.user.findFirst({ where: { handle: h }, select: { id: true } });
+  if (!user) return null;
+  const profile = await prisma.sellerProfile.findUnique({
+    where: { userId: user.id },
+    include: { user: { select: { id: true, handle: true, avatarUrl: true } } },
+  });
+  if (!profile) return null;
+  return toResolvedRoom(profile);
 }
 
 /** Force-give `coinAddress` to `sellerId`, releasing it from anyone else who had it.
@@ -99,7 +150,7 @@ export async function linkCoinToSeller(
     create: { userId: user.id, pumpCoinAddress: coin, verified: true },
   });
   // This admin/seed path always writes verified: true just above.
-  return { room: user.id, sellerHandle: user.handle, verified: true };
+  return { room: user.id, sellerHandle: user.handle, verified: true, streamSource: 'pumpfun', coin: coin || null, isLiveNow: false };
 }
 
 /** Ensure a running auction exists for a seller; returns its id (reuses if live). */

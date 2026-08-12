@@ -27,6 +27,11 @@ describe('coin <-> seller resolution', () => {
       streamTitle: null,
       streamImage: null,
       description: null,
+      // Video source: a linked coin is a pump.fun stream, not yet live natively.
+      streamSource: 'pumpfun',
+      coin: 'COIN_abc',
+      isLiveNow: false,
+      streamIframeUrl: null,
     });
   });
 
