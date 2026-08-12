@@ -21,6 +21,7 @@ const COLS: { h: string; links: { label: string; to?: string; href?: string }[] 
   {
     h: 'Resources',
     links: [
+      { label: 'Browser extension', to: '/extension' },
       { label: 'Help & quick start', to: '/help' },
       { label: 'Docs', to: '/docs' },
       { label: '$BID token', to: '/docs#tokenomics' },

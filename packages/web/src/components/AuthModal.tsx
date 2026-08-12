@@ -10,7 +10,7 @@ export default function AuthModal({
   onClose,
   onSuccess,
 }: {
-  mode: 'signup' | 'signin';
+  mode: 'signup' | 'signin' | 'forgot';
   onClose: () => void;
   onSuccess: (s: Session) => void;
 }) {
