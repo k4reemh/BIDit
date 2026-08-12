@@ -19,10 +19,14 @@ export interface LiveInput {
 
 /** Playback URLs for a live input (no secrets): safe to hand any viewer. */
 export interface Playback {
-  /** Cloudflare Stream iframe player (handles low-latency HLS + controls). */
+  /** Cloudflare Stream iframe player (handles low-latency HLS + controls).
+   *  Fallback when WebRTC playback can't connect. */
   iframeUrl: string;
   /** Raw LL-HLS manifest, for a custom player. */
   hlsUrl: string;
+  /** WebRTC (WHEP) playback endpoint: sub-second, glass-to-glass. The web player
+   *  tries this first and falls back to the iframe. */
+  whepUrl: string;
 }
 
 /** Deterministic Cloudflare playback URLs from an input id + customer code. Pure
@@ -30,7 +34,11 @@ export interface Playback {
  *  without holding a provider instance. */
 export function nativePlaybackUrls(liveInputId: string, customerCode: string): Playback {
   const base = `https://customer-${customerCode}.cloudflarestream.com/${liveInputId}`;
-  return { iframeUrl: `${base}/iframe`, hlsUrl: `${base}/manifest/video.m3u8` };
+  return {
+    iframeUrl: `${base}/iframe`,
+    hlsUrl: `${base}/manifest/video.m3u8`,
+    whepUrl: `${base}/webRTC/play`,
+  };
 }
 
 /** The (secret) broadcast credentials for an input. Owner-only. */

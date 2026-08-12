@@ -104,6 +104,9 @@ export interface RoomStreamStatus {
   live: boolean;
   iframeUrl: string | null;
   hlsUrl: string | null;
+  /** WebRTC (WHEP) playback URL for sub-second latency; the player prefers it and
+   *  falls back to the iframe. Null off native / when not provisioned. */
+  whepUrl: string | null;
   /** True on the mock provider: the web shows a live placeholder instead of a
    *  broken iframe (no real Cloudflare stream exists in dev/tests). */
   mock: boolean;
@@ -149,7 +152,7 @@ export async function streamStatusForRoom(
   const profile = await prisma.sellerProfile.findUnique({ where: { userId: room } });
   const source = asStreamSource(profile?.streamSource);
   if (source !== 'native' || !profile?.liveInputId || !profile.streamCustomerCode) {
-    return { source, live: false, iframeUrl: null, hlsUrl: null, mock: false };
+    return { source, live: false, iframeUrl: null, hlsUrl: null, whepUrl: null, mock: false };
   }
   const pb = nativePlaybackUrls(profile.liveInputId, profile.streamCustomerCode);
   return {
@@ -157,6 +160,7 @@ export async function streamStatusForRoom(
     live: profile.isLiveNow,
     iframeUrl: pb.iframeUrl,
     hlsUrl: pb.hlsUrl,
+    whepUrl: pb.whepUrl,
     mock: profile.streamCustomerCode === 'mockcf',
   };
 }

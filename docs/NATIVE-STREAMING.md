@@ -15,7 +15,22 @@ untouched — it keys on the seller's room (their userId), not the video.
   **webhook** (`POST /stream/webhook`, HMAC-verified) with a 30s poller fallback.
 - The watch page reaches a native seller at `/live/@<handle>` (no coin needed),
   resolves via `GET /resolve?handle=`, and polls `GET /stream/status?room=` to
-  notice go-live, then plays the Cloudflare iframe player.
+  notice go-live, then plays the video (see Latency below).
+
+## Latency
+
+Lowest latency comes from keeping the whole path on **WebRTC**:
+
+- **Ingest:** the one-click browser "Go Live" publishes over **WHIP** (WebRTC) —
+  sub-second in. OBS/RTMPS adds a couple of seconds. No dashboard toggle needed;
+  every Cloudflare live input accepts WHIP.
+- **Playback:** the watch player tries **WHEP** (WebRTC playback) first for
+  sub-second, glass-to-glass latency, and falls back to the Cloudflare iframe
+  player (low-latency HLS, a few seconds) if WebRTC can't connect. Again, no
+  toggle — WHEP is available on every live input.
+
+So: seller uses the browser "Go Live" (not OBS) + viewers on WHEP = the lowest
+latency Cloudflare offers. Nothing extra to enable in the dashboard for this.
 
 Provider seam: `src/streaming/provider.ts` (`MockStreamProvider` for dev/tests) +
 `src/streaming/cloudflare.ts` (`CloudflareStreamProvider`). Factory
@@ -51,8 +66,9 @@ provider, confirm once:
 
 1. As a seller, enable native streaming, then broadcast — either paste the RTMP
    URL + key into OBS, or use the one-click browser "Go Live" (WHIP).
-2. Open `/live/@<yourhandle>` in another browser: the stream should appear within
-   a few seconds and show the LIVE badge.
+2. Open `/live/@<yourhandle>` in another browser: the stream should appear and
+   show the LIVE badge. Confirm the WHEP player connects (sub-second); if it
+   can't, it silently falls back to the iframe — check the browser console.
 3. Cloudflare webhook flips `isLiveNow` (check `/stream/status?room=<sellerId>`),
    with the 30s poller as a backup.
 4. Run an auction and place a bid — unchanged from the pump.fun path.
@@ -62,5 +78,6 @@ provider, confirm once:
 Notes / spike items:
 - The webhook JSON field names (`uid` / `notificationName` / `status.state`) are
   parsed leniently; confirm against a real Cloudflare event and tighten if needed.
-- Playback uses the Cloudflare iframe player (low-latency HLS). For sub-second
-  latency you can later switch to the WHEP/WebRTC player.
+- Playback prefers the WHEP/WebRTC player (sub-second) and falls back to the
+  Cloudflare iframe (low-latency HLS). The WHEP path only exercises against real
+  Cloudflare — the mock provider renders a placeholder — so verify it in step 2.

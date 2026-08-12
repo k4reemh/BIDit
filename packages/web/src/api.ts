@@ -625,6 +625,8 @@ export interface StreamStatus {
   live: boolean;
   iframeUrl: string | null;
   hlsUrl: string | null;
+  /** WebRTC (WHEP) playback for sub-second latency; player prefers it, falls back to iframe. */
+  whepUrl: string | null;
   mock: boolean;
 }
 export const getStreamStatus = (room: string) =>
