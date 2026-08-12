@@ -5,6 +5,7 @@ import ChatPanel from '../components/ChatPanel';
 import BidTip from '../components/BidTip';
 import Avatar from '../components/Avatar';
 import ShopOverlay from '../components/ShopOverlay';
+import FollowLiveButton from '../components/FollowLiveButton';
 import { Bag, Verified, Theater, TheaterExit } from '../icons';
 
 // livekit-client is heavy, only load it on the watch page (and only this chunk).
@@ -151,7 +152,10 @@ export default function Watch({ session, onAuth }: { session: Session | null; on
             </div>
           </div>
           <div className="watch__meta">
-            <h1 className="display watch__title">{title}</h1>
+            <div className="watch__titlerow">
+              <h1 className="display watch__title">{title}</h1>
+              {r && <FollowLiveButton sellerId={r.room} session={session} onAuth={onAuth} />}
+            </div>
             <div className="watch__coin">{coin}</div>
             {description && <p className="muted watch__desc">{description}</p>}
           </div>

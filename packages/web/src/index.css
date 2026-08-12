@@ -2650,3 +2650,22 @@ img { display: block; max-width: 100%; }
 .golive__val { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
 .golive__val code { flex: 1; font-family: var(--font-display, monospace); font-size: 12.5px; color: var(--ink); word-break: break-all; }
 .linklike { background: none; border: 0; padding: 0; color: var(--accent-strong); font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+/* --- Go-live alerts --- */
+.watch__titlerow { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.notify-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 999px; border: 1.5px solid var(--line-2); background: var(--surface); color: var(--ink); font-weight: 600; font-size: 13.5px; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s, color .15s; }
+.notify-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+.notify-btn.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+.notify-btn:disabled { opacity: .6; cursor: default; }
+
+.alert-cats { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 6px; }
+.alert-cat { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.alert-cat:hover { border-color: var(--line-2); }
+.alert-cat.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); font-weight: 600; }
+.alert-cat svg { flex: none; }
+
+.alert-sellers { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.alert-sellers li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+.alert-sellers li:last-child { border-bottom: 0; }
+.alert-seller__name { font-weight: 600; color: var(--ink); text-decoration: none; }
+.alert-seller__name:hover { color: var(--accent-strong); }

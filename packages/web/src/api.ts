@@ -641,6 +641,17 @@ export interface StreamCredentials { rtmpsUrl: string; streamKey: string; whipUr
 export const getStreamCredentials = () => req<StreamCredentials>('/seller/stream/credentials');
 export interface Health { nativeStreaming: boolean }
 export const getHealth = () => req<Health>('/health');
+
+// ---- go-live alerts (follow a seller / a category) ----
+export interface AlertPrefs {
+  sellers: { sellerId: string; handle: string }[];
+  categories: string[];
+}
+export const getMyAlerts = () => req<AlertPrefs>('/me/alerts');
+export const setSellerLiveAlert = (sellerId: string, on: boolean) =>
+  req<{ on: boolean }>('/me/alerts/seller', { method: 'POST', body: JSON.stringify({ sellerId, on }) });
+export const setCategoryLiveAlert = (category: string, on: boolean) =>
+  req<{ on: boolean; category: string }>('/me/alerts/category', { method: 'POST', body: JSON.stringify({ category, on }) });
 export const getLive = () => req<LiveCoin[]>('/live');
 export const getPumpCoin = (mint: string) => req<PumpCoin>(`/pump/coin?mint=${encodeURIComponent(mint)}`);
 

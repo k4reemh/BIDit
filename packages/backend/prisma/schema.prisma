@@ -152,6 +152,7 @@ model User {
   withdrawals   Withdrawal[]
   pointsEvents  PointsEvent[]
   pumpCoinCreateAttempts PumpCoinCreateAttempt[]
+  liveAlerts    LiveAlertPref[]
 }
 
 model SellerProfile {
@@ -199,6 +200,9 @@ model SellerProfile {
   // Cloudflare per view.
   isLiveNow           Boolean   @default(false)
   liveStartedAt       DateTime?
+  // When we last fanned out "went live" alerts for this seller. Guards against
+  // spamming followers if a stream flaps live/offline in a short window.
+  lastLiveAlertAt     DateTime?
   // Per-room live-chat cooldown (ms between messages from one viewer). null = the
   // default (CHAT_COOLDOWN_MS); 0 = off. Seller-set in Settings.
   chatCooldownMs      Int?
@@ -660,6 +664,25 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+/// A user's opt-in to be alerted when a stream goes live. Exactly one of
+/// `sellerId` (a specific streamer) or `category` (any stream in that category)
+/// is set. Postgres allows many NULLs, so the two @@unique constraints only
+/// enforce uniqueness on the non-null side (one row per user+seller, one per
+/// user+category), which is what we want.
+model LiveAlertPref {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  sellerId  String?  // seller (User.id) this user wants go-live alerts for
+  category  String?  // category name this user wants go-live alerts for
+  createdAt DateTime @default(now())
+
+  @@unique([userId, sellerId])
+  @@unique([userId, category])
+  @@index([sellerId])
+  @@index([category])
 }
 
 // Giveaways (Whatnot-style). kind/status are plain strings (not enums) to avoid

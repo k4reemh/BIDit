@@ -78,9 +78,11 @@ import {
   setStreamSource,
   goLiveCredentials,
   applyLiveStatus,
+  applyPumpLiveStatus,
   streamStatusForRoom,
   pollLiveStatuses,
 } from '../src/streaming.js';
+import { setSellerAlert, setCategoryAlert, getAlertPrefs, AlertError } from '../src/alerts.js';
 import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway, ensureGiveawayFulfillment } from '../src/giveaways.js';
@@ -452,6 +454,28 @@ async function main() {
     }, 30_000);
     streamPoll.unref?.();
   }
+  // pump.fun go-live poller: pump streams have no webhook, so poll each linked
+  // seller's is-live flag (cached in pumpCoinInfo) and fire go-live alerts on the
+  // rising edge. 60s cadence; a no-op when there are no pump sellers.
+  const pumpLivePoll = setInterval(() => {
+    void (async () => {
+      const sellers = await prisma.sellerProfile.findMany({
+        where: { streamSource: 'pumpfun', pumpCoinAddress: { not: null } },
+        select: { userId: true, pumpCoinAddress: true, isLiveNow: true },
+      });
+      for (const s of sellers) {
+        try {
+          const info = (await pumpCoinInfo(s.pumpCoinAddress!)) as { isLive?: boolean };
+          const live = info?.isLive === true;
+          if (live === s.isLiveNow) continue;
+          await applyPumpLiveStatus(s.userId, live, prisma);
+        } catch {
+          /* transient pump.fun/network hiccup: retry next tick */
+        }
+      }
+    })().catch((e) => console.error('[pump-live-poll]', e));
+  }, 60_000);
+  pumpLivePoll.unref?.();
   // Escrow order timers: release funds once the dispute window passes, and refund
   // if a seller never ships. Harmless no-op in direct-payout mode (no held orders).
   const orderTimer = setInterval(() => {
@@ -929,6 +953,37 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         await markAllRead(userId, prisma);
         return send(res, 200, await listNotifications(userId, prisma));
+      }
+
+      // ---- go-live alerts (follow a seller / a category) ----
+      if (req.method === 'GET' && p === '/me/alerts') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await getAlertPrefs(userId, prisma));
+      }
+      if (req.method === 'POST' && p === '/me/alerts/seller') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          const r = await setSellerAlert(userId, String(b.sellerId ?? ''), b.on !== false, prisma);
+          return send(res, 200, r);
+        } catch (err) {
+          if (err instanceof AlertError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/me/alerts/category') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          const r = await setCategoryAlert(userId, String(b.category ?? ''), b.on !== false, prisma);
+          return send(res, 200, r);
+        } catch (err) {
+          if (err instanceof AlertError) return send(res, 400, { error: err.message });
+          throw err;
+        }
       }
 
       // ---- BIDit Points ----

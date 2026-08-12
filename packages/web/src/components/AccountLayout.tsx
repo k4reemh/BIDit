@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
 import Avatar from './Avatar';
-import { Person, Truck, Wallet, Bookmark, Bag, Settings, UserCheck } from '../icons';
+import { Person, Truck, Wallet, Bookmark, Bag, Settings, UserCheck, Bell } from '../icons';
 import type { Session } from '../api';
 
 interface Ctx {
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/shipping', label: 'Payments & Shipping', icon: Truck },
   { to: '/deposit', label: 'Deposit & Withdraw', icon: Wallet },
   { to: '/saved', label: 'Saved', icon: Bookmark },
+  { to: '/alerts', label: 'Live alerts', icon: Bell },
   { to: '/purchases', label: 'Purchases', icon: Bag },
   { to: '/ship', label: 'Ready to ship', icon: Truck },
 ];

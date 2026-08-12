@@ -7,7 +7,11 @@
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { notify } from './notifications.js';
+import { notifyLive } from './alerts.js';
 import { nativePlaybackUrls, type IngestCreds, type StreamProvider } from './streaming/provider.js';
+
+/** Don't re-alert followers if a stream flaps live/offline inside this window. */
+const LIVE_ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 
 export type StreamSource = 'pumpfun' | 'native';
 export const STREAM_SOURCES: StreamSource[] = ['pumpfun', 'native'];
@@ -78,25 +82,63 @@ export async function goLiveCredentials(
  * the affected seller's room + whether it actually changed, so the caller can push
  * a realtime nudge only on real transitions. Notifies the seller on going live.
  */
+/**
+ * Core go-live transition, keyed on the seller (room = userId). Idempotent: a
+ * no-op when the status already matches. On a rising edge it optionally tells the
+ * seller ("you are live"), then fans out go-live alerts to their followers and
+ * category subscribers — guarded by lastLiveAlertAt so a flapping stream doesn't
+ * spam. Never throws on the notification side.
+ */
+async function applyLiveForSeller(
+  sellerId: string,
+  live: boolean,
+  prisma: PrismaClient,
+  opts: { selfNotify: boolean },
+): Promise<{ room: string; changed: boolean } | null> {
+  const profile = await prisma.sellerProfile.findUnique({ where: { userId: sellerId } });
+  if (!profile) return null;
+  if (profile.isLiveNow === live) return { room: sellerId, changed: false };
+  await prisma.sellerProfile.update({
+    where: { userId: sellerId },
+    data: { isLiveNow: live, liveStartedAt: live ? new Date() : profile.liveStartedAt },
+  });
+  if (live) {
+    if (opts.selfNotify) {
+      await notify(
+        { userId: sellerId, kind: 'live', title: 'You are live on BIDit', body: 'Your stream is up. Start an auction whenever you are ready.', href: '/seller' },
+        prisma,
+      ).catch(() => {});
+    }
+    const lastAlert = profile.lastLiveAlertAt?.getTime() ?? 0;
+    if (Date.now() - lastAlert > LIVE_ALERT_COOLDOWN_MS) {
+      // Stamp first so a slow fan-out can't double-fire on a concurrent edge.
+      await prisma.sellerProfile.update({ where: { userId: sellerId }, data: { lastLiveAlertAt: new Date() } }).catch(() => {});
+      await notifyLive(sellerId, prisma).catch(() => {});
+    }
+  }
+  return { room: sellerId, changed: true };
+}
+
+/** Apply a native (Cloudflare) live transition, found by live input id. */
 export async function applyLiveStatus(
   liveInputId: string,
   live: boolean,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ room: string; changed: boolean } | null> {
-  const profile = await prisma.sellerProfile.findUnique({ where: { liveInputId } });
+  const profile = await prisma.sellerProfile.findUnique({ where: { liveInputId }, select: { userId: true } });
   if (!profile) return null;
-  if (profile.isLiveNow === live) return { room: profile.userId, changed: false };
-  await prisma.sellerProfile.update({
-    where: { liveInputId },
-    data: { isLiveNow: live, liveStartedAt: live ? new Date() : profile.liveStartedAt },
-  });
-  if (live) {
-    await notify(
-      { userId: profile.userId, kind: 'live', title: 'You are live on BIDit', body: 'Your stream is up. Start an auction whenever you are ready.', href: '/seller' },
-      prisma,
-    ).catch(() => {});
-  }
-  return { room: profile.userId, changed: true };
+  return applyLiveForSeller(profile.userId, live, prisma, { selfNotify: true });
+}
+
+/** Apply a pump.fun live transition, found by seller id (driven by the poller
+ *  that reads pump.fun's is-live flag). No "you are live" self-ping: the seller
+ *  is already on pump.fun. Followers/category subscribers still get alerted. */
+export async function applyPumpLiveStatus(
+  sellerId: string,
+  live: boolean,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{ room: string; changed: boolean } | null> {
+  return applyLiveForSeller(sellerId, live, prisma, { selfNotify: false });
 }
 
 export interface RoomStreamStatus {

@@ -29,6 +29,7 @@ import Profile from './pages/account/Profile';
 import Shipping from './pages/account/Shipping';
 import Deposit from './pages/account/Deposit';
 import Saved from './pages/account/Saved';
+import Alerts from './pages/account/Alerts';
 import Purchases from './pages/account/Purchases';
 import ShipItems from './pages/account/ShipItems';
 import SellerOverview from './pages/seller/Overview';
@@ -148,6 +149,7 @@ export default function App() {
             <Route path="/shipping" element={<Shipping />} />
             <Route path="/deposit" element={<Deposit />} />
             <Route path="/saved" element={<Saved />} />
+            <Route path="/alerts" element={<Alerts />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/ship" element={<ShipItems />} />
           </Route>
