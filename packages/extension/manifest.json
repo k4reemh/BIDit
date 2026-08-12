@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "BIDit — Live card auctions on Pump.fun",
+  "name": "BIDit: Live card auctions on Pump.fun",
   "version": "1.1.0",
   "description": "Bid on live trading-card auctions right on Pump.fun streams. Settle in USDC, held in escrow until it ships.",
   "icons": {

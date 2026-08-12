@@ -67,7 +67,7 @@ const STUBS: Record<string, { title: string; sub: string }> = {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [auth, setAuth] = useState<'signup' | 'signin' | null>(null);
+  const [auth, setAuth] = useState<'signup' | 'signin' | 'forgot' | null>(null);
   const [onboarding, setOnboarding] = useState<Session | null>(null);
   const [tutorial, setTutorial] = useState(false);
   const user = session ? toUser(session) : null;
@@ -78,6 +78,19 @@ export default function App() {
       setSession(s);
       if (!s.onboarded) setOnboarding(s);
     });
+  }, []);
+
+  // Deep links into the auth modal: ?signup=1 / ?signin=1 / ?forgot=1. Used by
+  // the browser extension popup and shareable campaign links. The param is
+  // stripped after opening so a refresh doesn't re-open the modal.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.has('signup') ? 'signup' : params.has('signin') ? 'signin' : params.has('forgot') ? 'forgot' : null;
+    if (!mode) return;
+    for (const k of ['signup', 'signin', 'forgot']) params.delete(k);
+    const rest = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    setAuth(mode);
   }, []);
 
   // Live balance over WebSocket: updates the moment a deposit lands, a bid is

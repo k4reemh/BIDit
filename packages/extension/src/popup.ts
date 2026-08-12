@@ -17,11 +17,13 @@ const connText = $('connText');
 const settled = $('settled');
 const verifyNotice = $('verifyNotice');
 
-// Point the outbound links at the configured website (prod by default).
+// Point the outbound links at the configured website (prod by default). The
+// auth links open the site's auth modal via a query param (no dedicated routes).
 ($('signupLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/?signup=1`;
-($('forgotLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/forgot`;
+($('forgotLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/?forgot=1`;
 ($('addFundsLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/deposit`;
-($('verifyLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/`;
+// Signing in on the site auto-surfaces its "verify your email" prompt.
+($('verifyLink') as HTMLAnchorElement).href = `${WEB_ORIGIN}/?signin=1`;
 
 const port = chrome.runtime.connect({ name: PORT_NAME });
 
