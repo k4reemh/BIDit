@@ -16,6 +16,7 @@ import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale, escrowSettleApplied, escrowLockApplied } from './ledger.js';
 import { createFulfillmentItem, applyWeeklyBundling, prepayMarketShipping, ShippingError } from './fulfillment.js';
+import { creditNftWin } from './nft.js';
 import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
@@ -51,6 +52,7 @@ export const LISTING_FULFILLMENT_SELECT = {
   parcelWidthMm: true,
   parcelHeightMm: true,
   marketplace: true,
+  nft: true,
 } as const;
 
 export type ListingForFulfillment = {
@@ -198,6 +200,23 @@ export async function settleAuction(
   // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
   await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
 
+  // NFT win: no physical fulfillment. The assets move to the buyer's account
+  // instantly (a custody ledger change), so the escrow can release at once:
+  // delivery is already done and verifiable. The 5% fee is taken at release,
+  // which is what pays the seller their 95% immediately.
+  if (auction.listing.nft) {
+    await creditNftWin(
+      { listingId: auction.listing.id, buyerId, sellerId, title: auction.listing.title },
+      prisma,
+    );
+    const won = await claimTransition(prisma, created.id, [OrderStatus.LOCKED], {
+      status: OrderStatus.RELEASED,
+      releasedAt: clock.now(),
+    });
+    if (won) await escrow.release(created.id);
+    return prisma.order.findUniqueOrThrow({ where: { id: created.id } });
+  }
+
   // Drop the won card into the shipping pipeline (Ready to ship + seller queue).
   // The order's escrow release is gated on delivery separately (Shippo, later).
   await postSaleFulfillment(
@@ -281,6 +300,16 @@ export async function settleAuctionDirect(
 
   // BIDit Points: buyer 100×/seller 20× per $1, keyed by orderId (idempotent).
   await awardOrderPoints({ orderId: created.id, buyerId, sellerId, amount }, prisma);
+
+  // NFT win: credit the assets to the buyer; nothing to ship. (Direct mode
+  // already paid the seller in full at settlement.)
+  if (auction.listing.nft) {
+    await creditNftWin(
+      { listingId: auction.listing.id, buyerId, sellerId, title: auction.listing.title },
+      prisma,
+    );
+    return created;
+  }
 
   // Physical fulfillment (shared with the escrow path).
   await postSaleFulfillment(

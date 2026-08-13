@@ -97,6 +97,9 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
   const priceLabel = current !== null ? 'Current bid' : 'Starting bid';
   const price = current ?? fromMicros(it.startingBid)!;
   const total = shipping !== null ? price + shipping : null;
+  // NFT auctions have no shipping lane, so nothing about the viewer's address
+  // may gate the bid button.
+  const noShipBlock = !it.nft && it.viewer !== null && it.viewer.hasAddress && shipping === null;
 
   return (
     <main className="container mkt-item">
@@ -149,7 +152,9 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
 
             <div className="mkt-item__shipline">
               <Truck width={15} height={15} />
-              {it.viewer === null ? (
+              {it.nft ? (
+                <span>Digital delivery: credited to the winner&rsquo;s BIDit account instantly</span>
+              ) : it.viewer === null ? (
                 <span>Sign in to see shipping to you</span>
               ) : !it.viewer.hasAddress ? (
                 <span>Add your address to see shipping (<Link to="/shipping">Payments &amp; Shipping</Link>)</span>
@@ -170,20 +175,20 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
                       placeholder={money2(nextBid)}
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      disabled={busy || (it.viewer !== null && it.viewer.hasAddress && shipping === null)}
+                      disabled={busy || noShipBlock}
                     />
                   </div>
                   <button
                     className="btn btn-primary mkt-item__bidbtn"
                     onClick={bid}
-                    disabled={busy || it.viewer?.leading || (it.viewer !== null && it.viewer.hasAddress && shipping === null)}
+                    disabled={busy || it.viewer?.leading || noShipBlock}
                   >
                     {it.viewer?.leading ? 'Highest bidder' : busy ? 'Bidding…' : 'Place bid'}
                   </button>
                 </div>
                 <p className="muted mkt-item__minnote">
                   Minimum bid ${money2(nextBid)}.{' '}
-                  {total !== null && <>Win now and you&rsquo;d pay <b>${money2((Number(amount) || nextBid) + shipping!)}</b> with shipping.</>}
+                  {!it.nft && total !== null && <>Win now and you&rsquo;d pay <b>${money2((Number(amount) || nextBid) + shipping!)}</b> with shipping.</>}
                 </p>
                 {flash && <div className="mkt-item__flash">{flash}</div>}
                 {err && <div className="auth__error">{err}</div>}
@@ -193,17 +198,37 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
             )}
           </div>
 
-          {/* Shipping table: every region the seller offers */}
-          <div className="mkt-item__shiptable">
-            <h3>Shipping</h3>
-            {Object.entries(it.shipPrices).map(([region, micros]) => (
-              <div key={region} className="mkt-item__shiprow">
-                <span>{REGION_LABEL[region] ?? region}</span>
-                <b>{Number(micros) === 0 ? 'Free' : `$${money2(Number(micros) / 1e6)}`}</b>
-              </div>
-            ))}
-            <p className="muted">Shipping is charged automatically with the winning bid. Funds for both are reserved when you bid.</p>
-          </div>
+          {it.nft ? (
+            /* What the winner gets: every NFT in the batch, delivered instantly. */
+            <div className="mkt-item__shiptable">
+              <h3>{it.nftAssets.length > 1 ? `This batch: ${it.nftAssets.length} NFTs` : 'This NFT'}</h3>
+              {it.nftAssets.map((n, i) => (
+                <div key={i} className="mkt-item__shiprow mkt-item__nftrow">
+                  <span className="mkt-item__nftname">
+                    {n.image && <img src={n.image} alt="" />}
+                    {n.name ?? 'Unnamed NFT'}
+                  </span>
+                  {n.collection && <b className="muted">{n.collection}</b>}
+                </div>
+              ))}
+              <p className="muted">
+                Win and {it.nftAssets.length > 1 ? 'all of them are' : 'it is'} credited to your BIDit account the
+                second the auction ends. Withdraw to any Solana wallet anytime; the seller is paid instantly.
+              </p>
+            </div>
+          ) : (
+            /* Shipping table: every region the seller offers */
+            <div className="mkt-item__shiptable">
+              <h3>Shipping</h3>
+              {Object.entries(it.shipPrices).map(([region, micros]) => (
+                <div key={region} className="mkt-item__shiprow">
+                  <span>{REGION_LABEL[region] ?? region}</span>
+                  <b>{Number(micros) === 0 ? 'Free' : `$${money2(Number(micros) / 1e6)}`}</b>
+                </div>
+              ))}
+              <p className="muted">Shipping is charged automatically with the winning bid. Funds for both are reserved when you bid.</p>
+            </div>
+          )}
 
           {/* Bid history */}
           <div className="mkt-item__bids">

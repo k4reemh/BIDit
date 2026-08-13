@@ -662,6 +662,9 @@ export interface MarketCard {
   sellerAvatar: string | null;
   sellerVerified: boolean;
   shipPrices: Record<string, string>;
+  /** NFT auction: digital delivery, no shipping. nftCount > 1 = batch. */
+  nft: boolean;
+  nftCount: number;
 }
 export interface MarketList { items: MarketCard[]; total: number; page: number; pageSize: number }
 export type MarketSort = 'ending' | 'newest' | 'price_asc' | 'price_desc';
@@ -691,6 +694,8 @@ export interface MarketItemDetail {
   serverNow: number;
   seller: { id: string; handle: string; avatarUrl: string | null; verified: boolean };
   shipPrices: Record<string, string>;
+  nft: boolean;
+  nftAssets: { name: string | null; image: string | null; collection: string | null }[];
   bids: { handle: string; amount: string; at: number; status: string }[];
   viewer: { region: MarketRegion; shippingC: string | null; hasAddress: boolean; leading: boolean } | null;
 }
@@ -721,6 +726,35 @@ export interface MyMarketRow {
   currentBid: string | null; startingBid: string; bidCount: number; endsAt: number | null;
 }
 export const getMyMarket = () => req<MyMarketRow[]>('/market/mine');
+
+// ---- NFT custody + NFT auctions ----
+export interface NftAsset {
+  id: string;
+  mint: string;
+  name: string | null;
+  image: string | null;
+  collection: string | null;
+  standard: string | null;
+  status: string; // HELD | WITHDRAWING | WITHDRAWN
+  locked: boolean;
+  listingId: string | null;
+  marketplace: boolean;
+  withdrawTxSig: string | null;
+}
+export const getMyNfts = () => req<NftAsset[]>('/nft/mine');
+export const armNftDeposit = () =>
+  req<{ depositAddress: string; watchUntil: number }>('/nft/arm', { method: 'POST', body: '{}' });
+export const withdrawNftApi = (assetId: string, address: string) =>
+  req<{ ok: true }>('/nft/withdraw', { method: 'POST', body: JSON.stringify({ assetId, address }) });
+export const listNftForAuction = (input: {
+  assetIds: string[];
+  startingBid: string;
+  title?: string;
+  mode: 'stream' | 'market';
+  durationHours?: number;
+}) => req<{ listingId: string; auctionId: string | null; endsAt: number | null }>('/nft/list', { method: 'POST', body: JSON.stringify(input) });
+export const unlistNftApi = (listingId: string) =>
+  req<{ ok: true }>('/nft/unlist', { method: 'POST', body: JSON.stringify({ listingId }) });
 
 // ---- go-live alerts (follow a seller / a category) ----
 export interface AlertPrefs {

@@ -27,6 +27,8 @@ const SORTS: { key: MarketSort; label: string }[] = [
 ];
 
 function ShipTag({ c }: { c: MarketCard }) {
+  // NFTs deliver digitally: no shipping line, an NFT badge instead.
+  if (c.nft) return <span className="mkt-card__nft">NFT{c.nftCount > 1 ? ` ×${c.nftCount}` : ''}</span>;
   // Show the cheapest lane the seller offers; the item page shows the viewer's own.
   const prices = Object.values(c.shipPrices).map((p) => Number(p) / 1e6);
   if (prices.length === 0) return null;

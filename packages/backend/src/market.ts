@@ -166,6 +166,9 @@ export interface MarketCard {
   sellerAvatar: string | null;
   sellerVerified: boolean;
   shipPrices: Record<string, string>;
+  /** NFT auction: digital delivery, no shipping. nftCount > 1 = batch. */
+  nft: boolean;
+  nftCount: number;
 }
 
 export async function listMarket(
@@ -197,7 +200,12 @@ export async function listMarket(
       skip: page * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        listing: { include: { seller: { select: { handle: true, avatarUrl: true, sellerProfile: { select: { verified: true } } } } } },
+        listing: {
+          include: {
+            seller: { select: { handle: true, avatarUrl: true, sellerProfile: { select: { verified: true } } } },
+            _count: { select: { nftAssets: true } },
+          },
+        },
         _count: { select: { bids: true } },
       },
     }),
@@ -218,6 +226,8 @@ export async function listMarket(
       sellerAvatar: a.listing.seller.avatarUrl,
       sellerVerified: a.listing.seller.sellerProfile?.verified ?? false,
       shipPrices: (a.listing.shipPrices ?? {}) as Record<string, string>,
+      nft: a.listing.nft,
+      nftCount: a.listing._count.nftAssets,
     })),
     total,
     page,
@@ -234,7 +244,12 @@ export async function getMarketItem(
   const a = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: {
-      listing: { include: { seller: { select: { id: true, handle: true, avatarUrl: true, sellerProfile: { select: { verified: true } } } } } },
+      listing: {
+        include: {
+          seller: { select: { id: true, handle: true, avatarUrl: true, sellerProfile: { select: { verified: true } } } },
+          nftAssets: { select: { name: true, image: true, collection: true } },
+        },
+      },
       bids: { orderBy: { createdAt: 'desc' }, take: 12, include: { user: { select: { handle: true } } } },
     },
   });
@@ -279,6 +294,8 @@ export async function getMarketItem(
       verified: a.listing.seller.sellerProfile?.verified ?? false,
     },
     shipPrices: (a.listing.shipPrices ?? {}) as Record<string, string>,
+    nft: a.listing.nft,
+    nftAssets: a.listing.nftAssets.map((n) => ({ name: n.name, image: n.image, collection: n.collection })),
     bids: a.bids.map((b) => ({
       handle: b.user.handle,
       amount: b.amount.toString(),
@@ -323,20 +340,25 @@ export async function placeMarketBid(
 ): Promise<BidResult & { shippingC?: string }> {
   const a = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { listing: { select: { marketplace: true, sellerId: true, shipPrices: true, title: true } } },
+    include: { listing: { select: { marketplace: true, nft: true, sellerId: true, shipPrices: true, title: true } } },
   });
   if (!a || !a.listing.marketplace) throw new MarketError('That listing was not found.');
   if (a.listing.sellerId === userId) throw new MarketError('You can’t bid on your own listing.');
 
-  // Shipping to the bidder's region is part of the reserve, so an address is a
-  // precondition of bidding, not an afterthought at checkout.
-  const u = await prisma.user.findUnique({ where: { id: userId }, select: { shippingAddress: true } });
-  const dest = decryptPii<{ country?: string }>(u?.shippingAddress ?? null);
-  if (!dest?.country) throw new MarketError('Add your shipping address before bidding (Account → Payments & Shipping).');
-  const region = regionForCountry(dest.country);
-  const prices = parseShipPrices(a.listing.shipPrices);
-  const shippingC = prices[region];
-  if (shippingC === undefined) throw new MarketError('This seller doesn’t ship to your region.');
+  // NFT auctions deliver digitally to the winner's BIDit account: no shipping,
+  // no address needed. Physical listings reserve shipping to the bidder's
+  // region, so an address is a precondition of bidding there.
+  let shippingC = 0n;
+  if (!a.listing.nft) {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { shippingAddress: true } });
+    const dest = decryptPii<{ country?: string }>(u?.shippingAddress ?? null);
+    if (!dest?.country) throw new MarketError('Add your shipping address before bidding (Account → Payments & Shipping).');
+    const region = regionForCountry(dest.country);
+    const prices = parseShipPrices(a.listing.shipPrices);
+    const price = prices[region];
+    if (price === undefined) throw new MarketError('This seller doesn’t ship to your region.');
+    shippingC = price;
+  }
 
   const result = await placeBid(
     { auctionId, userId, amount, shippingC, antiSnipeFloorMs: MARKET_ANTI_SNIPE_MS },

@@ -94,6 +94,17 @@ import {
   type MarketSort,
   type MarketRegion,
 } from '../src/market.js';
+import { getNftChain, MockNftChain } from '../src/chain/nft-chain.js';
+import {
+  armNftDeposit,
+  creditNftDeposits,
+  listMyNfts,
+  withdrawNft,
+  processNftWithdrawals,
+  createNftListing,
+  unlistNftListing,
+  NftError,
+} from '../src/nft.js';
 import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway, ensureGiveawayFulfillment } from '../src/giveaways.js';
@@ -332,6 +343,7 @@ async function main() {
   // immediately, no escrow, no 5% fee. Used for the real-money friends test.
   const directPayout = process.env.BIDIT_PAYOUT_MODE === 'direct';
   const chain = await getChainClient(); // MockChain unless SOLANA_RPC is set
+  const nftChain = await getNftChain(chain.cluster); // mock unless a real cluster
   // Seller coin auto-create ("<handle>'s BIDit Livestream"): PumpPortal on
   // mainnet, mock elsewhere; BIDIT_PUMP_PROVIDER overrides for spikes.
   const pumpCreate = getPumpCreateProvider(chain.cluster);
@@ -498,6 +510,18 @@ async function main() {
     })().catch((e) => console.error('[pump-live-poll]', e));
   }, 60_000);
   pumpLivePoll.unref?.();
+  // NFT deposit watcher: scans only ARMED users' deposit wallets (the deposit
+  // page arms a 30-minute window), so an idle site makes zero NFT RPC calls.
+  const nftDepositPoll = setInterval(() => {
+    void creditNftDeposits(chain, nftChain, systemClock, prisma).catch((e) => console.error('[nft-watch]', e));
+  }, 20_000);
+  nftDepositPoll.unref?.();
+  // NFT withdrawal worker: sends WITHDRAWING assets out of custody. Retry-safe
+  // (amount-1 transfers can't double-send), so failures just retry next tick.
+  const nftWithdrawPoll = setInterval(() => {
+    void processNftWithdrawals(nftChain, prisma).catch((e) => console.error('[nft-withdraw]', e));
+  }, 30_000);
+  nftWithdrawPoll.unref?.();
   // Escrow order timers: release funds once the dispute window passes, and refund
   // if a seller never ships. Harmless no-op in direct-payout mode (no held orders).
   const orderTimer = setInterval(() => {
@@ -1099,6 +1123,88 @@ async function main() {
         if (!userId) return send(res, 401, { error: 'unauthorized' });
         const rows = await listMyMarket(userId, prisma);
         return send(res, 200, rows.map((r) => ({ ...r, photo: mediaUrl('listing', r.listingId, r.photo) })));
+      }
+
+      // ---- NFT custody + NFT auctions ----
+      // Arm deposit detection and hand back the user's deposit address.
+      if (req.method === 'POST' && p === '/nft/arm') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await armNftDeposit(userId, chain, systemClock, prisma));
+      }
+      if (req.method === 'GET' && p === '/nft/mine') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, await listMyNfts(userId, prisma));
+      }
+      if (req.method === 'POST' && p === '/nft/withdraw') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        try {
+          await withdrawNft(userId, String(b.assetId ?? ''), String(b.address ?? '').trim(), nftChain, prisma);
+          return send(res, 200, { ok: true });
+        } catch (err) {
+          if (err instanceof NftError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      // List NFTs for auction: on stream (queued for the live room) or on the
+      // marketplace (timed auction that starts now). Batch = several assetIds.
+      if (req.method === 'POST' && p === '/nft/list') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        try {
+          const created = await createNftListing(
+            userId,
+            {
+              assetIds: Array.isArray(b.assetIds) ? (b.assetIds as unknown[]).map(String) : [],
+              startingBid: usdc(String(b.startingBid ?? '0')),
+              title: typeof b.title === 'string' ? b.title : undefined,
+              description: typeof b.description === 'string' ? b.description : undefined,
+              mode: b.mode === 'market' ? 'market' : 'stream',
+              durationHours: b.durationHours != null ? Number(b.durationHours) : undefined,
+            },
+            systemClock,
+            prisma,
+          );
+          return send(res, 200, created);
+        } catch (err) {
+          if (err instanceof NftError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/nft/unlist') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await unlistNftListing(userId, String(b.listingId ?? ''), prisma);
+          return send(res, 200, { ok: true });
+        } catch (err) {
+          if (err instanceof NftError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      // Dev: drop a fake NFT at the caller's deposit address and credit it now.
+      if (req.method === 'POST' && p === '/dev/simulate-nft-deposit') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (!(nftChain instanceof MockNftChain)) return send(res, 400, { error: 'mock NFT chain only' });
+        const b = await readJson(req);
+        const mint = String(b.mint ?? `MockMint${Date.now()}${Math.floor(Math.random() * 1e4)}`);
+        const depositAddress = await chain.depositAddress(userId);
+        nftChain.seedNft(depositAddress, mint, {
+          name: typeof b.name === 'string' ? b.name : `Mock NFT ${mint.slice(-4)}`,
+          image: typeof b.image === 'string' ? b.image : null,
+          collection: typeof b.collection === 'string' ? b.collection : 'Mock Collection',
+        });
+        await armNftDeposit(userId, chain, systemClock, prisma);
+        const credited = await creditNftDeposits(chain, nftChain, systemClock, prisma);
+        return send(res, 200, { ok: true, mint, credited });
       }
 
       // ---- BIDit Points ----

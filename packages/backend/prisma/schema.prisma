@@ -153,6 +153,11 @@ model User {
   pointsEvents  PointsEvent[]
   pumpCoinCreateAttempts PumpCoinCreateAttempt[]
   liveAlerts    LiveAlertPref[]
+  nftAssets     NftAsset[]   @relation("NftOwner")
+  /// NFT deposit detection is armed (polled) until this time; null = not armed.
+  /// Set when the user opens the deposit-NFT flow, so the watcher only scans
+  /// wallets that expect an inbound NFT instead of every user every tick.
+  nftWatchUntil DateTime?
 }
 
 model SellerProfile {
@@ -414,6 +419,11 @@ model Listing {
   // winning bid. A missing region means the seller doesn't ship there.
   marketplace Boolean       @default(false)
   shipPrices  Json?
+  // NFT auction: the "item" is one or more custody NftAssets (batch mode = many).
+  // No shipping, no fulfillment: the win credits the assets to the buyer's BIDit
+  // account instantly and the seller is paid at once.
+  nft         Boolean       @default(false)
+  nftAssets   NftAsset[]
   createdAt   DateTime      @default(now())
 
   /** Optional wheel-spin prize pool (WheelEntry[]). When set, the auction is a
@@ -674,6 +684,38 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+/// An NFT held in BIDit custody. The token physically sits in the DEPOSITOR's
+/// BIDit deposit wallet (whose key the backend derives from the wallet seed);
+/// `custodyUserId` keys that wallet and never changes while the token is here.
+/// `ownerId` is the beneficial owner: it changes instantly when an auction
+/// settles. Withdrawable by the owner any time the asset isn't attached to an
+/// active listing. Statuses: HELD -> WITHDRAWING -> WITHDRAWN (re-deposit
+/// reactivates the same mint row).
+model NftAsset {
+  id              String   @id @default(cuid())
+  mint            String   @unique
+  ownerId         String
+  owner           User     @relation("NftOwner", fields: [ownerId], references: [id])
+  custodyUserId   String
+  name            String?
+  image           String?
+  collection      String?
+  /// Metaplex token standard ('ProgrammableNonFungible' = pNFT, which may refuse
+  /// plain SPL transfers; the UI warns on these). Null when metadata was down.
+  standard        String?
+  status          String   @default("HELD") // HELD | WITHDRAWING | WITHDRAWN
+  listingId       String?
+  listing         Listing? @relation(fields: [listingId], references: [id])
+  withdrawAddress String?
+  withdrawTxSig   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ownerId, status])
+  @@index([listingId])
+  @@index([status])
 }
 
 /// A user's opt-in to be alerted when a stream goes live. Exactly one of
