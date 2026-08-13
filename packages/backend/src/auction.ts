@@ -144,6 +144,13 @@ export interface PlaceBidParams {
   auctionId: string;
   userId: string;
   amount: bigint;
+  /** Marketplace: seller's shipping price for this bidder's region. The funds
+   *  check and hold cover amount + shippingC so the win can charge both. */
+  shippingC?: bigint;
+  /** Marketplace anti-snipe: a bid landing with less than this many ms left
+   *  pushes the deadline back to this floor (e.g. 120s), instead of the live
+   *  auctions' short counter-bid window. */
+  antiSnipeFloorMs?: number;
 }
 
 export async function placeBid(
@@ -183,14 +190,19 @@ export async function placeBid(
       return { ok: false, reason: BidRejectReason.ALREADY_LEADING };
     }
 
-    // (5) Balance check: lock the bidder's account, then available >= amount.
+    // (5) Balance check: lock the bidder's account, then available >= amount
+    // (+ shipping on marketplace bids: the winner is charged both, so both are
+    // reserved up front — "the user needs to have the funds for both").
+    const shippingC = params.shippingC ?? 0n;
+    if (shippingC < 0n) return { ok: false, reason: BidRejectReason.BID_TOO_LOW };
+    const totalReserve = params.amount + shippingC;
     const account = await tx.account.findUnique({ where: { userId: params.userId } });
     if (!account) return { ok: false, reason: BidRejectReason.INSUFFICIENT_BALANCE };
     await lockAccount(tx, account.id);
     const settled = await getSettledBalance(account.id, tx);
     const holds = await getActiveHolds(account.id, tx);
     const available = settled - holds;
-    if (available < params.amount) {
+    if (available < totalReserve) {
       return { ok: false, reason: BidRejectReason.INSUFFICIENT_BALANCE };
     }
 
@@ -216,12 +228,14 @@ export async function placeBid(
       });
     }
 
-    // New leader: record the bid, place the hold.
+    // New leader: record the bid, place the hold (bid + shipping together, so
+    // releasing the hold on outbid frees both).
     const bid = await tx.bid.create({
       data: {
         auctionId: auction.id,
         userId: params.userId,
         amount: params.amount,
+        shippingC,
         status: BidStatus.ACTIVE,
       },
     });
@@ -230,14 +244,19 @@ export async function placeBid(
         accountId: account.id,
         auctionId: auction.id,
         bidId: bid.id,
-        amount: params.amount,
+        amount: totalReserve,
         status: HoldStatus.ACTIVE,
       },
     });
 
-    // Anti-snipe: a late bid nudges the deadline (capped at 5s); see antiSnipeRemaining.
+    // Anti-snipe. Live: a late bid nudges the deadline (capped at 5s, see
+    // antiSnipeRemaining). Marketplace: a bid inside the floor window pushes the
+    // deadline back out to the floor, eBay-style.
     const remainingMs = auction.endsAt.getTime() - now.getTime();
-    const newRemaining = antiSnipeRemaining(remainingMs);
+    const newRemaining =
+      params.antiSnipeFloorMs !== undefined
+        ? Math.max(remainingMs, params.antiSnipeFloorMs)
+        : antiSnipeRemaining(remainingMs);
     const extended = newRemaining > remainingMs;
     const endsAt = extended ? new Date(now.getTime() + newRemaining) : auction.endsAt;
 

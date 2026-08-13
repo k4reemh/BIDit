@@ -600,6 +600,75 @@ async function shipmentContext(
 }
 
 /**
+ * Marketplace: shipping was part of the winning reserve (bid + the seller's flat
+ * region price captured on the Bid), so the win pays it automatically. Called
+ * from settlement right after postSaleFulfillment: charges the winner's stored
+ * shipping price and moves the just-created fulfillment item straight into an
+ * already-PAID shipment, skipping Ready-to-ship entirely.
+ *
+ * Best-effort by design: any failure (address deleted since bidding, ledger
+ * hiccup) leaves the item in READY_TO_SHIP where the normal quote-and-pay flow
+ * still works, so a marketplace win can never strand goods or money.
+ */
+export async function prepayMarketShipping(
+  params: { orderId: string; auctionId: string; buyerId: string; sellerId: string },
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<void> {
+  try {
+    const bid = await prisma.bid.findFirst({
+      where: { auctionId: params.auctionId, userId: params.buyerId, status: 'WON' },
+      orderBy: { createdAt: 'desc' },
+      select: { shippingC: true },
+    });
+    if (!bid) return;
+    const shippingC = bid.shippingC;
+
+    const item = await prisma.fulfillmentItem.findFirst({
+      where: { orderId: params.orderId, status: 'READY_TO_SHIP' },
+      select: { id: true },
+    });
+    if (!item) return; // already shipped/bundled by another path
+
+    const buyer = await prisma.user.findUniqueOrThrow({ where: { id: params.buyerId } });
+    const dest = decryptPii<ShipLocation & Record<string, unknown>>(buyer.shippingAddress);
+    if (!dest || !dest.line1 || !dest.country) return; // address gone: fall back to Ready-to-ship
+
+    const shipment = await prisma.shipment.create({
+      data: {
+        buyerId: params.buyerId,
+        sellerId: params.sellerId,
+        mode: 'STANDARD',
+        status: 'PENDING_PAYMENT',
+        shippingFee: shippingC,
+        shipTo: encryptPii(dest) as Prisma.InputJsonValue,
+      },
+    });
+
+    if (shippingC > 0n) {
+      const buyerAccountId = await getOrCreateUserAccount(params.buyerId, prisma);
+      try {
+        await settleShipping({ buyerAccountId, amount: shippingC, shipmentId: shipment.id }, prisma);
+      } catch (err) {
+        // Nothing moved: drop the unpaid shipment, item stays in Ready-to-ship.
+        await prisma.shipment.deleteMany({ where: { id: shipment.id, status: 'PENDING_PAYMENT' } });
+        throw err;
+      }
+    }
+
+    const now = clock.now();
+    await prisma.shipment.update({ where: { id: shipment.id }, data: { status: 'PAID', paidAt: now } });
+    await prisma.fulfillmentItem.updateMany({
+      where: { id: item.id },
+      data: { status: 'IN_SHIPMENT', shipmentId: shipment.id },
+    });
+    await startSellerShipClock([item.id], clock, prisma);
+  } catch (err) {
+    console.error('[market-ship] prepay failed (falls back to Ready-to-ship):', (err as Error)?.message ?? err);
+  }
+}
+
+/**
  * Price a shipment for real and hand back a quote the buyer can pay.
  *
  * Asks the carrier with both real addresses, the seller's declared package and

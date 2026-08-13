@@ -55,11 +55,14 @@ export function mediaUrl(
   kind: 'avatar' | 'cover' | 'listing',
   id: string,
   stored: string | null | undefined,
+  /** Which photo of a multi-photo listing (marketplace galleries). 0 = first. */
+  index = 0,
 ): string | null {
   if (!stored) return null;
   const s = stored.trim();
   if (s.startsWith('https://')) return s;
   if (!s.startsWith('data:image/')) return null;
   const v = createHash('sha1').update(s).digest('hex').slice(0, 12);
-  return `/media/${kind}?id=${encodeURIComponent(id)}&v=${v}`;
+  const i = index > 0 ? `&i=${index}` : '';
+  return `/media/${kind}?id=${encodeURIComponent(id)}${i}&v=${v}`;
 }

@@ -642,6 +642,86 @@ export const getStreamCredentials = () => req<StreamCredentials>('/seller/stream
 export interface Health { nativeStreaming: boolean }
 export const getHealth = () => req<Health>('/health');
 
+// ---- marketplace (timed auctions) ----
+export const MARKET_REGIONS = ['US', 'CA', 'UK', 'EU', 'ASIA', 'OTHER'] as const;
+export type MarketRegion = (typeof MARKET_REGIONS)[number];
+/** micros string -> dollars number (display only). */
+export const fromMicros = (m: string | null | undefined) => (m == null ? null : Number(m) / 1e6);
+
+export interface MarketCard {
+  auctionId: string;
+  listingId: string;
+  title: string;
+  photo: string | null;
+  category: string | null;
+  currentBid: string | null;
+  startingBid: string;
+  bidCount: number;
+  endsAt: number;
+  sellerHandle: string;
+  sellerAvatar: string | null;
+  sellerVerified: boolean;
+  shipPrices: Record<string, string>;
+}
+export interface MarketList { items: MarketCard[]; total: number; page: number; pageSize: number }
+export type MarketSort = 'ending' | 'newest' | 'price_asc' | 'price_desc';
+export const getMarket = (opts: { category?: string; sort?: MarketSort; q?: string; page?: number } = {}) => {
+  const qs = new URLSearchParams();
+  if (opts.category) qs.set('category', opts.category);
+  if (opts.sort) qs.set('sort', opts.sort);
+  if (opts.q) qs.set('q', opts.q);
+  if (opts.page) qs.set('page', String(opts.page));
+  const s = qs.toString();
+  return req<MarketList>(`/market${s ? `?${s}` : ''}`);
+};
+
+export interface MarketItemDetail {
+  auctionId: string;
+  listingId: string;
+  status: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  photos: string[];
+  startingBid: string;
+  currentBid: string | null;
+  minIncrementBps: number;
+  minIncrementFloor: string;
+  endsAt: number | null;
+  serverNow: number;
+  seller: { id: string; handle: string; avatarUrl: string | null; verified: boolean };
+  shipPrices: Record<string, string>;
+  bids: { handle: string; amount: string; at: number; status: string }[];
+  viewer: { region: MarketRegion; shippingC: string | null; hasAddress: boolean; leading: boolean } | null;
+}
+export const getMarketItem = (auctionId: string) =>
+  req<MarketItemDetail>(`/market/item?auction=${encodeURIComponent(auctionId)}`);
+
+export const placeMarketBidApi = (auctionId: string, amount: string) =>
+  req<{ ok: true; currentBid: string | null; minNextBid: string; endsAt: number | null; extended: boolean; shippingC: string | null }>(
+    '/market/bid',
+    { method: 'POST', body: JSON.stringify({ auctionId, amount }) },
+  );
+
+export interface CreateMarketListingInput {
+  title: string;
+  description?: string;
+  category?: string;
+  photos: string[];
+  startingBid: string;
+  durationHours: number;
+  /** region -> dollars string, e.g. { US: "15" }. */
+  shipPrices: Record<string, string>;
+}
+export const createMarketListingApi = (input: CreateMarketListingInput) =>
+  req<{ listingId: string; auctionId: string; endsAt: number }>('/market/list', { method: 'POST', body: JSON.stringify(input) });
+
+export interface MyMarketRow {
+  auctionId: string; listingId: string; title: string; photo: string | null; status: string;
+  currentBid: string | null; startingBid: string; bidCount: number; endsAt: number | null;
+}
+export const getMyMarket = () => req<MyMarketRow[]>('/market/mine');
+
 // ---- go-live alerts (follow a seller / a category) ----
 export interface AlertPrefs {
   sellers: { sellerId: string; handle: string }[];

@@ -83,6 +83,17 @@ import {
   pollLiveStatuses,
 } from '../src/streaming.js';
 import { setSellerAlert, setCategoryAlert, getAlertPrefs, AlertError } from '../src/alerts.js';
+import {
+  createMarketListing,
+  listMarket,
+  getMarketItem,
+  listMyMarket,
+  placeMarketBid,
+  MarketError,
+  MARKET_REGIONS,
+  type MarketSort,
+  type MarketRegion,
+} from '../src/market.js';
 import { createListing, updateListing, listSellerListings, setListingWheel, setListingStorePrice } from '../src/listings.js';
 import { purchaseListing, listStoreItems, ItemUnavailableError } from '../src/store.js';
 import { openGiveaway, getOpenGiveaway, ensureGiveawayFulfillment } from '../src/giveaways.js';
@@ -215,6 +226,17 @@ function authRateLimited(req: http.IncomingMessage): boolean {
 // Throttle money endpoints per-USER (withdraw, buy). The balance check + daily cap
 // already stop overspend; this blunts request floods that would hammer the DB/RPC.
 const moneyHits = new Map<string, number[]>();
+/** Friendly copy for a rejected marketplace bid. */
+function bidRejectMessage(reason: string): string {
+  switch (reason) {
+    case 'AUCTION_ENDED': return 'This auction has ended.';
+    case 'BID_TOO_LOW': return 'Your bid is below the minimum next bid.';
+    case 'ALREADY_LEADING': return 'You are already the highest bidder.';
+    case 'INSUFFICIENT_BALANCE': return 'Not enough funds for this bid plus shipping. Add funds and try again.';
+    default: return 'That bid could not be placed.';
+  }
+}
+
 function moneyRateLimited(userId: string): boolean {
   const now = Date.now();
   const recent = (moneyHits.get(userId) ?? []).filter((t) => now - t < 60_000);
@@ -585,7 +607,9 @@ async function main() {
           : p === '/media/cover'
             ? (await prisma.sellerProfile.findUnique({ where: { userId: id }, select: { streamImage: true } }))
                 ?.streamImage
-            : (await prisma.listing.findUnique({ where: { id }, select: { photos: true } }))?.photos[0];
+            : (await prisma.listing.findUnique({ where: { id }, select: { photos: true } }))?.photos[
+              Math.max(0, Math.min(11, Number(url.searchParams.get('i') ?? 0) || 0))
+            ];
       const img = decodeDataUrl(stored);
       if (!img) return send(res, 404, { error: 'not found' });
       // A matching ETag means the client already holds these exact bytes.
@@ -984,6 +1008,97 @@ async function main() {
           if (err instanceof AlertError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+
+      // ---- marketplace (Grailed-style timed auctions) ----
+      if (req.method === 'GET' && p === '/market') {
+        const sortRaw = url.searchParams.get('sort') ?? 'ending';
+        const sort = (['ending', 'newest', 'price_asc', 'price_desc'] as const).find((s) => s === sortRaw) ?? 'ending';
+        const out = await listMarket(
+          {
+            category: url.searchParams.get('category') || undefined,
+            q: url.searchParams.get('q') || undefined,
+            sort: sort as MarketSort,
+            page: Number(url.searchParams.get('page') ?? 0) || 0,
+          },
+          systemClock,
+          prisma,
+        );
+        // Photos live in the DB as data URLs; ship compact media links instead.
+        return send(res, 200, {
+          ...out,
+          items: out.items.map((it) => ({ ...it, photo: mediaUrl('listing', it.listingId, it.photo) })),
+        });
+      }
+      if (req.method === 'GET' && p === '/market/item') {
+        const viewer = authUser(req); // optional: enriches with the viewer's shipping lane
+        const item = await getMarketItem(url.searchParams.get('auction') ?? '', viewer, systemClock, prisma);
+        if (!item) return send(res, 404, { error: 'listing not found' });
+        return send(res, 200, {
+          ...item,
+          photos: item.photos.map((ph, i) => mediaUrl('listing', item.listingId, ph, i)).filter(Boolean),
+          seller: { ...item.seller, avatarUrl: mediaUrl('avatar', item.seller.id, item.seller.avatarUrl) },
+        });
+      }
+      if (req.method === 'POST' && p === '/market/list') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        try {
+          const ship: Partial<Record<MarketRegion, bigint>> = {};
+          const rawShip = (b.shipPrices ?? {}) as Record<string, unknown>;
+          for (const region of MARKET_REGIONS) {
+            const v = rawShip[region];
+            if (v === undefined || v === null || String(v).trim() === '') continue;
+            ship[region] = usdc(String(v));
+          }
+          const created = await createMarketListing(
+            userId,
+            {
+              title: String(b.title ?? ''),
+              description: b.description ? String(b.description) : undefined,
+              category: b.category ? String(b.category) : undefined,
+              photos: Array.isArray(b.photos) ? (b.photos as unknown[]).filter((x): x is string => typeof x === 'string') : [],
+              startingBid: usdc(String(b.startingBid ?? '0')),
+              durationHours: Number(b.durationHours ?? 24),
+              shipPrices: ship,
+            },
+            systemClock,
+            prisma,
+          );
+          return send(res, 200, { ...created, endsAt: created.endsAt.getTime() });
+        } catch (err) {
+          if (err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/market/bid') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        try {
+          const result = await placeMarketBid(userId, String(b.auctionId ?? ''), usdc(String(b.amount ?? '0')), systemClock, prisma);
+          if (!result.ok) return send(res, 400, { error: bidRejectMessage(result.reason) });
+          return send(res, 200, {
+            ok: true,
+            currentBid: result.snapshot.currentBid?.toString() ?? null,
+            minNextBid: result.snapshot.minNextBid.toString(),
+            endsAt: result.snapshot.endsAt?.getTime() ?? null,
+            extended: result.extended,
+            shippingC: result.shippingC ?? null,
+          });
+        } catch (err) {
+          if (err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'GET' && p === '/market/mine') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const rows = await listMyMarket(userId, prisma);
+        return send(res, 200, rows.map((r) => ({ ...r, photo: mediaUrl('listing', r.listingId, r.photo) })));
       }
 
       // ---- BIDit Points ----

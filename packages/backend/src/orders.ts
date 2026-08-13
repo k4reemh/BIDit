@@ -15,7 +15,7 @@ import type { Order } from '@prisma/client';
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
 import { getOrCreateUserAccount, settleDirectSale, escrowSettleApplied, escrowLockApplied } from './ledger.js';
-import { createFulfillmentItem, applyWeeklyBundling, ShippingError } from './fulfillment.js';
+import { createFulfillmentItem, applyWeeklyBundling, prepayMarketShipping, ShippingError } from './fulfillment.js';
 import { awardOrderPoints } from './points.js';
 import { notify } from './notifications.js';
 import { systemClock, type Clock } from './clock.js';
@@ -50,6 +50,7 @@ export const LISTING_FULFILLMENT_SELECT = {
   parcelLengthMm: true,
   parcelWidthMm: true,
   parcelHeightMm: true,
+  marketplace: true,
 } as const;
 
 export type ListingForFulfillment = {
@@ -205,6 +206,12 @@ export async function settleAuction(
     prisma,
   );
 
+  // Marketplace win: shipping was reserved with the bid, so charge it now and
+  // hand the seller an already-paid shipment (skips Ready-to-ship).
+  if (auction.listing.marketplace) {
+    await prepayMarketShipping({ orderId: created.id, auctionId, buyerId, sellerId }, clock, prisma);
+  }
+
   return order;
 }
 
@@ -281,6 +288,12 @@ export async function settleAuctionDirect(
     clock,
     prisma,
   );
+
+  // Marketplace win: shipping was reserved with the bid; charge it now (see
+  // the escrow path above).
+  if (auction.listing.marketplace) {
+    await prepayMarketShipping({ orderId: created.id, auctionId, buyerId, sellerId }, clock, prisma);
+  }
 
   return created;
 }

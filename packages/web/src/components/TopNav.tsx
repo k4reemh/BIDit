@@ -76,6 +76,9 @@ export default function TopNav({
             <NavLink to="/browse" className={({ isActive }) => (isActive ? 'active' : '')}>
               Browse
             </NavLink>
+            <NavLink to="/marketplace" className={({ isActive }) => (isActive ? 'active' : '')}>
+              Marketplace
+            </NavLink>
             <div className="nav__catwrap" ref={catsRef}>
               <button
                 className={`nav__cat${cats ? ' open' : ''}`}

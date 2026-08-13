@@ -30,6 +30,9 @@ import Shipping from './pages/account/Shipping';
 import Deposit from './pages/account/Deposit';
 import Saved from './pages/account/Saved';
 import Alerts from './pages/account/Alerts';
+import Marketplace from './pages/Marketplace';
+import MarketItem from './pages/MarketItem';
+import MarketSell from './pages/MarketSell';
 import Purchases from './pages/account/Purchases';
 import ShipItems from './pages/account/ShipItems';
 import SellerOverview from './pages/seller/Overview';
@@ -143,6 +146,9 @@ export default function App() {
           <Route path="/admin/users" element={<AdminUsers session={session} />} />
           <Route path="/admin/shipments" element={<AdminShipments session={session} />} />
           <Route path="/live/:coin" element={<Watch session={session} onAuth={() => setAuth('signin')} />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/marketplace/sell" element={<MarketSell session={session} setSession={setSession} onAuth={() => setAuth('signup')} />} />
+          <Route path="/marketplace/:id" element={<MarketItem session={session} onAuth={() => setAuth('signin')} />} />
 
           <Route element={<AccountLayout session={session} setSession={setSession} onAuth={() => setAuth('signin')} />}>
             <Route path="/profile" element={<Profile />} />

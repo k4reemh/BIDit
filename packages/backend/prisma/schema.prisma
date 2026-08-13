@@ -408,6 +408,12 @@ model Listing {
   parcelHeightMm Int?
   category    String?
   status      ListingStatus @default(DRAFT)
+  // Marketplace (timed-auction) listings. `marketplace` keeps them out of the
+  // live-room flows; `shipPrices` is the seller's flat shipping price per region
+  // ({ region: microUsdcString }) shown as "+$X shipping" and charged with the
+  // winning bid. A missing region means the seller doesn't ship there.
+  marketplace Boolean       @default(false)
+  shipPrices  Json?
   createdAt   DateTime      @default(now())
 
   /** Optional wheel-spin prize pool (WheelEntry[]). When set, the auction is a
@@ -452,6 +458,10 @@ model Bid {
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   amount    BigInt
+  /// Marketplace: the seller's shipping price for THIS bidder's region, captured
+  /// at bid time. The hold covers amount + shippingC; at settle the winner is
+  /// charged both. 0 on live-room bids (shipping paid separately post-win).
+  shippingC BigInt    @default(0)
   status    BidStatus @default(ACTIVE)
   createdAt DateTime  @default(now())
 
