@@ -139,7 +139,7 @@ export default function MarketSell({ session, setSession, onAuth }: { session: S
               <span>{REGION_LABEL[r]}</span>
               <div className="mkt-item__amt">
                 <span>$</span>
-                <input inputMode="decimal" value={ship[r] ?? ''} placeholder="—"
+                <input inputMode="decimal" value={ship[r] ?? ''} placeholder="0.00"
                   onChange={(e) => setShip((prev) => ({ ...prev, [r]: e.target.value }))} />
               </div>
             </div>

@@ -30,6 +30,10 @@ export class NftError extends Error {}
 
 /** How long one "I'm depositing an NFT" arm keeps the watcher polling. */
 export const NFT_WATCH_MS = 30 * 60 * 1000;
+/** Active custody rows per user. Amount-1 spam tokens are free to mint, so an
+ *  unbounded wallet scan would let one user stuff the DB (and burn a DAS
+ *  metadata call per junk mint). Past the cap, extra tokens are ignored. */
+export const MAX_CUSTODY_PER_USER = 100;
 const MAX_BATCH = 10;
 const MIN_START_MICROS = 1_000_000n;
 const MAX_START_MICROS = 100_000_000_000n;
@@ -73,12 +77,17 @@ export async function creditNftDeposits(
       const depositAddress = await chain.depositAddress(userId);
       const found = await nftChain.listNfts(depositAddress);
       if (found.length === 0) continue;
+      let headroom =
+        MAX_CUSTODY_PER_USER -
+        (await prisma.nftAsset.count({ where: { ownerId: userId, status: { not: 'WITHDRAWN' } } }));
       const mints = found.map((f) => f.mint);
       const existing = await prisma.nftAsset.findMany({ where: { mint: { in: mints } } });
       const byMint = new Map(existing.map((a) => [a.mint, a]));
       for (const { mint } of found) {
         const row = byMint.get(mint);
         if (row && row.status !== 'WITHDRAWN') continue; // already in custody
+        if (headroom <= 0) break; // custody cap: ignore the overflow
+        headroom -= 1;
         const meta = await nftChain.metadata(mint).catch(() => null);
         await prisma.nftAsset.upsert({
           where: { mint },

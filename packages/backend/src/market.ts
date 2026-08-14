@@ -176,7 +176,9 @@ export async function listMarket(
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ items: MarketCard[]; total: number; page: number; pageSize: number }> {
-  const page = Math.max(0, Math.floor(opts.page ?? 0));
+  // Clamp the offset: an absurd page number would otherwise turn into a huge
+  // OFFSET scan. 500 pages × 24 covers far more inventory than exists.
+  const page = Math.min(500, Math.max(0, Math.floor(opts.page ?? 0)));
   const where = {
     status: AuctionStatus.RUNNING,
     endsAt: { gt: clock.now() },

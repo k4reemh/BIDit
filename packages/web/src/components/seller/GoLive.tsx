@@ -85,7 +85,7 @@ export default function GoLive({ session, setSession }: { session: Session; setS
       const name = (e as DOMException)?.name;
       setErr(
         name === 'NotAllowedError' || name === 'SecurityError'
-          ? 'Your browser blocked the camera/mic. If the address-bar camera icon is already set to Allow, the block is usually at the OS level (Mac: System Settings → Privacy & Security → Camera and Microphone → enable your browser), or another app is using the camera. Fix that, reload, and try again — or use OBS below.'
+          ? 'Your browser blocked the camera/mic. If the address-bar camera icon is already set to Allow, the block is usually at the OS level (Mac: System Settings → Privacy & Security → Camera and Microphone → enable your browser), or another app is using the camera. Fix that, reload, and try again, or use OBS below.'
           : name === 'NotReadableError'
             ? 'Your camera or mic is in use by another app (Zoom, OBS, FaceTime, another tab). Close it and try again, or use OBS below.'
             : name === 'NotFoundError' || name === 'OverconstrainedError'

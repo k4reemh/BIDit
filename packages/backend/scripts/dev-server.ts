@@ -237,6 +237,18 @@ function authRateLimited(req: http.IncomingMessage): boolean {
 // Throttle money endpoints per-USER (withdraw, buy). The balance check + daily cap
 // already stop overspend; this blunts request floods that would hammer the DB/RPC.
 const moneyHits = new Map<string, number[]>();
+/** Parse a user-supplied USDC amount, mapping garbage to a 400 instead of the
+ *  500 a raw RangeError would become in the outer catch. */
+function usdcInput(raw: unknown): bigint {
+  try {
+    return usdc(String(raw ?? '0'));
+  } catch {
+    const err = new Error('That amount doesn’t look like a valid USDC value.');
+    (err as Error & { status: number }).status = 400;
+    throw err;
+  }
+}
+
 /** Friendly copy for a rejected marketplace bid. */
 function bidRejectMessage(reason: string): string {
   switch (reason) {
@@ -1075,7 +1087,7 @@ async function main() {
           for (const region of MARKET_REGIONS) {
             const v = rawShip[region];
             if (v === undefined || v === null || String(v).trim() === '') continue;
-            ship[region] = usdc(String(v));
+            ship[region] = usdcInput(v);
           }
           const created = await createMarketListing(
             userId,
@@ -1084,7 +1096,7 @@ async function main() {
               description: b.description ? String(b.description) : undefined,
               category: b.category ? String(b.category) : undefined,
               photos: Array.isArray(b.photos) ? (b.photos as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-              startingBid: usdc(String(b.startingBid ?? '0')),
+              startingBid: usdcInput(b.startingBid),
               durationHours: Number(b.durationHours ?? 24),
               shipPrices: ship,
             },
@@ -1103,7 +1115,7 @@ async function main() {
         if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
         const b = await readJson(req);
         try {
-          const result = await placeMarketBid(userId, String(b.auctionId ?? ''), usdc(String(b.amount ?? '0')), systemClock, prisma);
+          const result = await placeMarketBid(userId, String(b.auctionId ?? ''), usdcInput(b.amount), systemClock, prisma);
           if (!result.ok) return send(res, 400, { error: bidRejectMessage(result.reason) });
           return send(res, 200, {
             ok: true,
@@ -1130,6 +1142,7 @@ async function main() {
       if (req.method === 'POST' && p === '/nft/arm') {
         const userId = authUser(req);
         if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
         return send(res, 200, await armNftDeposit(userId, chain, systemClock, prisma));
       }
       if (req.method === 'GET' && p === '/nft/mine') {
@@ -1162,7 +1175,7 @@ async function main() {
             userId,
             {
               assetIds: Array.isArray(b.assetIds) ? (b.assetIds as unknown[]).map(String) : [],
-              startingBid: usdc(String(b.startingBid ?? '0')),
+              startingBid: usdcInput(b.startingBid),
               title: typeof b.title === 'string' ? b.title : undefined,
               description: typeof b.description === 'string' ? b.description : undefined,
               mode: b.mode === 'market' ? 'market' : 'stream',
