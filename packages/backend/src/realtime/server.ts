@@ -425,7 +425,9 @@ export class RealtimeServer {
       await this.ensureSub(roomChannel(room), (payload) => this.deliverToRoom(room, payload));
     }
     const auctions = await this.prisma.auction.findMany({
-      where: { status: AuctionStatus.RUNNING, listing: { sellerId: room } },
+      // marketplace: false — the coin/stream watch room only shows live-room
+      // auctions. A marketplace listing runs on /marketplace, not here.
+      where: { status: AuctionStatus.RUNNING, listing: { sellerId: room, marketplace: false } },
       select: { id: true },
     });
     for (const { id } of auctions) {
@@ -443,7 +445,7 @@ export class RealtimeServer {
       const cutoff = new Date(this.clock.now().getTime() - CLOSE_REPLAY_WINDOW_MS);
       const recent = await this.prisma.auction.findFirst({
         where: {
-          listing: { sellerId: room },
+          listing: { sellerId: room, marketplace: false },
           status: { in: [AuctionStatus.SETTLING, AuctionStatus.CLOSED] },
           endsAt: { gte: cutoff },
         },
@@ -654,7 +656,7 @@ export class RealtimeServer {
     for (const result of results) {
       const auction = await this.prisma.auction.findUnique({
         where: { id: result.auctionId },
-        include: { listing: { select: { sellerId: true, wheel: true } } },
+        include: { listing: { select: { sellerId: true, wheel: true, marketplace: true } } },
       });
       if (!auction) continue;
 
@@ -671,6 +673,11 @@ export class RealtimeServer {
           console.error('[settle]', err);
         }
       }
+
+      // Marketplace auctions settle above but never touch the live room: their
+      // item page polls for the result, and broadcasting here would fire a
+      // winner celebration on the seller's coin/stream watch page.
+      if (auction.listing.marketplace) continue;
 
       const room = auction.listing.sellerId;
       const winner = result.winnerUserId

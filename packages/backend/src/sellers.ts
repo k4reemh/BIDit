@@ -161,7 +161,8 @@ export async function seedRunningAuction(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<string> {
   const running = await prisma.auction.findFirst({
-    where: { status: AuctionStatus.RUNNING, listing: { sellerId } },
+    // Never reuse a marketplace auction as the seller's live-room demo auction.
+    where: { status: AuctionStatus.RUNNING, listing: { sellerId, marketplace: false } },
     select: { id: true },
   });
   if (running) return running.id;

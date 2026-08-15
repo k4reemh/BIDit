@@ -101,6 +101,22 @@ describe('coin <-> seller resolution', () => {
     const auction = await prisma.auction.findUnique({ where: { id: id1 } });
     expect(auction?.status).toBe(AuctionStatus.RUNNING);
   });
+
+  it('ignores a marketplace auction: it is not the seller live-room auction', async () => {
+    const { room } = await linkCoinToSeller('COIN_mkt', 'seller_mkt', prisma);
+    // A running marketplace auction for the same seller must not be adopted as
+    // the live-room auction, and must not block seeding a real live-room one.
+    const mktListing = await prisma.listing.create({
+      data: { sellerId: room, title: 'Marketplace item', photos: ['x'], startingBid: 1_000_000n, status: 'QUEUED', marketplace: true },
+    });
+    const mktAuction = await prisma.auction.create({
+      data: { listingId: mktListing.id, startingBid: 1_000_000n, status: AuctionStatus.RUNNING, endsAt: new Date(Date.now() + 3_600_000) },
+    });
+    const seeded = await seedRunningAuction(room, {}, undefined, prisma);
+    expect(seeded).not.toBe(mktAuction.id);
+    const seededAuction = await prisma.auction.findUnique({ where: { id: seeded }, include: { listing: true } });
+    expect(seededAuction?.listing.marketplace).toBe(false);
+  });
 });
 
 describe('coin address validation (SEC-7)', () => {

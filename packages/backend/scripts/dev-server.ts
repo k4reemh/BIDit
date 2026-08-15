@@ -2664,7 +2664,10 @@ async function liveCoins(viewerCount: (room: string) => number) {
   // instead of a pair per seller.
   const [auctions, giveaways] = await Promise.all([
     prisma.auction.findMany({
-      where: { status: AuctionStatus.RUNNING, listing: { sellerId: { in: sellerIds } } },
+      // marketplace: false — a timed marketplace listing is NOT a livestream. It
+      // lives on /marketplace only and must not light up the seller's coin/stream
+      // card or put its item on the live grid.
+      where: { status: AuctionStatus.RUNNING, listing: { sellerId: { in: sellerIds }, marketplace: false } },
       include: { listing: { select: { sellerId: true, title: true, photos: true } } },
       orderBy: { createdAt: 'desc' },
     }),
