@@ -753,6 +753,66 @@ export interface MyMarketRow {
 }
 export const getMyMarket = () => req<MyMarketRow[]>('/market/mine');
 
+// ---- offers (buy-now listings) + direct messages ----
+export interface OfferCardData {
+  offerId: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  amount: string;
+  shippingC: string;
+  counterAmount: string | null;
+  status: string;
+  expiresAt: number;
+  listingTitle: string;
+  listingPhoto: string | null;
+  askingPrice: string | null;
+}
+export const makeOfferApi = (listingId: string, amount: string) =>
+  req<{ ok: true; offerId: string; conversationId: string; shippingC: string; expiresAt: number }>('/market/offer', {
+    method: 'POST',
+    body: JSON.stringify({ listingId, amount }),
+  });
+export type OfferAction = 'accept' | 'decline' | 'counter' | 'cancel';
+export const respondOfferApi = (offerId: string, action: OfferAction, counterAmount?: string) =>
+  req<{ ok: true; status: string; orderId?: string }>('/market/offer/respond', {
+    method: 'POST',
+    body: JSON.stringify({ offerId, action, counterAmount }),
+  });
+
+export interface InboxRow {
+  conversationId: string;
+  other: { id: string; handle: string; avatarUrl: string | null };
+  lastMessageAt: number;
+  preview: string | null;
+  previewKind: string;
+  unread: number;
+}
+export const getInbox = () => req<InboxRow[]>('/messages');
+export const getUnreadMessages = () => req<{ count: number }>('/messages/unread');
+export interface ThreadMessage {
+  id: string;
+  senderId: string;
+  kind: string;
+  text: string | null;
+  listingId: string | null;
+  offerId: string | null;
+  at: number;
+}
+export interface Thread {
+  conversationId: string;
+  other: { id: string; handle: string; avatarUrl: string | null; verified: boolean };
+  messages: ThreadMessage[];
+  offers: OfferCardData[];
+  serverNow: number;
+}
+export const getThreadApi = (id: string, after?: number) =>
+  req<Thread>(`/messages/thread?id=${encodeURIComponent(id)}${after ? `&after=${after}` : ''}`);
+export const startConversationApi = (userId: string) =>
+  req<{ conversationId: string }>('/messages/start', { method: 'POST', body: JSON.stringify({ userId }) });
+export const sendMessageApi = (conversationId: string, text: string) =>
+  req<{ ok: true; messageId: string }>('/messages/send', { method: 'POST', body: JSON.stringify({ conversationId, text }) });
+
 // ---- NFT custody + NFT auctions ----
 export interface NftAsset {
   id: string;

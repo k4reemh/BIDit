@@ -158,6 +158,11 @@ model User {
   /// Set when the user opens the deposit-NFT flow, so the watcher only scans
   /// wallets that expect an inbound NFT instead of every user every tick.
   nftWatchUntil DateTime?
+  conversationsA Conversation[] @relation("ConvA")
+  conversationsB Conversation[] @relation("ConvB")
+  directMessages DirectMessage[]
+  offersMade     Offer[] @relation("OfferBuyer")
+  offersReceived Offer[] @relation("OfferSeller")
 }
 
 model SellerProfile {
@@ -431,6 +436,7 @@ model Listing {
   wheel       Json?
 
   auctions Auction[]
+  offers   Offer[]
   orders   Order[]
 
   @@index([sellerId])
@@ -489,10 +495,14 @@ model Hold {
   id         String     @id @default(cuid())
   accountId  String
   account    Account    @relation(fields: [accountId], references: [id])
-  auctionId  String
-  auction    Auction    @relation(fields: [auctionId], references: [id])
+  /** The auction whose leading bid this hold backs; null for offer holds. */
+  auctionId  String?
+  auction    Auction?   @relation(fields: [auctionId], references: [id])
   bidId      String?    @unique
   bid        Bid?       @relation(fields: [bidId], references: [id])
+  /** The marketplace offer this hold backs (offer amount + region shipping). */
+  offerId    String?
+  offer      Offer?     @relation(fields: [offerId], references: [id])
   amount     BigInt
   status     HoldStatus @default(ACTIVE)
   createdAt  DateTime   @default(now())
@@ -500,6 +510,7 @@ model Hold {
 
   @@index([accountId, status])
   @@index([auctionId, status])
+  @@index([offerId, status])
 }
 
 model Order {
@@ -870,4 +881,72 @@ model ChatBlock {
   createdAt DateTime @default(now())
 
   @@unique([roomId, userId])
+}
+
+/// A direct-message thread between two users (one per pair; aId < bId so the
+/// pair is unique regardless of who started it). Offers ride inside the thread
+/// as OFFER messages. Per-side lastReadAt drives unread counts.
+model Conversation {
+  id            String   @id @default(cuid())
+  aId           String
+  a             User     @relation("ConvA", fields: [aId], references: [id])
+  bId           String
+  b             User     @relation("ConvB", fields: [bId], references: [id])
+  aLastReadAt   DateTime?
+  bLastReadAt   DateTime?
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  messages      DirectMessage[]
+
+  @@unique([aId, bId])
+  @@index([aId, lastMessageAt])
+  @@index([bId, lastMessageAt])
+}
+
+model DirectMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  /// TEXT (plain message) | OFFER (references offerId, rendered as an action
+  /// card) | SYSTEM (accepted/declined/expired notices, sender = actor).
+  kind           String       @default("TEXT")
+  text           String?      @db.VarChar(2000)
+  listingId      String?
+  offerId        String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+/// A buyer's offer on a fixed-price marketplace listing. The offer is REAL
+/// money: amount + the buyer's region shipping go on Hold when it's made, so an
+/// accepted offer can never bounce. Statuses:
+///   PENDING   -> seller may accept / decline / counter; buyer may cancel
+///   COUNTERED -> buyer may accept (pays counterAmount + shipping) / decline
+///   ACCEPTED | DECLINED | CANCELED | EXPIRED  (terminal; hold released, except
+///   ACCEPTED where the charge consumed the funds)
+model Offer {
+  id            String   @id @default(cuid())
+  listingId     String
+  listing       Listing  @relation(fields: [listingId], references: [id])
+  buyerId       String
+  buyer         User     @relation("OfferBuyer", fields: [buyerId], references: [id])
+  sellerId      String
+  seller        User     @relation("OfferSeller", fields: [sellerId], references: [id])
+  amount        BigInt
+  shippingC     BigInt   @default(0)
+  counterAmount BigInt?
+  status        String   @default("PENDING")
+  orderId       String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  holds         Hold[]
+
+  @@index([listingId, status])
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status, expiresAt])
 }

@@ -96,6 +96,15 @@ import {
   type MarketSort,
   type MarketRegion,
 } from '../src/market.js';
+import { makeOffer, respondOffer, expireOffers, offerCard, OfferError, type OfferAction } from '../src/offers.js';
+import {
+  startConversation,
+  sendMessage,
+  listConversations,
+  getThread,
+  unreadTotal,
+  MessageError,
+} from '../src/messages.js';
 import { getNftChain, MockNftChain } from '../src/chain/nft-chain.js';
 import {
   armNftDeposit,
@@ -268,6 +277,17 @@ function moneyRateLimited(userId: string): boolean {
   recent.push(now);
   moneyHits.set(userId, recent);
   return recent.length > 20; // >20 money actions / minute / user
+}
+
+// Direct messages get their own, looser bucket: a lively back-and-forth can
+// legitimately pass 20/min, but 60/min still stops scripted spam.
+const dmHits = new Map<string, number[]>();
+function dmRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const recent = (dmHits.get(userId) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  dmHits.set(userId, recent);
+  return recent.length > 60;
 }
 
 // Throttle coin-create PREPAREs per-USER: each one costs two external API calls
@@ -536,6 +556,11 @@ async function main() {
     void processNftWithdrawals(nftChain, prisma).catch((e) => console.error('[nft-withdraw]', e));
   }, 30_000);
   nftWithdrawPoll.unref?.();
+  // Offer expiry: overdue offers flip EXPIRED and their reserved funds free up.
+  const offerExpiryPoll = setInterval(() => {
+    void expireOffers(systemClock, prisma).catch((e) => console.error('[offer-expiry]', e));
+  }, 60_000);
+  offerExpiryPoll.unref?.();
   // Escrow order timers: release funds once the dispute window passes, and refund
   // if a seller never ships. Harmless no-op in direct-payout mode (no held orders).
   const orderTimer = setInterval(() => {
@@ -1147,6 +1172,108 @@ async function main() {
           return send(res, 200, { ok: true });
         } catch (err) {
           if (err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      // ---- offers on buy-now listings (funds reserved until answered) ----
+      if (req.method === 'POST' && p === '/market/offer') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
+        const b = await readJson(req);
+        try {
+          const out = await makeOffer(userId, String(b.listingId ?? ''), usdcInput(b.amount), systemClock, prisma);
+          return send(res, 200, { ok: true, ...out });
+        } catch (err) {
+          if (err instanceof OfferError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/market/offer/respond') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
+        const b = await readJson(req);
+        const action = (['accept', 'decline', 'counter', 'cancel'] as const).find((a) => a === b.action);
+        if (!action) return send(res, 400, { error: 'bad action' });
+        try {
+          const out = await respondOffer(
+            userId,
+            String(b.offerId ?? ''),
+            action as OfferAction,
+            { directPayout, escrow },
+            b.counterAmount != null && String(b.counterAmount).trim() !== '' ? usdcInput(b.counterAmount) : undefined,
+            systemClock,
+            prisma,
+          );
+          return send(res, 200, { ok: true, ...out });
+        } catch (err) {
+          if (err instanceof OfferError || err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+
+      // ---- direct messages ----
+      if (req.method === 'GET' && p === '/messages') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const rows = await listConversations(userId, prisma);
+        return send(res, 200, rows.map((r) => ({ ...r, other: { ...r.other, avatarUrl: mediaUrl('avatar', r.other.id, r.other.avatarUrl) } })));
+      }
+      if (req.method === 'GET' && p === '/messages/unread') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        return send(res, 200, { count: await unreadTotal(userId, prisma) });
+      }
+      if (req.method === 'GET' && p === '/messages/thread') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        try {
+          const thread = await getThread(
+            url.searchParams.get('id') ?? '',
+            userId,
+            { after: Number(url.searchParams.get('after') ?? 0) || undefined },
+            systemClock,
+            prisma,
+          );
+          // OFFER messages carry a full card so the client can render actions.
+          const offerIds = [...new Set(thread.messages.map((m) => m.offerId).filter((x): x is string => !!x))];
+          const cards = (await Promise.all(offerIds.map((id) => offerCard(id, prisma)))).filter(
+            (c): c is NonNullable<typeof c> => c !== null,
+          );
+          return send(res, 200, {
+            ...thread,
+            other: { ...thread.other, avatarUrl: mediaUrl('avatar', thread.other.id, thread.other.avatarUrl) },
+            offers: cards.map((c) => ({ ...c, listingPhoto: mediaUrl('listing', c.listingId, c.listingPhoto) })),
+          });
+        } catch (err) {
+          if (err instanceof MessageError) return send(res, 404, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/messages/start') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          return send(res, 200, await startConversation(userId, String(b.userId ?? ''), prisma));
+        } catch (err) {
+          if (err instanceof MessageError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/messages/send') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        await requireVerifiedEmail(userId, prisma);
+        if (dmRateLimited(userId)) return send(res, 429, { error: 'Slow down a moment.' });
+        const b = await readJson(req);
+        try {
+          const out = await sendMessage(String(b.conversationId ?? ''), userId, String(b.text ?? ''), systemClock, prisma);
+          return send(res, 200, { ok: true, ...out });
+        } catch (err) {
+          if (err instanceof MessageError) return send(res, 400, { error: err.message });
           throw err;
         }
       }

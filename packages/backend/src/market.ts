@@ -653,9 +653,7 @@ export async function buyMarketItem(
   }
 
   const amount = l.buyNowPrice;
-  const sellerId = l.sellerId;
   const buyerAccountId = await getOrCreateUserAccount(buyerId, prisma);
-  const sellerAccountId = await getOrCreateUserAccount(sellerId, prisma);
 
   // Item + shipping are one purchase: require the whole total up front so the
   // charge can't succeed on the item and then bounce on the shipping.
@@ -666,13 +664,47 @@ export async function buyMarketItem(
     );
   }
 
+  const sale = await settleMarketSale({ listingId, buyerId, amount, shippingC, via: 'buy' }, opts, clock, prisma);
+  return { orderId: sale.orderId, amount: amount.toString(), shippingC: shippingC.toString(), nft: sale.nft };
+}
+
+export interface SettleMarketSaleParams {
+  listingId: string;
+  buyerId: string;
+  /** The price actually charged: the buy-now price, or the accepted offer. */
+  amount: bigint;
+  shippingC: bigint;
+  via: 'buy' | 'offer';
+}
+
+/**
+ * The shared sale pipeline for buy-now purchases and accepted offers: claim the
+ * unit atomically, move the money through the same escrow/direct rails as an
+ * auction win (with full rollback on any charge failure), retire the listing,
+ * award points, deliver (instant NFT credit or fulfillment + prepaid shipment),
+ * and notify both sides. Callers are responsible for validation and any funds
+ * pre-checks; the claim + charge here are the source of truth under races.
+ */
+export async function settleMarketSale(
+  params: SettleMarketSaleParams,
+  opts: MarketBuyOptions,
+  clock: Clock = systemClock,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<{ orderId: string; nft: boolean }> {
+  const { listingId, buyerId, amount, shippingC, via } = params;
+  const l = await prisma.listing.findUnique({ where: { id: listingId } });
+  if (!l) throw new MarketError('That listing was not found.');
+  const sellerId = l.sellerId;
+  const buyerAccountId = await getOrCreateUserAccount(buyerId, prisma);
+  const sellerAccountId = await getOrCreateUserAccount(sellerId, prisma);
+
   // Claim the unit. The WHERE doubles as the availability check, so a race with
   // another buyer or with a delist resolves to exactly one winner.
   const claimed = await prisma.listing.updateMany({
     where: { id: listingId, status: ListingStatus.QUEUED, marketplace: true, buyNowPrice: { not: null }, quantity: { gt: 0 } },
     data: { quantity: { decrement: 1 } },
   });
-  if (claimed.count !== 1) throw new MarketError('Someone just bought this item.');
+  if (claimed.count !== 1) throw new MarketError('This item is no longer available.');
 
   const now = clock.now();
   const { platformFee, sellerProceeds } = opts.directPayout
@@ -743,10 +775,16 @@ export async function buyMarketItem(
       if (won.count === 1) await opts.escrow.release(created.id);
     }
     await notify(
-      { userId: sellerId, kind: 'sold', title: `Marketplace sale: ${l.title}`, body: `Sold for ${price}. Funds are in your balance.`, href: '/seller/orders' },
+      {
+        userId: sellerId,
+        kind: 'sold',
+        title: `Marketplace sale: ${l.title}`,
+        body: `Sold for ${price}${via === 'offer' ? ' (accepted offer)' : ''}. Funds are in your balance.`,
+        href: '/seller/orders',
+      },
       prisma,
     );
-    return { orderId: created.id, amount: amount.toString(), shippingC: '0', nft: true };
+    return { orderId: created.id, nft: true };
   }
 
   // Physical: the same fulfillment entry as any sale, then the prepaid shipment.
@@ -774,18 +812,24 @@ export async function buyMarketItem(
     {
       userId: buyerId,
       kind: 'won',
-      title: `You bought ${l.title}`,
+      title: via === 'offer' ? `Offer accepted: ${l.title} is yours` : `You bought ${l.title}`,
       body: `Paid ${price}${shippingC > 0n ? ` plus $${formatUsdc(shippingC)} shipping` : ''}. The seller ships it to your address.`,
       href: '/purchases',
     },
     prisma,
   );
   await notify(
-    { userId: sellerId, kind: 'sold', title: `Marketplace sale: ${l.title}`, body: `Sold for ${price}. Shipping is paid; print the label and send it.`, href: '/seller/orders' },
+    {
+      userId: sellerId,
+      kind: 'sold',
+      title: `Marketplace sale: ${l.title}`,
+      body: `Sold for ${price}${via === 'offer' ? ' (accepted offer)' : ''}. Shipping is paid; print the label and send it.`,
+      href: '/seller/orders',
+    },
     prisma,
   );
 
-  return { orderId: created.id, amount: amount.toString(), shippingC: shippingC.toString(), nft: false };
+  return { orderId: created.id, nft: false };
 }
 
 /** Take down an unsold buy-now listing. Guarded so it can't race a purchase:

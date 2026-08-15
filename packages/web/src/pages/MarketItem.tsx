@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   getMarketItem,
   placeMarketBidApi,
   buyMarketItemApi,
   delistMarketApi,
+  makeOfferApi,
+  startConversationApi,
   refreshMe,
   money2,
   fromMicros,
@@ -40,6 +42,10 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
   const [confirming, setConfirming] = useState(false);
   // Set after a successful buy-now: true = it was an NFT (points to My NFTs).
   const [bought, setBought] = useState<boolean | null>(null);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offerAmt, setOfferAmt] = useState('');
+  const [offerSent, setOfferSent] = useState<string | null>(null); // conversationId
+  const nav = useNavigate();
   const [now, setNow] = useState(Date.now());
   // Offset server time so the countdown can't drift with the viewer's clock.
   const skew = useRef(0);
@@ -120,6 +126,36 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
       setErr((e as Error).message || 'Could not take the listing down.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const sendOffer = async () => {
+    if (!session) return onAuth();
+    if (!it || !offerAmt.trim()) return;
+    setErr('');
+    setBusy(true);
+    try {
+      const r = await makeOfferApi(it.listingId, offerAmt.trim());
+      setOfferSent(r.conversationId);
+      setOfferOpen(false);
+      setOfferAmt('');
+      refreshMe().catch(() => {});
+    } catch (e) {
+      setErr((e as Error).message || 'That offer could not be sent.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const messageSeller = async () => {
+    if (!session) return onAuth();
+    if (!it) return;
+    setErr('');
+    try {
+      const r = await startConversationApi(it.seller.id);
+      nav(`/messages/${r.conversationId}`);
+    } catch (e) {
+      setErr((e as Error).message || 'Could not open the conversation.');
     }
   };
 
@@ -240,6 +276,41 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
                       Cancel
                     </button>
                   </>
+                )}
+                {/* Offer + message: the negotiation lane under the buy button. */}
+                {bought === null && it.available && !isOwner && (
+                  <div className="mkt-item__offerlane">
+                    {offerSent ? (
+                      <div className="mkt-item__flash">
+                        Offer sent, funds reserved. Track it in <Link to={`/messages/${offerSent}`}>Messages</Link>.
+                      </div>
+                    ) : !offerOpen ? (
+                      <div className="mkt-item__offerrow">
+                        <button className="btn btn-ghost" onClick={() => { if (!session) return onAuth(); setErr(''); setOfferOpen(true); }} disabled={busy || noShipBlock}>
+                          Make an offer
+                        </button>
+                        <button className="btn btn-ghost" onClick={messageSeller} disabled={busy}>
+                          Message seller
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mkt-item__offerrow">
+                        <div className="mkt-item__amt">
+                          <span>$</span>
+                          <input inputMode="decimal" autoFocus value={offerAmt} onChange={(e) => setOfferAmt(e.target.value)} placeholder="Your offer" disabled={busy} />
+                        </div>
+                        <button className="btn btn-primary" onClick={sendOffer} disabled={busy || !offerAmt.trim()}>
+                          {busy ? 'Sending…' : 'Send offer'}
+                        </button>
+                        <button className="btn btn-ghost" onClick={() => setOfferOpen(false)} disabled={busy}>Cancel</button>
+                      </div>
+                    )}
+                    {!offerSent && (
+                      <p className="muted mkt-item__offernote">
+                        Offers are real: the amount{!it.nft && shipping !== null ? ' plus your shipping' : ''} stays reserved from your balance until the seller replies (48h max).
+                      </p>
+                    )}
+                  </div>
                 )}
                 {err && <div className="auth__error">{err}</div>}
               </div>

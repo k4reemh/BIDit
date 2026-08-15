@@ -5,10 +5,27 @@ import Avatar from './Avatar';
 import ProfileMenu from './ProfileMenu';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
-import { Search, GitHub, Gift, XLogo, Chevron, Wallet, ArrowRight } from '../icons';
-import { money2 } from '../api';
+import { Search, GitHub, Gift, XLogo, Chevron, Wallet, ArrowRight, Chat } from '../icons';
+import { money2, getUnreadMessages } from '../api';
 import { FEATURED_CATEGORIES } from '../data';
 import type { User } from '../App';
+
+/** Messages icon with an unread badge, polled like the notification bell. */
+function MessagesLink() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const load = () => getUnreadMessages().then((r) => setCount(r.count)).catch(() => {});
+    void load();
+    const t = setInterval(load, 45_000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <Link className="icon-btn nav__msgs" to="/messages" aria-label="Messages">
+      <Chat width={19} height={19} />
+      {count > 0 && <span className="nav__msgbadge">{count > 9 ? '9+' : count}</span>}
+    </Link>
+  );
+}
 
 export default function TopNav({
   user,
@@ -154,6 +171,7 @@ export default function TopNav({
           {user ? (
             <>
               <Link className="nav__bal" to="/deposit" title="Your wallet balance"><Wallet width={15} height={15} /> ${money2(user.settled)}</Link>
+              <MessagesLink />
               <NotificationBell />
               <Link className="icon-btn" to="/points" aria-label="BIDit Points"><Gift /></Link>
               <button className="nav__avatar" onClick={() => setMenu((v) => !v)} aria-label="Account">

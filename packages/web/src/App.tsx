@@ -33,6 +33,7 @@ import Alerts from './pages/account/Alerts';
 import Nfts from './pages/account/Nfts';
 import Marketplace from './pages/Marketplace';
 import MarketItem from './pages/MarketItem';
+import Messages from './pages/Messages';
 import MarketSell from './pages/MarketSell';
 import Purchases from './pages/account/Purchases';
 import ShipItems from './pages/account/ShipItems';
@@ -150,6 +151,8 @@ export default function App() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/marketplace/sell" element={<MarketSell session={session} setSession={setSession} onAuth={() => setAuth('signup')} />} />
           <Route path="/marketplace/:id" element={<MarketItem session={session} onAuth={() => setAuth('signin')} />} />
+          <Route path="/messages" element={<Messages session={session} onAuth={() => setAuth('signin')} />} />
+          <Route path="/messages/:id" element={<Messages session={session} onAuth={() => setAuth('signin')} />} />
 
           <Route element={<AccountLayout session={session} setSession={setSession} onAuth={() => setAuth('signin')} />}>
             <Route path="/profile" element={<Profile />} />
