@@ -23,7 +23,7 @@ import bs58 from 'bs58';
 import type { ChainClient, DepositEvent, SendResult, SolDepositEvent, SwapResult, TransferStatus, WalletName } from './types.js';
 import { deriveDepositKeypair as walletDeriveDepositKeypair } from '../wallet.js';
 
-function loadKeypair(envVar: string): Keypair {
+export function loadKeypair(envVar: string): Keypair {
   const raw = process.env[envVar];
   if (!raw) throw new Error(`Missing env ${envVar} (a base58 secret key or JSON byte array)`);
   const trimmed = raw.trim();

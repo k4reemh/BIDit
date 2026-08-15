@@ -20,14 +20,8 @@ import {
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { deriveDepositKeypair } from '../wallet.js';
+import { loadKeypair } from './solana.js';
 import type { CustodyNft, NftChain, NftMetadata } from './nft-chain.js';
-
-function loadTreasury(): Keypair {
-  const raw = (process.env.TREASURY_SECRET ?? '').trim();
-  if (!raw) throw new Error('NFT chain: TREASURY_SECRET is required');
-  const bytes = raw.startsWith('[') ? Uint8Array.from(JSON.parse(raw) as number[]) : Buffer.from(raw, 'base64');
-  return Keypair.fromSecretKey(Uint8Array.from(bytes));
-}
 
 export class SolanaNftChain implements NftChain {
   readonly mode = 'solana' as const;
@@ -39,7 +33,7 @@ export class SolanaNftChain implements NftChain {
     this.rpcUrl = (process.env.SOLANA_RPC ?? '').trim();
     if (!this.rpcUrl) throw new Error('NFT chain: SOLANA_RPC is required');
     this.conn = new Connection(this.rpcUrl, 'confirmed');
-    this.treasury = loadTreasury();
+    this.treasury = loadKeypair('TREASURY_SECRET');
   }
 
   async listNfts(depositAddress: string): Promise<CustodyNft[]> {
