@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getMarket, money2, fromMicros, type MarketCard, type MarketSort } from '../api';
+import { getMarket, money2, fromMicros, type MarketCard, type MarketSort, type MarketSaleMode } from '../api';
 import { mediaSrc } from '../config';
 import Avatar from '../components/Avatar';
 import { Verified, Tag } from '../icons';
@@ -41,13 +41,14 @@ export default function Marketplace() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [category, setCategory] = useState('');
+  const [mode, setMode] = useState<MarketSaleMode | ''>('');
   const [sort, setSort] = useState<MarketSort>('ending');
   const [now, setNow] = useState(Date.now());
   const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
-    getMarket({ category: category || undefined, sort, page })
+    getMarket({ category: category || undefined, sort, page, mode: mode || undefined })
       .then((r) => {
         if (!alive) return;
         setCards((prev) => (page > 0 && prev ? [...prev, ...r.items] : r.items));
@@ -55,7 +56,7 @@ export default function Marketplace() {
       })
       .catch(() => alive && setCards((prev) => prev ?? []));
     return () => { alive = false; };
-  }, [category, sort, page]);
+  }, [category, sort, page, mode]);
 
   // Tick the countdowns once a minute; the grid doesn't need per-second churn.
   useEffect(() => {
@@ -63,14 +64,15 @@ export default function Marketplace() {
     return () => clearInterval(t);
   }, []);
 
-  const shown = useMemo(() => (cards ?? []).filter((c) => c.endsAt > now), [cards, now]);
+  // Buy-now cards have no deadline; auctions drop off as they end.
+  const shown = useMemo(() => (cards ?? []).filter((c) => c.endsAt === null || c.endsAt > now), [cards, now]);
 
   return (
     <main className="container mkt">
       <header className="mkt__head">
         <div>
           <h1 className="display mkt__title">The Marketplace</h1>
-          <p className="muted">Timed auctions from real sellers. Bid, win, it ships to your door.</p>
+          <p className="muted">Auctions and buy-now from real sellers. Win it or buy it, it ships to your door.</p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/marketplace/sell')}>
           <Tag width={16} height={16} style={{ marginRight: 6, verticalAlign: '-2px' }} />
@@ -91,9 +93,22 @@ export default function Marketplace() {
             </button>
           ))}
         </div>
-        <select className="mkt__sort" value={sort} onChange={(e) => { setSort(e.target.value as MarketSort); setPage(0); }}>
-          {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
+        <div className="mkt__controls">
+          <div className="mkt__modes">
+            {([['', 'All'], ['auction', 'Auctions'], ['fixed', 'Buy now']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                className={`mkt-chip${mode === key ? ' is-on' : ''}`}
+                onClick={() => { setMode(key); setPage(0); }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <select className="mkt__sort" value={sort} onChange={(e) => { setSort(e.target.value as MarketSort); setPage(0); }}>
+            {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {cards === null ? (
@@ -110,13 +125,17 @@ export default function Marketplace() {
         <>
           <div className="mkt__grid">
             {shown.map((c) => {
-              const t = timeLeft(c.endsAt, now);
-              const price = fromMicros(c.currentBid) ?? fromMicros(c.startingBid)!;
+              const t = c.endsAt !== null ? timeLeft(c.endsAt, now) : null;
+              const price = fromMicros(c.buyNow) ?? fromMicros(c.currentBid) ?? fromMicros(c.startingBid)!;
               return (
-                <Link key={c.auctionId} className="mkt-card" to={`/marketplace/${c.auctionId}`}>
+                <Link key={c.id} className="mkt-card" to={`/marketplace/${c.id}`}>
                   <div className="mkt-card__ph">
                     {c.photo ? <img src={mediaSrc(c.photo) ?? undefined} alt="" loading="lazy" /> : <div className="mkt-card__noimg" />}
-                    <span className={`mkt-card__time${t.urgent ? ' is-urgent' : ''}`}>{t.label}</span>
+                    {t ? (
+                      <span className={`mkt-card__time${t.urgent ? ' is-urgent' : ''}`}>{t.label}</span>
+                    ) : (
+                      <span className="mkt-card__time is-buynow">Buy now</span>
+                    )}
                     {c.bidCount > 0 && <span className="mkt-card__bids">{c.bidCount} bid{c.bidCount === 1 ? '' : 's'}</span>}
                   </div>
                   <div className="mkt-card__body">

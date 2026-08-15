@@ -648,16 +648,21 @@ export type MarketRegion = (typeof MARKET_REGIONS)[number];
 /** micros string -> dollars number (display only). */
 export const fromMicros = (m: string | null | undefined) => (m == null ? null : Number(m) / 1e6);
 
+export type MarketSaleMode = 'auction' | 'fixed';
 export interface MarketCard {
-  auctionId: string;
+  /** Route key: auction id for auctions, listing id for buy-now. */
+  id: string;
+  saleMode: MarketSaleMode;
+  auctionId: string | null;
   listingId: string;
   title: string;
   photo: string | null;
   category: string | null;
   currentBid: string | null;
   startingBid: string;
+  buyNow: string | null;
   bidCount: number;
-  endsAt: number;
+  endsAt: number | null;
   sellerHandle: string;
   sellerAvatar: string | null;
   sellerVerified: boolean;
@@ -668,20 +673,25 @@ export interface MarketCard {
 }
 export interface MarketList { items: MarketCard[]; total: number; page: number; pageSize: number }
 export type MarketSort = 'ending' | 'newest' | 'price_asc' | 'price_desc';
-export const getMarket = (opts: { category?: string; sort?: MarketSort; q?: string; page?: number } = {}) => {
+export const getMarket = (opts: { category?: string; sort?: MarketSort; q?: string; page?: number; mode?: MarketSaleMode } = {}) => {
   const qs = new URLSearchParams();
   if (opts.category) qs.set('category', opts.category);
   if (opts.sort) qs.set('sort', opts.sort);
   if (opts.q) qs.set('q', opts.q);
   if (opts.page) qs.set('page', String(opts.page));
+  if (opts.mode) qs.set('mode', opts.mode);
   const s = qs.toString();
   return req<MarketList>(`/market${s ? `?${s}` : ''}`);
 };
 
 export interface MarketItemDetail {
-  auctionId: string;
+  id: string;
+  saleMode: MarketSaleMode;
+  auctionId: string | null;
   listingId: string;
   status: string;
+  available: boolean;
+  buyNow: string | null;
   title: string;
   description: string | null;
   category: string | null;
@@ -699,8 +709,17 @@ export interface MarketItemDetail {
   bids: { handle: string; amount: string; at: number; status: string }[];
   viewer: { region: MarketRegion; shippingC: string | null; hasAddress: boolean; leading: boolean } | null;
 }
-export const getMarketItem = (auctionId: string) =>
-  req<MarketItemDetail>(`/market/item?auction=${encodeURIComponent(auctionId)}`);
+export const getMarketItem = (id: string) =>
+  req<MarketItemDetail>(`/market/item?id=${encodeURIComponent(id)}`);
+
+export const buyMarketItemApi = (listingId: string) =>
+  req<{ ok: true; orderId: string; amount: string; shippingC: string; nft: boolean }>('/market/buy', {
+    method: 'POST',
+    body: JSON.stringify({ listingId }),
+  });
+
+export const delistMarketApi = (listingId: string) =>
+  req<{ ok: true }>('/market/delist', { method: 'POST', body: JSON.stringify({ listingId }) });
 
 export const placeMarketBidApi = (auctionId: string, amount: string) =>
   req<{ ok: true; currentBid: string | null; minNextBid: string; endsAt: number | null; extended: boolean; shippingC: string | null }>(
@@ -713,17 +732,24 @@ export interface CreateMarketListingInput {
   description?: string;
   category?: string;
   photos: string[];
-  startingBid: string;
-  durationHours: number;
+  saleMode?: MarketSaleMode;
+  startingBid?: string;
+  durationHours?: number;
+  /** Fixed mode: the buy-now price in dollars, e.g. "40". */
+  price?: string;
   /** region -> dollars string, e.g. { US: "15" }. */
   shipPrices: Record<string, string>;
 }
 export const createMarketListingApi = (input: CreateMarketListingInput) =>
-  req<{ listingId: string; auctionId: string; endsAt: number }>('/market/list', { method: 'POST', body: JSON.stringify(input) });
+  req<{ listingId: string; auctionId: string | null; endsAt: number | null; saleMode: MarketSaleMode }>(
+    '/market/list',
+    { method: 'POST', body: JSON.stringify(input) },
+  );
 
 export interface MyMarketRow {
-  auctionId: string; listingId: string; title: string; photo: string | null; status: string;
-  currentBid: string | null; startingBid: string; bidCount: number; endsAt: number | null;
+  id: string; saleMode: MarketSaleMode; auctionId: string | null; listingId: string;
+  title: string; photo: string | null; status: string;
+  currentBid: string | null; startingBid: string; buyNow: string | null; bidCount: number; endsAt: number | null;
 }
 export const getMyMarket = () => req<MyMarketRow[]>('/market/mine');
 
@@ -748,10 +774,12 @@ export const withdrawNftApi = (assetId: string, address: string) =>
   req<{ ok: true }>('/nft/withdraw', { method: 'POST', body: JSON.stringify({ assetId, address }) });
 export const listNftForAuction = (input: {
   assetIds: string[];
-  startingBid: string;
+  startingBid?: string;
   title?: string;
   mode: 'stream' | 'market';
   durationHours?: number;
+  /** Market mode: sell at this set price instead of running an auction. */
+  fixedPrice?: string;
 }) => req<{ listingId: string; auctionId: string | null; endsAt: number | null }>('/nft/list', { method: 'POST', body: JSON.stringify(input) });
 export const unlistNftApi = (listingId: string) =>
   req<{ ok: true }>('/nft/unlist', { method: 'POST', body: JSON.stringify({ listingId }) });

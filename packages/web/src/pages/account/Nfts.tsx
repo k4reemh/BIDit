@@ -35,6 +35,7 @@ export default function Nfts() {
   const [auctionOpen, setAuctionOpen] = useState(false);
   const [startBid, setStartBid] = useState('');
   const [mode, setMode] = useState<'stream' | 'market'>('market');
+  const [marketKind, setMarketKind] = useState<'auction' | 'fixed'>('auction');
   const [durationHours, setDurationHours] = useState(24);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -102,23 +103,27 @@ export default function Nfts() {
     setErr('');
     setBusy(true);
     try {
+      const fixed = mode === 'market' && marketKind === 'fixed';
       const created = await listNftForAuction({
         assetIds: [...selected],
-        startingBid: startBid,
+        startingBid: fixed ? undefined : startBid,
         mode,
-        durationHours: mode === 'market' ? durationHours : undefined,
+        durationHours: mode === 'market' && !fixed ? durationHours : undefined,
+        fixedPrice: fixed ? startBid : undefined,
       });
       setSelected(new Set());
       setAuctionOpen(false);
       setStartBid('');
       setFlash(
         mode === 'market'
-          ? 'Your NFT auction is live on the marketplace.'
+          ? fixed
+            ? 'Your NFT is listed for sale on the marketplace.'
+            : 'Your NFT auction is live on the marketplace.'
           : 'Queued for your stream. Run it from Seller → Live like any item.',
       );
       await load();
-      if (mode === 'market' && created.auctionId) {
-        window.location.href = `/marketplace/${created.auctionId}`;
+      if (mode === 'market') {
+        window.location.href = `/marketplace/${created.auctionId ?? created.listingId}`;
       }
     } catch (e) {
       setErr((e as Error).message || 'Could not start the auction.');
@@ -243,16 +248,12 @@ export default function Nfts() {
       {auctionOpen && (
         <div className="nft-modal" role="dialog" aria-label="Start an NFT auction">
           <div className="nft-modal__card card">
-            <h3 className="acct-sub">Auction {selected.size === 1 ? 'your NFT' : `${selected.size} NFTs as one batch`}</h3>
-            <div className="fld">
-              <label>Starting bid (USDC)</label>
-              <input inputMode="decimal" value={startBid} onChange={(e) => setStartBid(e.target.value)} placeholder="e.g. 50" />
-            </div>
+            <h3 className="acct-sub">Sell {selected.size === 1 ? 'your NFT' : `${selected.size} NFTs as one batch`}</h3>
             <div className="fld">
               <label>Where</label>
               <div className="src-toggle">
                 <button className={`src-opt${mode === 'market' ? ' is-on' : ''}`} onClick={() => setMode('market')}>
-                  <b>Marketplace</b><span>Timed auction, starts now</span>
+                  <b>Marketplace</b><span>Auction or a set price</span>
                 </button>
                 <button className={`src-opt${mode === 'stream' ? ' is-on' : ''}`} onClick={() => setMode('stream')}>
                   <b>My stream</b><span>Queued for your live room</span>
@@ -261,6 +262,23 @@ export default function Nfts() {
             </div>
             {mode === 'market' && (
               <div className="fld">
+                <label>How it sells</label>
+                <div className="src-toggle">
+                  <button className={`src-opt${marketKind === 'auction' ? ' is-on' : ''}`} onClick={() => setMarketKind('auction')}>
+                    <b>Auction</b><span>Timed, starts now</span>
+                  </button>
+                  <button className={`src-opt${marketKind === 'fixed' ? ' is-on' : ''}`} onClick={() => setMarketKind('fixed')}>
+                    <b>Buy now</b><span>First buyer takes it</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="fld">
+              <label>{mode === 'market' && marketKind === 'fixed' ? 'Price (USDC)' : 'Starting bid (USDC)'}</label>
+              <input inputMode="decimal" value={startBid} onChange={(e) => setStartBid(e.target.value)} placeholder="e.g. 50" />
+            </div>
+            {mode === 'market' && marketKind === 'auction' && (
+              <div className="fld">
                 <label>Auction length</label>
                 <select value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))}>
                   {DURATIONS.map((d) => <option key={d.h} value={d.h}>{d.label}</option>)}
@@ -268,13 +286,14 @@ export default function Nfts() {
               </div>
             )}
             <p className="muted" style={{ fontSize: 12.5 }}>
-              The winner gets {selected.size === 1 ? 'the NFT' : 'every NFT in the batch'} credited to their BIDit
-              account the moment the auction ends, and you're paid 95% instantly.
+              {mode === 'market' && marketKind === 'fixed'
+                ? `The buyer gets ${selected.size === 1 ? 'the NFT' : 'every NFT in the batch'} credited to their BIDit account the moment they pay, and you're paid 95% instantly.`
+                : `The winner gets ${selected.size === 1 ? 'the NFT' : 'every NFT in the batch'} credited to their BIDit account the moment the auction ends, and you're paid 95% instantly.`}
             </p>
             {err && <div className="auth__error">{err}</div>}
             <div className="acct-actions">
               <button className="btn btn-primary" onClick={startAuction} disabled={busy || !startBid.trim()}>
-                {busy ? 'Starting…' : 'Start the auction'}
+                {busy ? 'Listing…' : mode === 'market' && marketKind === 'fixed' ? 'List it for sale' : 'Start the auction'}
               </button>
               <button className="btn btn-ghost" onClick={() => setAuctionOpen(false)}>Cancel</button>
             </div>

@@ -256,6 +256,8 @@ export interface CreateNftListingInput {
    *  auction that starts immediately (durationHours applies). */
   mode: 'stream' | 'market';
   durationHours?: number;
+  /** Market mode only: sell at this set price instead of running an auction. */
+  fixedPrice?: bigint;
 }
 
 export async function createNftListing(
@@ -265,7 +267,12 @@ export async function createNftListing(
   prisma: PrismaClient = defaultPrisma,
 ): Promise<{ listingId: string; auctionId: string | null; endsAt: number | null }> {
   await requireSeller(sellerId, prisma);
-  if (input.startingBid < MIN_START_MICROS || input.startingBid > MAX_START_MICROS) {
+  const fixed = input.mode === 'market' && input.fixedPrice !== undefined && input.fixedPrice !== null;
+  if (fixed) {
+    if (input.fixedPrice! < MIN_START_MICROS || input.fixedPrice! > MAX_START_MICROS) {
+      throw new NftError('Price must be between $1 and $100,000.');
+    }
+  } else if (input.startingBid < MIN_START_MICROS || input.startingBid > MAX_START_MICROS) {
     throw new NftError('Starting bid must be between $1 and $100,000.');
   }
   const assets = await requireUnlockedOwned(sellerId, input.assetIds, prisma);
@@ -284,7 +291,8 @@ export async function createNftListing(
       title: title.slice(0, 90),
       description: input.description ? String(input.description).slice(0, 2000) : null,
       photos,
-      startingBid: input.startingBid,
+      startingBid: fixed ? input.fixedPrice! : input.startingBid,
+      buyNowPrice: fixed ? input.fixedPrice! : null,
       category: 'NFTs',
       status: ListingStatus.QUEUED,
       nft: true,
@@ -295,6 +303,9 @@ export async function createNftListing(
     where: { id: { in: assets.map((a) => a.id) } },
     data: { listingId: listing.id },
   });
+
+  // Fixed price: the listing is live on the marketplace as-is, no auction.
+  if (fixed) return { listingId: listing.id, auctionId: null, endsAt: null };
 
   if (input.mode === 'market') {
     const hours = Math.floor(input.durationHours ?? 24);
@@ -330,7 +341,14 @@ export async function unlistNftListing(
   });
   if (!listing || !listing.nft || listing.sellerId !== sellerId) throw new NftError('Listing not found.');
   if (listing.auctions.length > 0) throw new NftError('That auction is running; it can’t be unlisted now.');
-  await prisma.listing.update({ where: { id: listingId }, data: { status: ListingStatus.CANCELED } });
+  // Guarded transition: a fixed-price listing can be bought at any moment, and
+  // that purchase claims the unit (quantity -> 0). This WHERE loses that race,
+  // so an unlist can never free assets a buyer just paid for.
+  const claimed = await prisma.listing.updateMany({
+    where: { id: listingId, status: ListingStatus.QUEUED, quantity: { gt: 0 } },
+    data: { status: ListingStatus.CANCELED },
+  });
+  if (claimed.count !== 1) throw new NftError('That listing can’t be unlisted now (it may have just sold).');
   await prisma.nftAsset.updateMany({ where: { listingId }, data: { listingId: null } });
 }
 
@@ -345,7 +363,7 @@ export async function unlistNftListing(
  * second call finds no assets still attached.
  */
 export async function creditNftWin(
-  params: { listingId: string; buyerId: string; sellerId: string; title: string },
+  params: { listingId: string; buyerId: string; sellerId: string; title: string; bought?: boolean },
   prisma: PrismaClient = defaultPrisma,
 ): Promise<number> {
   const assets = await prisma.nftAsset.findMany({ where: { listingId: params.listingId } });
@@ -359,7 +377,7 @@ export async function creditNftWin(
     {
       userId: params.buyerId,
       kind: 'nft',
-      title: `You won ${params.title}`,
+      title: `You ${params.bought ? 'bought' : 'won'} ${params.title}`,
       body: `${n === 1 ? 'The NFT is' : `All ${n} NFTs are`} in your BIDit account. Withdraw to your wallet anytime.`,
       href: '/nfts',
     },

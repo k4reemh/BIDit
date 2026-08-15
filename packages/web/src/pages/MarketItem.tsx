@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import {
   getMarketItem,
   placeMarketBidApi,
+  buyMarketItemApi,
+  delistMarketApi,
   refreshMe,
   money2,
   fromMicros,
@@ -35,6 +37,9 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  // Set after a successful buy-now: true = it was an NFT (points to My NFTs).
+  const [bought, setBought] = useState<boolean | null>(null);
   const [now, setNow] = useState(Date.now());
   // Offset server time so the countdown can't drift with the viewer's clock.
   const skew = useRef(0);
@@ -72,13 +77,47 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
     const val = amount.trim() || String(nextBid);
     setBusy(true);
     try {
-      const r = await placeMarketBidApi(it.auctionId, val);
+      const r = await placeMarketBidApi(it.auctionId!, val);
       setFlash(`You're the highest bidder at $${money2(fromMicros(r.currentBid)!)}.`);
       setAmount('');
       await load();
       refreshMe().catch(() => {});
     } catch (e) {
       setErr((e as Error).message || 'That bid could not be placed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const buy = async () => {
+    if (!session) return onAuth();
+    if (!it) return;
+    setErr('');
+    setBusy(true);
+    try {
+      const r = await buyMarketItemApi(it.listingId);
+      setBought(r.nft);
+      setConfirming(false);
+      await load();
+      refreshMe().catch(() => {});
+    } catch (e) {
+      setErr((e as Error).message || 'The purchase did not go through.');
+      setConfirming(false);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const delist = async () => {
+    if (!it) return;
+    setErr('');
+    setBusy(true);
+    try {
+      await delistMarketApi(it.listingId);
+      await load();
+    } catch (e) {
+      setErr((e as Error).message || 'Could not take the listing down.');
     } finally {
       setBusy(false);
     }
@@ -93,9 +132,11 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
     );
   }
 
+  const fixed = it.saleMode === 'fixed';
+  const isOwner = session !== null && session.userId === it.seller.id;
   const current = fromMicros(it.currentBid);
-  const priceLabel = current !== null ? 'Current bid' : 'Starting bid';
-  const price = current ?? fromMicros(it.startingBid)!;
+  const priceLabel = fixed ? 'Price' : current !== null ? 'Current bid' : 'Starting bid';
+  const price = fixed ? fromMicros(it.buyNow)! : current ?? fromMicros(it.startingBid)!;
   const total = shipping !== null ? price + shipping : null;
   // NFT auctions have no shipping lane, so nothing about the viewer's address
   // may gate the bid button.
@@ -148,6 +189,7 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
                 <b className="mkt-item__price">${money2(price)}</b>
               </div>
               {t && <span className={`mkt-item__clock${t.urgent ? ' is-urgent' : ''}`}>{ended ? 'Auction ended' : `${t.label} left`}</span>}
+              {fixed && <span className="mkt-item__clock">{it.available ? 'Buy now' : it.status === 'SOLD' ? 'Sold' : 'Taken down'}</span>}
             </div>
 
             <div className="mkt-item__shipline">
@@ -165,7 +207,43 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
               )}
             </div>
 
-            {!ended ? (
+            {fixed ? (
+              <div className="mkt-item__buy">
+                {bought !== null ? (
+                  <div className="mkt-item__flash">
+                    It&rsquo;s yours.{' '}
+                    {bought ? <>The NFT is in <Link to="/nfts">My NFTs</Link>.</> : <>Track it in <Link to="/purchases">Purchases</Link>.</>}
+                  </div>
+                ) : !it.available ? (
+                  <p className="muted" style={{ marginTop: 10 }}>
+                    {it.status === 'SOLD' ? 'This item has sold.' : 'This listing was taken down.'}
+                  </p>
+                ) : isOwner ? (
+                  <button className="btn btn-ghost" style={{ width: '100%' }} onClick={delist} disabled={busy}>
+                    {busy ? 'Working…' : 'Take listing down'}
+                  </button>
+                ) : !confirming ? (
+                  <button
+                    className="btn btn-primary mkt-item__bidbtn"
+                    style={{ width: '100%' }}
+                    onClick={() => { if (!session) return onAuth(); setErr(''); setConfirming(true); }}
+                    disabled={busy || noShipBlock}
+                  >
+                    Buy now for ${money2(price)}
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn btn-primary mkt-item__bidbtn" style={{ width: '100%' }} onClick={buy} disabled={busy}>
+                      {busy ? 'Buying…' : `Confirm: pay $${money2(total ?? price)}${!it.nft && shipping ? ' with shipping' : ''}`}
+                    </button>
+                    <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setConfirming(false)} disabled={busy}>
+                      Cancel
+                    </button>
+                  </>
+                )}
+                {err && <div className="auth__error">{err}</div>}
+              </div>
+            ) : !ended ? (
               <>
                 <div className="mkt-item__bidrow">
                   <div className="mkt-item__amt">
@@ -212,8 +290,10 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
                 </div>
               ))}
               <p className="muted">
-                Win and {it.nftAssets.length > 1 ? 'all of them are' : 'it is'} credited to your BIDit account the
-                second the auction ends. Withdraw to any Solana wallet anytime; the seller is paid instantly.
+                {fixed
+                  ? `Buy and ${it.nftAssets.length > 1 ? 'all of them are' : 'it is'} credited to your BIDit account instantly.`
+                  : `Win and ${it.nftAssets.length > 1 ? 'all of them are' : 'it is'} credited to your BIDit account the second the auction ends.`}{' '}
+                Withdraw to any Solana wallet anytime; the seller is paid instantly.
               </p>
             </div>
           ) : (
@@ -226,26 +306,32 @@ export default function MarketItem({ session, onAuth }: { session: Session | nul
                   <b>{Number(micros) === 0 ? 'Free' : `$${money2(Number(micros) / 1e6)}`}</b>
                 </div>
               ))}
-              <p className="muted">Shipping is charged automatically with the winning bid. Funds for both are reserved when you bid.</p>
+              <p className="muted">
+                {fixed
+                  ? 'Shipping is charged together with your purchase; the seller gets a paid label immediately.'
+                  : 'Shipping is charged automatically with the winning bid. Funds for both are reserved when you bid.'}
+              </p>
             </div>
           )}
 
-          {/* Bid history */}
-          <div className="mkt-item__bids">
-            <h3>Bid history</h3>
-            {it.bids.length === 0 ? (
-              <p className="muted">No bids yet. Start it off.</p>
-            ) : (
-              <ul>
-                {it.bids.map((b, i) => (
-                  <li key={i}>
-                    <span>@{b.handle}</span>
-                    <b>${money2(fromMicros(b.amount)!)}</b>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {/* Bid history (auctions only) */}
+          {!fixed && (
+            <div className="mkt-item__bids">
+              <h3>Bid history</h3>
+              {it.bids.length === 0 ? (
+                <p className="muted">No bids yet. Start it off.</p>
+              ) : (
+                <ul>
+                  {it.bids.map((b, i) => (
+                    <li key={i}>
+                      <span>@{b.handle}</span>
+                      <b>${money2(fromMicros(b.amount)!)}</b>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </aside>
       </div>
     </main>

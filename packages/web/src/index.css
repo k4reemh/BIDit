@@ -2680,6 +2680,15 @@ img { display: block; max-width: 100%; }
 .mkt-chip { flex: none; padding: 7px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s; }
 .mkt-chip:hover { border-color: var(--line-2); }
 .mkt-chip.is-on { background: var(--ink); border-color: var(--ink); color: var(--surface); font-weight: 600; }
+.mkt__controls { display: flex; align-items: center; gap: 10px; flex: none; }
+.mkt__modes { display: flex; gap: 6px; }
+.mkt-card__time.is-buynow { background: var(--accent); color: #fff; }
+.mkt-sell__modes { display: flex; gap: 10px; }
+.mkt-mode { flex: 1; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s; display: grid; gap: 3px; }
+.mkt-mode b { font-size: 14.5px; color: var(--ink); }
+.mkt-mode span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.mkt-mode.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.mkt-item__buy { margin-top: 12px; }
 .mkt__sort { flex: none; height: 38px; padding: 0 12px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13.5px; }
 
 .mkt__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px 16px; }

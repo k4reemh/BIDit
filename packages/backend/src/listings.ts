@@ -243,6 +243,12 @@ export async function setListingStorePrice(
   if (buyNowPrice !== null && listing.wheel !== null) {
     throw new Error('a randomizer cannot be sold at a fixed price: it is won by bidding');
   }
+  // Marketplace and NFT listings price through their own flows (the marketplace
+  // sell form / NFT listing modal); a store price here would let purchaseListing
+  // sell them without marketplace shipping or NFT delivery.
+  if (buyNowPrice !== null && (listing.marketplace || listing.nft)) {
+    throw new Error('marketplace and NFT listings are priced from the marketplace flow');
+  }
   return prisma.listing.update({
     where: { id: listingId },
     data: { buyNowPrice },

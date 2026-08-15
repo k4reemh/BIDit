@@ -40,6 +40,10 @@ export function listStoreItems(
       buyNowPrice: { not: null },
       status: ListingStatus.QUEUED,
       quantity: { gt: 0 },
+      // Marketplace buy-now listings sell through /market/buy (shipping is
+      // charged with the purchase there); NFTs sell through NFT auctions.
+      marketplace: false,
+      nft: false,
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], // id tiebreak keeps same-ms rows stable
     take: 500,
@@ -81,6 +85,12 @@ export async function purchaseListing(
   // priced BEFORE a wheel was added to it.
   if (listing.wheel !== null) {
     throw new ItemUnavailableError('This is a randomizer: bid on it to win a roll.');
+  }
+  // A marketplace buy must go through buyMarketItem, which also charges the
+  // seller's region shipping and prepays the label; buying it here would skip
+  // that. An NFT sold here would enter physical fulfillment and never deliver.
+  if (listing.marketplace || listing.nft) {
+    throw new ItemUnavailableError('This item sells on the marketplace.');
   }
 
   // Claim a unit. The WHERE doubles as the availability check: status must be

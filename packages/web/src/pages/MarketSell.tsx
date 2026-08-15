@@ -21,7 +21,9 @@ export default function MarketSell({ session, setSession, onAuth }: { session: S
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [saleMode, setSaleMode] = useState<'auction' | 'fixed'>('auction');
   const [startingBid, setStartingBid] = useState('');
+  const [price, setPrice] = useState('');
   const [durationHours, setDurationHours] = useState(24);
   const [ship, setShip] = useState<Record<string, string>>({ US: '' });
   const [busy, setBusy] = useState(false);
@@ -68,11 +70,13 @@ export default function MarketSell({ session, setSession, onAuth }: { session: S
         description: description || undefined,
         category: category || undefined,
         photos: photos.filter(Boolean),
-        startingBid,
-        durationHours,
+        saleMode,
+        startingBid: saleMode === 'auction' ? startingBid : undefined,
+        durationHours: saleMode === 'auction' ? durationHours : undefined,
+        price: saleMode === 'fixed' ? price : undefined,
         shipPrices,
       });
-      navigate(`/marketplace/${created.auctionId}`);
+      navigate(`/marketplace/${created.auctionId ?? created.listingId}`);
     } catch (e) {
       setErr((e as Error).message || 'Could not create the listing.');
     } finally {
@@ -107,25 +111,64 @@ export default function MarketSell({ session, setSession, onAuth }: { session: S
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} maxLength={2000}
               placeholder="Condition, provenance, what's included. Buyers bid harder when they know exactly what they're getting." />
           </div>
-          <div className="fld-row">
-            <div className="fld">
-              <label>Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                <option value="">No category</option>
-                {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-              </select>
-            </div>
-            <div className="fld">
-              <label>Auction length</label>
-              <select value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))}>
-                {DURATIONS.map((d) => <option key={d.h} value={d.h}>{d.label}</option>)}
-              </select>
-            </div>
-          </div>
           <div className="fld">
-            <label>Starting bid (USDC)</label>
-            <input inputMode="decimal" value={startingBid} onChange={(e) => setStartingBid(e.target.value)} placeholder="e.g. 25" />
+            <label>How it sells</label>
+            <div className="mkt-sell__modes">
+              <button
+                type="button"
+                className={`mkt-mode${saleMode === 'auction' ? ' is-on' : ''}`}
+                onClick={() => setSaleMode('auction')}
+              >
+                <b>Auction</b>
+                <span>Starts low, bidders fight it out on a timer.</span>
+              </button>
+              <button
+                type="button"
+                className={`mkt-mode${saleMode === 'fixed' ? ' is-on' : ''}`}
+                onClick={() => setSaleMode('fixed')}
+              >
+                <b>Buy now</b>
+                <span>Your price, first buyer takes it instantly.</span>
+              </button>
+            </div>
           </div>
+          {saleMode === 'auction' ? (
+            <>
+              <div className="fld-row">
+                <div className="fld">
+                  <label>Category</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <option value="">No category</option>
+                    {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="fld">
+                  <label>Auction length</label>
+                  <select value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))}>
+                    {DURATIONS.map((d) => <option key={d.h} value={d.h}>{d.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="fld">
+                <label>Starting bid (USDC)</label>
+                <input inputMode="decimal" value={startingBid} onChange={(e) => setStartingBid(e.target.value)} placeholder="e.g. 25" />
+              </div>
+            </>
+          ) : (
+            <div className="fld-row">
+              <div className="fld">
+                <label>Category</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">No category</option>
+                  {CATEGORIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="fld">
+                <label>Price (USDC)</label>
+                <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 40" />
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="card acct-card">
@@ -148,11 +191,13 @@ export default function MarketSell({ session, setSession, onAuth }: { session: S
           {err && <div className="auth__error" style={{ marginTop: 12 }}>{err}</div>}
           <div className="acct-actions">
             <button className="btn btn-primary" onClick={submit} disabled={busy}>
-              {busy ? 'Listing…' : 'Start the auction'}
+              {busy ? 'Listing…' : saleMode === 'auction' ? 'Start the auction' : 'List it for sale'}
             </button>
           </div>
           <p className="muted" style={{ fontSize: 12.5 }}>
-            The auction goes live the moment you list. You keep 95% of the winning bid; shipping covers the label.
+            {saleMode === 'auction'
+              ? 'The auction goes live the moment you list. You keep 95% of the winning bid; shipping covers the label.'
+              : 'The listing goes live the moment you post it and stays up until it sells or you take it down. You keep 95% of the price; shipping covers the label.'}
           </p>
         </section>
       </div>

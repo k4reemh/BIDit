@@ -89,6 +89,8 @@ import {
   getMarketItem,
   listMyMarket,
   placeMarketBid,
+  buyMarketItem,
+  delistMarketListing,
   MarketError,
   MARKET_REGIONS,
   type MarketSort,
@@ -1046,16 +1048,18 @@ async function main() {
         }
       }
 
-      // ---- marketplace (Grailed-style timed auctions) ----
+      // ---- marketplace (Grailed-style: timed auctions + buy now) ----
       if (req.method === 'GET' && p === '/market') {
         const sortRaw = url.searchParams.get('sort') ?? 'ending';
         const sort = (['ending', 'newest', 'price_asc', 'price_desc'] as const).find((s) => s === sortRaw) ?? 'ending';
+        const modeRaw = url.searchParams.get('mode');
         const out = await listMarket(
           {
             category: url.searchParams.get('category') || undefined,
             q: url.searchParams.get('q') || undefined,
             sort: sort as MarketSort,
             page: Number(url.searchParams.get('page') ?? 0) || 0,
+            mode: modeRaw === 'auction' || modeRaw === 'fixed' ? modeRaw : undefined,
           },
           systemClock,
           prisma,
@@ -1068,7 +1072,14 @@ async function main() {
       }
       if (req.method === 'GET' && p === '/market/item') {
         const viewer = authUser(req); // optional: enriches with the viewer's shipping lane
-        const item = await getMarketItem(url.searchParams.get('auction') ?? '', viewer, systemClock, prisma);
+        // `id` is the route key (auction id or fixed-price listing id); the old
+        // `auction` param stays accepted for open tabs from before the rename.
+        const item = await getMarketItem(
+          url.searchParams.get('id') ?? url.searchParams.get('auction') ?? '',
+          viewer,
+          systemClock,
+          prisma,
+        );
         if (!item) return send(res, 404, { error: 'listing not found' });
         return send(res, 200, {
           ...item,
@@ -1089,6 +1100,7 @@ async function main() {
             if (v === undefined || v === null || String(v).trim() === '') continue;
             ship[region] = usdcInput(v);
           }
+          const saleMode = b.saleMode === 'fixed' ? ('fixed' as const) : ('auction' as const);
           const created = await createMarketListing(
             userId,
             {
@@ -1096,14 +1108,43 @@ async function main() {
               description: b.description ? String(b.description) : undefined,
               category: b.category ? String(b.category) : undefined,
               photos: Array.isArray(b.photos) ? (b.photos as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-              startingBid: usdcInput(b.startingBid),
-              durationHours: Number(b.durationHours ?? 24),
+              saleMode,
+              startingBid: saleMode === 'auction' ? usdcInput(b.startingBid) : undefined,
+              durationHours: saleMode === 'auction' ? Number(b.durationHours ?? 24) : undefined,
+              price: saleMode === 'fixed' ? usdcInput(b.price) : undefined,
               shipPrices: ship,
             },
             systemClock,
             prisma,
           );
-          return send(res, 200, { ...created, endsAt: created.endsAt.getTime() });
+          return send(res, 200, { ...created, endsAt: created.endsAt?.getTime() ?? null });
+        } catch (err) {
+          if (err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      // Buy a fixed-price marketplace listing outright (price + region shipping
+      // in one charge; NFT listings credit the buyer's account instantly).
+      if (req.method === 'POST' && p === '/market/buy') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        if (moneyRateLimited(userId)) return send(res, 429, { error: 'Too many requests. Please wait a minute.' });
+        const b = await readJson(req);
+        try {
+          const out = await buyMarketItem(userId, String(b.listingId ?? ''), { directPayout, escrow }, systemClock, prisma);
+          return send(res, 200, { ok: true, ...out });
+        } catch (err) {
+          if (err instanceof MarketError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'POST' && p === '/market/delist') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        const b = await readJson(req);
+        try {
+          await delistMarketListing(userId, String(b.listingId ?? ''), prisma);
+          return send(res, 200, { ok: true });
         } catch (err) {
           if (err instanceof MarketError) return send(res, 400, { error: err.message });
           throw err;
@@ -1175,11 +1216,12 @@ async function main() {
             userId,
             {
               assetIds: Array.isArray(b.assetIds) ? (b.assetIds as unknown[]).map(String) : [],
-              startingBid: usdcInput(b.startingBid),
+              startingBid: b.startingBid != null && String(b.startingBid).trim() !== '' ? usdcInput(b.startingBid) : 0n,
               title: typeof b.title === 'string' ? b.title : undefined,
               description: typeof b.description === 'string' ? b.description : undefined,
               mode: b.mode === 'market' ? 'market' : 'stream',
               durationHours: b.durationHours != null ? Number(b.durationHours) : undefined,
+              fixedPrice: b.fixedPrice != null && String(b.fixedPrice).trim() !== '' ? usdcInput(b.fixedPrice) : undefined,
             },
             systemClock,
             prisma,

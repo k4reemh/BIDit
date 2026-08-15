@@ -611,18 +611,24 @@ async function shipmentContext(
  * still works, so a marketplace win can never strand goods or money.
  */
 export async function prepayMarketShipping(
-  params: { orderId: string; auctionId: string; buyerId: string; sellerId: string },
+  params: { orderId: string; auctionId?: string; buyerId: string; sellerId: string; shippingC?: bigint },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<void> {
   try {
-    const bid = await prisma.bid.findFirst({
-      where: { auctionId: params.auctionId, userId: params.buyerId, status: 'WON' },
-      orderBy: { createdAt: 'desc' },
-      select: { shippingC: true },
-    });
-    if (!bid) return;
-    const shippingC = bid.shippingC;
+    // Auction wins read the shipping price captured on the WON bid; buy-now
+    // purchases pass the price they just charged against directly.
+    let shippingC = params.shippingC;
+    if (shippingC === undefined) {
+      if (!params.auctionId) return;
+      const bid = await prisma.bid.findFirst({
+        where: { auctionId: params.auctionId, userId: params.buyerId, status: 'WON' },
+        orderBy: { createdAt: 'desc' },
+        select: { shippingC: true },
+      });
+      if (!bid) return;
+      shippingC = bid.shippingC;
+    }
 
     const item = await prisma.fulfillmentItem.findFirst({
       where: { orderId: params.orderId, status: 'READY_TO_SHIP' },
