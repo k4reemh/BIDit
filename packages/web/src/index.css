@@ -2846,3 +2846,19 @@ img { display: block; max-width: 100%; }
   .msgs__thread { min-height: 70vh; }
   .msgs__bubble { max-width: 86%; }
 }
+
+/* ---- referrals ---- */
+.pts__invite { display: flex; gap: 28px; align-items: center; padding: 26px 30px; margin: 22px 0; }
+.pts__invite-main { flex: 1; min-width: 0; }
+.pts__invite-main .section-title { margin: 8px 0 6px; }
+.pts__invite-linkrow { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.pts__invite-link { flex: 1; min-width: 220px; display: flex; align-items: center; padding: 0 16px; height: 46px; border-radius: 12px; border: 1.5px dashed var(--line-2); background: var(--bg-2); font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pts__invite-stats { flex: none; display: flex; gap: 26px; }
+.pts__invite-stats > div { display: flex; flex-direction: column; align-items: center; min-width: 76px; }
+.pts__invite-stats b { font-size: 26px; }
+.pts__invite-stats span { font-size: 12.5px; color: var(--muted); }
+.lb__tabs { display: flex; gap: 8px; justify-content: center; margin: 0 0 20px; }
+@media (max-width: 760px) {
+  .pts__invite { flex-direction: column; align-items: stretch; }
+  .pts__invite-stats { justify-content: space-around; }
+}

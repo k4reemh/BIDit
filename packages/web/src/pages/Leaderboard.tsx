@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Avatar from '../components/Avatar';
-import { getLeaderboard, type LeaderboardRow } from '../api';
+import { getLeaderboard, getReferralLeaders, type LeaderboardRow, type ReferralLeaderRow } from '../api';
 import { Gift, ArrowRight } from '../icons';
 
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 export default function Leaderboard() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const [refRows, setRefRows] = useState<ReferralLeaderRow[] | null>(null);
+  const [tab, setTab] = useState<'points' | 'referrals'>('points');
   const [error, setError] = useState('');
 
   useEffect(() => {
     getLeaderboard().then(setRows).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load the leaderboard.'));
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'referrals' || refRows !== null) return;
+    getReferralLeaders().then(setRefRows).catch(() => setRefRows([]));
+  }, [tab, refRows]);
 
   const podium = rows?.slice(0, 3) ?? [];
   const rest = rows?.slice(3) ?? [];
@@ -29,9 +36,40 @@ export default function Leaderboard() {
         </p>
       </header>
 
+      <div className="lb__tabs">
+        <button className={`mkt-chip${tab === 'points' ? ' is-on' : ''}`} onClick={() => setTab('points')}>Points</button>
+        <button className={`mkt-chip${tab === 'referrals' ? ' is-on' : ''}`} onClick={() => setTab('referrals')}>Referrals</button>
+      </div>
+
       {error && <div className="auth__error">{error}</div>}
 
-      {rows && rows.length === 0 && (
+      {tab === 'referrals' && (
+        <>
+          {refRows === null ? (
+            <p className="muted" style={{ padding: '24px 0' }}>Loading…</p>
+          ) : refRows.length === 0 ? (
+            <div className="lb__empty card">
+              <Gift width={26} height={26} />
+              <b>No qualified referrals yet</b>
+              <p className="muted">Share your link from the Points page. First friend in gets you on this board.</p>
+              <Link className="btn btn-primary" to="/points">Get your invite link <ArrowRight width={16} height={16} /></Link>
+            </div>
+          ) : (
+            <div className="lb__list card">
+              {refRows.map((r, i) => (
+                <div key={r.userId} className="lb__row">
+                  <span className="lb__rank">{i + 1}</span>
+                  <Avatar handle={r.handle} src={r.avatarUrl} size={34} />
+                  <b className="lb__handle">@{r.handle}</b>
+                  <span className="lb__pts">{fmt(r.qualified)} referral{r.qualified === 1 ? '' : 's'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'points' && rows && rows.length === 0 && (
         <div className="lb__empty card">
           <Gift width={26} height={26} />
           <b>The board is wide open</b>
@@ -40,7 +78,7 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {podium.length > 0 && (
+      {tab === 'points' && podium.length > 0 && (
         <div className="lb__podium">
           {podiumOrder.map((r) => (
             <div key={r.rank} className={`lb__pod card lb__pod--${r.rank}`}>
@@ -55,7 +93,7 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {rest.length > 0 && (
+      {tab === 'points' && rest.length > 0 && (
         <div className="lb__list card">
           {rest.map((r) => (
             <div key={r.rank} className="lb__row">

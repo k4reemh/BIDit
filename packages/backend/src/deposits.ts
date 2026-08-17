@@ -17,6 +17,7 @@ import { deposit, getOrCreateUserAccount } from './ledger.js';
 import type { ChainClient } from './chain/index.js';
 import { deriveDepositAddress } from './wallet.js';
 import { getSolUsdPrice, lamportsToUsdcMicros, solSpreadBps, type SolPrice } from './prices.js';
+import { qualifyReferral, MIN_REFERRAL_DEPOSIT } from './points.js';
 import { notify } from './notifications.js';
 
 /** Kill switch: SOL deposits are on unless BIDIT_SOL_DEPOSITS=no. */
@@ -239,6 +240,13 @@ export class DepositWatcher {
         );
         await this.prisma.depositReceipt.update({ where: { id: r.id }, data: { creditedAt: new Date() } });
         credited += 1;
+        // A first deposit of $10+ is a qualifying action for the referral
+        // program. Best-effort: a failure here must never block crediting.
+        if (r.amountMicros >= MIN_REFERRAL_DEPOSIT) {
+          await qualifyReferral(r.userId, this.prisma).catch((e) =>
+            console.error('[referral] qualify on deposit failed', (e as Error)?.message ?? e),
+          );
+        }
         if (r.asset === 'SOL') {
           // The conversion deserves a durable record the user can see: what
           // arrived, what it became, at what price. USDC stays balance-push only.

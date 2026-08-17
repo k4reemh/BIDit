@@ -163,6 +163,18 @@ model User {
   directMessages DirectMessage[]
   offersMade     Offer[] @relation("OfferBuyer")
   offersReceived Offer[] @relation("OfferSeller")
+  /// Referral program. `referralCode` is this user's immutable share code
+  /// (vanity, from their handle at generation time). `referredById` is set
+  /// exactly once at signup from a ?ref= link. `referralQualifiedAt` flips when
+  /// this user's first qualifying action (deposit >= $10 or first purchase)
+  /// pays out both sides; the CAS on null is the exactly-once guard.
+  referralCode        String?   @unique
+  referredById        String?
+  referredBy          User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals           User[]    @relation("Referrals")
+  referralQualifiedAt DateTime?
+
+  @@index([referredById, referralQualifiedAt])
 }
 
 model SellerProfile {

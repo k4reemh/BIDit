@@ -97,6 +97,7 @@ import {
   type MarketRegion,
 } from '../src/market.js';
 import { makeOffer, respondOffer, expireOffers, offerCard, OfferError, type OfferAction } from '../src/offers.js';
+import { getReferralInfo, referralLeaders, applyReferralAtSignup, ReferralError } from '../src/referrals.js';
 import {
   startConversation,
   sendMessage,
@@ -765,6 +766,13 @@ async function main() {
             { email: String(b.email ?? ''), password: String(b.password ?? ''), handle: String(b.handle ?? '') },
             prisma,
           );
+          // Attach the referrer when the signup came through a ?ref= link.
+          // Best-effort: a bad code must never break account creation.
+          if (typeof b.ref === 'string' && b.ref.trim() !== '') {
+            await applyReferralAtSignup(user.id, b.ref, prisma).catch((e) =>
+              console.error('[referral] attach on register failed', (e as Error)?.message ?? e),
+            );
+          }
           // Mail the code now; the account exists but stays unverified until it
           // comes back. A mail failure must not strand a created account, so a
           // throw here only means "no code yet": they can resend.
@@ -1212,6 +1220,22 @@ async function main() {
           if (err instanceof OfferError || err instanceof MarketError) return send(res, 400, { error: err.message });
           throw err;
         }
+      }
+
+      // ---- referrals ----
+      if (req.method === 'GET' && p === '/me/referral') {
+        const userId = authUser(req);
+        if (!userId) return send(res, 401, { error: 'unauthorized' });
+        try {
+          return send(res, 200, await getReferralInfo(userId, prisma));
+        } catch (err) {
+          if (err instanceof ReferralError) return send(res, 400, { error: err.message });
+          throw err;
+        }
+      }
+      if (req.method === 'GET' && p === '/referral/leaders') {
+        const rows = await referralLeaders(25, prisma);
+        return send(res, 200, rows.map((r) => ({ ...r, avatarUrl: mediaUrl('avatar', r.userId, r.avatarUrl) })));
       }
 
       // ---- direct messages ----

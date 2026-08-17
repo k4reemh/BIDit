@@ -15,6 +15,7 @@
  */
 import { prisma as defaultPrisma } from './db.js';
 import type { PrismaClient } from './db.js';
+import { notify } from './notifications.js';
 
 const USDC = 1_000_000n; // one dollar in micro-units
 
@@ -76,6 +77,66 @@ export async function awardOrderPoints(
 ): Promise<void> {
   await grant(params.buyerId, 'buy', params.orderId, pointsForSpend(params.amount), prisma);
   await grant(params.sellerId, 'sell', params.orderId, pointsForSale(params.amount), prisma);
+  // A purchase is a qualifying action for the referral program: the buyer has
+  // real money on the line, so their referrer's reward unlocks here.
+  await qualifyReferral(params.buyerId, prisma).catch((e) =>
+    console.error('[referral] qualify on order failed', (e as Error)?.message ?? e),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Referrals: invite a friend, both sides earn once the friend does something real
+// ---------------------------------------------------------------------------
+
+export const REFERRER_POINTS = 2_500n;
+export const REFEREE_POINTS = 1_000n;
+/** A deposit must be at least this ($10) to qualify a referral. The qualifying
+ *  action must cost real money, or throwaway signups could farm points. */
+export const MIN_REFERRAL_DEPOSIT = 10_000_000n;
+
+/**
+ * Pay out the referral for `userId`'s first qualifying action (first deposit of
+ * $10+, or any purchase). Exactly once per referred user: the CAS on
+ * `referralQualifiedAt IS NULL` decides the winner under races, and the point
+ * grants are additionally idempotent by (user, kind, ref). Safe to call from
+ * any money path; a user with no referrer is a cheap no-op.
+ */
+export async function qualifyReferral(userId: string, prisma: PrismaClient = defaultPrisma): Promise<boolean> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { referredById: true, referralQualifiedAt: true, handle: true },
+  });
+  if (!u?.referredById || u.referralQualifiedAt) return false;
+  const claimed = await prisma.user.updateMany({
+    where: { id: userId, referralQualifiedAt: null, referredById: { not: null } },
+    data: { referralQualifiedAt: new Date() },
+  });
+  if (claimed.count !== 1) return false;
+
+  await grant(u.referredById, 'referral', userId, REFERRER_POINTS, prisma);
+  await grant(userId, 'referred', userId, REFEREE_POINTS, prisma);
+  await notify(
+    {
+      userId: u.referredById,
+      kind: 'referral',
+      title: `Referral landed: @${u.handle} is in`,
+      body: `They made their first move on BIDit. +${REFERRER_POINTS.toLocaleString('en-US')} points to you. Keep sharing your link.`,
+      href: '/points',
+    },
+    prisma,
+  );
+  await notify(
+    {
+      userId,
+      kind: 'referral',
+      title: `Referral bonus: +${REFEREE_POINTS.toLocaleString('en-US')} points`,
+      body: 'Welcome bonus for joining through a friend. Points convert into future $BID rewards.',
+      href: '/points',
+      email: false,
+    },
+    prisma,
+  );
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +157,7 @@ export const MISSIONS: readonly MissionDef[] = [
   { id: 'first_bid', title: 'Place your first bid', desc: 'Jump into any live auction and bid.', points: 1_000n },
   { id: 'first_win', title: 'Win your first auction', desc: 'Outbid the room and take an item home.', points: 3_000n },
   { id: 'giveaway_win', title: 'Win a live giveaway', desc: 'Get drawn as the winner of a stream giveaway.', points: 1_000n },
-  { id: 'refer_friend', title: 'Refer a friend', desc: 'They sign up and purchase an item.', points: 5_000n, comingSoon: true },
+  { id: 'refer_friend', title: 'Refer a friend', desc: 'They sign up with your link and make their first deposit or purchase.', points: 5_000n },
   { id: 'first_sale', title: 'Make your first sale', desc: 'Sell and fulfill your first item on BIDit.', points: 3_000n },
   { id: 'sell_10', title: 'Fulfill 10 orders', desc: 'Sell and fulfill 10 items on BIDit.', points: 3_000n },
   { id: 'verified_seller', title: 'Become a Verified Seller', desc: 'Fulfill 10 orders to earn the Verified badge.', points: 10_000n },
@@ -121,7 +182,7 @@ async function missionCompleted(userId: string, missionId: string, prisma: Prism
     case 'giveaway_win':
       return (await prisma.giveaway.count({ where: { winnerUserId: userId } })) > 0;
     case 'refer_friend':
-      return false; // referral links ship next
+      return (await prisma.user.count({ where: { referredById: userId, referralQualifiedAt: { not: null } } })) > 0;
     case 'first_sale':
       return (await fulfilledCount(userId, prisma)) >= 1;
     case 'sell_10':

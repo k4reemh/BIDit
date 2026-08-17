@@ -115,7 +115,10 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
 }
 
 export async function register(email: string, password: string): Promise<Session> {
-  const s = await req<Session>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) });
+  // A ?ref= code captured at page load rides along so the referrer gets credit.
+  const ref = localStorage.getItem('bidit_ref') ?? undefined;
+  const s = await req<Session>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, ref }) });
+  if (ref) localStorage.removeItem('bidit_ref');
   setToken(s.token);
   return s;
 }
@@ -788,6 +791,11 @@ export interface InboxRow {
   previewKind: string;
   unread: number;
 }
+export interface ReferralInfo { code: string; referred: number; qualified: number; pointsEarned: string }
+export const getReferralInfoApi = () => req<ReferralInfo>('/me/referral');
+export interface ReferralLeaderRow { handle: string; avatarUrl: string | null; userId: string; qualified: number }
+export const getReferralLeaders = () => req<ReferralLeaderRow[]>('/referral/leaders');
+
 export const getInbox = () => req<InboxRow[]>('/messages');
 export const getUnreadMessages = () => req<{ count: number }>('/messages/unread');
 export interface ThreadMessage {

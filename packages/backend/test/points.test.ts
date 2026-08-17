@@ -76,7 +76,7 @@ describe('missions', () => {
     expect(get('deposit').status).toBe('claimable'); // deposited on creation
     expect(get('first_bid').status).toBe('locked');
     expect(get('first_win').status).toBe('locked');
-    expect(get('refer_friend').status).toBe('locked'); // coming soon stays locked
+    expect(get('refer_friend').status).toBe('locked'); // no qualified referrals yet
 
     await winAuction(buyer.userId, '10', clock); // places a bid + wins
 
@@ -99,7 +99,8 @@ describe('missions', () => {
     const user = await makeUser('buyer');
     await expect(claimMission(user.userId, 'first_win', prisma)).rejects.toThrow(/Complete the mission/);
     await expect(claimMission(user.userId, 'nope', prisma)).rejects.toThrow(/Unknown mission/);
-    await expect(claimMission(user.userId, 'refer_friend', prisma)).rejects.toThrow(/soon/);
+    // Referrals are live now: an unearned claim fails like any other mission.
+    await expect(claimMission(user.userId, 'refer_friend', prisma)).rejects.toThrow(/Complete the mission/);
   });
 
   it('giveaway win unlocks the giveaway mission', async () => {

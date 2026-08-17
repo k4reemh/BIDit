@@ -87,6 +87,19 @@ export default function App() {
     });
   }, []);
 
+  // Referral links: /?ref=code sticks until the visitor signs up (register()
+  // sends it along and clears it). Captured before anything can navigate away.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref && ref.trim() !== '') {
+      localStorage.setItem('bidit_ref', ref.trim().toLowerCase());
+      params.delete('ref');
+      const qs = params.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    }
+  }, []);
+
   // Deep links into the auth modal: ?signup=1 / ?signin=1 / ?forgot=1. Used by
   // the browser extension popup and shareable campaign links. The param is
   // stripped after opening so a refresh doesn't re-open the modal.

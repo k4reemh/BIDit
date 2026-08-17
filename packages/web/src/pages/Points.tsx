@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getPoints, claimMission, type PointsSummary, type Mission, type Session } from '../api';
+import {
+  getPoints,
+  claimMission,
+  getReferralInfoApi,
+  type PointsSummary,
+  type Mission,
+  type Session,
+  type ReferralInfo,
+} from '../api';
 import {
   Gift, Radio, Wallet, Tag, UserCheck, Users, Dice, Check, ArrowRight, Bag,
 } from '../icons';
@@ -23,11 +31,26 @@ export default function Points({ session, onAuth }: { session: Session | null; o
   const [busy, setBusy] = useState('');
   const [justClaimed, setJustClaimed] = useState('');
   const [error, setError] = useState('');
+  const [referral, setReferral] = useState<ReferralInfo | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!session) return;
     getPoints().then(setData).catch((e) => setError(e instanceof Error ? e.message : 'Couldn’t load your points.'));
+    getReferralInfoApi().then(setReferral).catch(() => {});
   }, [session]);
+
+  const inviteLink = referral ? `${window.location.origin}/?ref=${referral.code}` : '';
+  const copyLink = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked: the link is visible to select manually */
+    }
+  };
 
   const claim = async (m: Mission) => {
     setBusy(m.id);
@@ -87,6 +110,38 @@ export default function Points({ session, onAuth }: { session: Session | null; o
             </>
           )}
         </div>
+      </section>
+
+      {/* invite friends */}
+      <section className="pts__invite card">
+        <div className="pts__invite-main">
+          <span className="pts__eyebrow"><Users width={15} height={15} /> Referrals</span>
+          <h2 className="section-title">Invite friends, you both earn</h2>
+          <p className="muted">
+            You get <b className="accent">2,500 points</b> every time someone joins with your link and makes their first
+            deposit ($10+) or purchase. They start with <b className="accent">1,000 points</b>. Your first successful
+            referral also unlocks the 5,000-point mission below.
+          </p>
+          {session ? (
+            referral ? (
+              <div className="pts__invite-linkrow">
+                <code className="pts__invite-link">{inviteLink}</code>
+                <button className="btn btn-primary" onClick={copyLink}>{copied ? 'Copied' : 'Copy link'}</button>
+              </div>
+            ) : (
+              <p className="muted">Loading your link…</p>
+            )
+          ) : (
+            <button className="btn btn-primary" onClick={onAuth}>Sign in to get your link</button>
+          )}
+        </div>
+        {session && referral && (
+          <div className="pts__invite-stats">
+            <div><b>{fmt(referral.referred)}</b><span>joined</span></div>
+            <div><b>{fmt(referral.qualified)}</b><span>qualified</span></div>
+            <div><b>{fmt(Number(referral.pointsEarned))}</b><span>points earned</span></div>
+          </div>
+        )}
       </section>
 
       {/* missions */}
