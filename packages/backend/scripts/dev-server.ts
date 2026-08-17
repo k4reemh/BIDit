@@ -2925,6 +2925,7 @@ function listingDto(l: {
   parcelWidthMm?: number | null;
   parcelHeightMm?: number | null;
   wheel?: unknown;
+  nft?: boolean;
 }) {
   const wheel = normalizeWheelEntries(l.wheel);
   return {
@@ -2934,6 +2935,7 @@ function listingDto(l: {
     buyNowPrice: l.buyNowPrice != null ? formatUsdc(l.buyNowPrice) : null,
     status: l.status,
     quantity: l.quantity,
+    nft: l.nft === true,
     imageUrl: l.photos[0] ?? null,
     weightGrams: l.weightGrams ?? null,
     parcelPreset: l.parcelPreset ?? null,

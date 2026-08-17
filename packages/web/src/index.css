@@ -2954,3 +2954,7 @@ img { display: block; max-width: 100%; }
 }
 .chat__emotes button { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
 .chat__emotes button:hover { background: var(--bg-2); border-color: var(--line); }
+
+/* ---- NFT listing cards (seller dashboard) ---- */
+.lc--nft { border-color: rgba(124, 58, 237, 0.35); }
+.lc__type--nft { background: rgba(124, 58, 237, 0.18); color: #c4b5fd; }

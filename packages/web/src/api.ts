@@ -189,6 +189,8 @@ export interface SellerListing {
   buyNowPrice: string | null;
   status: string;
   quantity: number;
+  /** NFT custody listing: delivery is instant credit, no shipping or shop price. */
+  nft?: boolean;
   imageUrl: string | null;
   weightGrams: number | null;
   parcelPreset: string | null;
