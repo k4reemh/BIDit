@@ -14,6 +14,7 @@ import {
   type Session,
 } from '../api';
 import { mediaSrc } from '../config';
+import { renderChatText } from '../emotes';
 import Avatar from '../components/Avatar';
 import { Verified } from '../icons';
 
@@ -286,7 +287,7 @@ export default function Messages({ session, onAuth }: { session: Session | null;
                   const mine = m.senderId === session.userId;
                   return (
                     <div key={m.id} className={`msgs__bubble${mine ? ' is-mine' : ''}`}>
-                      {m.text}
+                      {renderChatText(m.text ?? '')}
                     </div>
                   );
                 })}

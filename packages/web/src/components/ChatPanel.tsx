@@ -3,6 +3,7 @@ import Avatar from './Avatar';
 import { openRoom, type RoomController, type ChatLine } from '../realtime';
 import type { Session } from '../api';
 import { Chat, ArrowRight, Trash, Shield } from '../icons';
+import { EMOTES, Emote, renderChatText } from '../emotes';
 
 const DEFAULT_COOLDOWN_MS = 5000; // fallback until CHAT_HISTORY delivers the room's value
 
@@ -25,6 +26,7 @@ export default function ChatPanel({
   const [msgs, setMsgs] = useState<ChatLine[]>([]);
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<ChatLine | null>(null);
+  const [emotesOpen, setEmotesOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownMs, setCooldownMs] = useState(DEFAULT_COOLDOWN_MS); // the room's setting, from CHAT_HISTORY
@@ -119,7 +121,7 @@ export default function ChatPanel({
               <span className={`chat__who${m.senderId === room ? ' is-host' : ''}${m.tier ? ` tier-${m.tier}` : ''}`}>
                 @{m.handle}
               </span>{' '}
-              <span className="chat__text">{m.text}</span>
+              <span className="chat__text">{renderChatText(m.text)}</span>
             </div>
             <div className="chat__mod">
               <button title="Reply" onClick={() => armReply(m)}><Chat width={13} height={13} /></button>
@@ -145,6 +147,34 @@ export default function ChatPanel({
 
       {session ? (
         <div className="chat__input">
+          <div className="chat__emotes-anchor">
+            <button
+              className="chat__emotebtn"
+              title="Emotes"
+              onClick={() => setEmotesOpen((v) => !v)}
+              aria-label="Insert emote"
+            >
+              🍞
+            </button>
+            {emotesOpen && (
+              <div className="chat__emotes">
+                {EMOTES.map((e) => (
+                  <button
+                    key={e.name}
+                    title={`:${e.name}:`}
+                    onClick={() => {
+                      setText((t) => `${t}${t && !t.endsWith(' ') ? ' ' : ''}:${e.name}: `);
+                      setEmotesOpen(false);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    <Emote def={e} />
+                    <span>{e.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <input
             ref={inputRef}
             value={text}
@@ -152,7 +182,7 @@ export default function ChatPanel({
             disabled={blocked}
             placeholder={blocked ? 'You’re blocked from this chat' : replyTo ? `Reply to @${replyTo.handle}…` : 'Type something…'}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setReplyTo(null); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') { setReplyTo(null); setEmotesOpen(false); } }}
           />
           <button className="btn btn-primary btn-sm chat__send" disabled={!canSend} onClick={send} aria-label="Send message">
             {cooling > 0 ? `${Math.ceil(cooling / 1000)}s` : <ArrowRight width={16} height={16} />}
