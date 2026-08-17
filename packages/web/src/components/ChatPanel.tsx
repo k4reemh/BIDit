@@ -24,6 +24,8 @@ export default function ChatPanel({
 }) {
   const [msgs, setMsgs] = useState<ChatLine[]>([]);
   const [text, setText] = useState('');
+  const [replyTo, setReplyTo] = useState<ChatLine | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownMs, setCooldownMs] = useState(DEFAULT_COOLDOWN_MS); // the room's setting, from CHAT_HISTORY
   const [blocked, setBlocked] = useState(false);
@@ -86,10 +88,17 @@ export default function ChatPanel({
     if (blocked || cooling > 0) return;
     const t = text.trim();
     if (!t) return;
-    ctl.current?.sendChat(t);
+    ctl.current?.sendChat(t, replyTo?.id);
     setText('');
+    setReplyTo(null);
     setNotice('');
     if (cooldownMs > 0) setCooldownUntil(Date.now() + cooldownMs); // optimistic; server is authoritative
+  };
+
+  const armReply = (m: ChatLine) => {
+    if (!session) return onAuth();
+    setReplyTo(m);
+    inputRef.current?.focus();
   };
 
   return (
@@ -102,30 +111,48 @@ export default function ChatPanel({
           <div key={m.id} className="chat__msg">
             <Avatar handle={m.handle} src={m.avatarUrl} size={26} />
             <div className="chat__bubble">
-              <span className="chat__who">@{m.handle}</span>{' '}
+              {m.replyTo && (
+                <div className="chat__quote">
+                  <span className="chat__quote-who">@{m.replyTo.handle}</span> {m.replyTo.text}
+                </div>
+              )}
+              <span className={`chat__who${m.senderId === room ? ' is-host' : ''}${m.tier ? ` tier-${m.tier}` : ''}`}>
+                @{m.handle}
+              </span>{' '}
               <span className="chat__text">{m.text}</span>
             </div>
-            {canModerate && m.senderId !== room && (
-              <div className="chat__mod">
-                <button title="Delete message" onClick={() => ctl.current?.deleteChat(m.id)}><Trash width={13} height={13} /></button>
-                <button title="Block user" onClick={() => ctl.current?.blockUser(m.senderId)}><Shield width={13} height={13} /></button>
-              </div>
-            )}
+            <div className="chat__mod">
+              <button title="Reply" onClick={() => armReply(m)}><Chat width={13} height={13} /></button>
+              {canModerate && m.senderId !== room && (
+                <>
+                  <button title="Delete message" onClick={() => ctl.current?.deleteChat(m.id)}><Trash width={13} height={13} /></button>
+                  <button title="Block user" onClick={() => ctl.current?.blockUser(m.senderId)}><Shield width={13} height={13} /></button>
+                </>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
       {notice && <div className="chat__notice">{notice}</div>}
 
+      {replyTo && (
+        <div className="chat__replybar">
+          <span>Replying to <b>@{replyTo.handle}</b>: {replyTo.text.length > 60 ? `${replyTo.text.slice(0, 57)}...` : replyTo.text}</span>
+          <button onClick={() => setReplyTo(null)} aria-label="Cancel reply">×</button>
+        </div>
+      )}
+
       {session ? (
         <div className="chat__input">
           <input
+            ref={inputRef}
             value={text}
             maxLength={300}
             disabled={blocked}
-            placeholder={blocked ? 'You’re blocked from this chat' : 'Type something…'}
+            placeholder={blocked ? 'You’re blocked from this chat' : replyTo ? `Reply to @${replyTo.handle}…` : 'Type something…'}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setReplyTo(null); }}
           />
           <button className="btn btn-primary btn-sm chat__send" disabled={!canSend} onClick={send} aria-label="Send message">
             {cooling > 0 ? `${Math.ceil(cooling / 1000)}s` : <ArrowRight width={16} height={16} />}

@@ -8,6 +8,7 @@
  * The WebSocket layer (realtime/server.ts) is a thin wrapper over these functions,
  * mirroring how giveaways.ts backs the giveaway handlers.
  */
+import { chatTierFor } from '@bidit/shared';
 import { prisma as defaultPrisma } from './db.js';
 import { mediaUrl } from './media.js';
 import type { PrismaClient } from './db.js';
@@ -71,9 +72,16 @@ export interface PostedChat {
   /** Sender's profile photo, resolved live from the User row (NOT snapshotted
    *  like `handle`) so a changed avatar updates everywhere, including backlog. */
   avatarUrl: string | null;
+  /** Points tier at post time; null = none. */
+  tier: string | null;
+  /** Quoted parent when this is a reply (snapshotted handle + excerpt). */
+  replyTo: { id: string; handle: string; text: string } | null;
   text: string;
   createdAt: Date;
 }
+
+/** Excerpt cap for the quoted parent inside a reply. */
+const REPLY_EXCERPT_LEN = 120;
 
 /**
  * Post a chat message to a room. Enforces (in order): not blocked, valid text,
@@ -81,7 +89,7 @@ export interface PostedChat {
  * row for broadcast. Throws ChatError on any rejection.
  */
 export async function postChatMessage(
-  params: { room: string; userId: string; text: string },
+  params: { room: string; userId: string; text: string; replyToId?: string },
   clock: Clock = systemClock,
   prisma: PrismaClient = defaultPrisma,
 ): Promise<PostedChat> {
@@ -106,15 +114,42 @@ export async function postChatMessage(
 
   const sender = await prisma.user.findUnique({
     where: { id: params.userId },
-    select: { handle: true, avatarUrl: true },
+    select: { handle: true, avatarUrl: true, points: true },
   });
   const handle = sender?.handle ?? 'someone';
+  // The tier rides the message like the handle: a snapshot of the rank the
+  // sender held when they said it.
+  const tierId = chatTierFor(sender?.points ?? 0n);
+  const tier = tierId === 'none' ? null : tierId;
+
+  // Replies snapshot the parent's handle + an excerpt. An invalid parent
+  // (wrong room, deleted, or racing a moderator's delete) silently degrades to
+  // a plain message rather than rejecting the send.
+  let replyTo: PostedChat['replyTo'] = null;
+  if (params.replyToId) {
+    const parent = await prisma.chatMessage.findFirst({
+      where: { id: params.replyToId, roomId: params.room, deletedAt: null },
+      select: { id: true, handle: true, text: true },
+    });
+    if (parent) replyTo = { id: parent.id, handle: parent.handle, text: parent.text.slice(0, REPLY_EXCERPT_LEN) };
+  }
+
   const row = await prisma.chatMessage.create({
-    data: { roomId: params.room, userId: params.userId, handle, text, createdAt: now },
-    select: { id: true, roomId: true, userId: true, handle: true, text: true, createdAt: true },
+    data: {
+      roomId: params.room,
+      userId: params.userId,
+      handle,
+      tier,
+      replyToId: replyTo?.id ?? null,
+      replyToHandle: replyTo?.handle ?? null,
+      replyToText: replyTo?.text ?? null,
+      text,
+      createdAt: now,
+    },
+    select: { id: true, roomId: true, userId: true, handle: true, tier: true, text: true, createdAt: true },
   });
   // A URL, never the inline image: a 50-line backlog of data URLs was megabytes.
-  return { ...row, avatarUrl: mediaUrl('avatar', params.userId, sender?.avatarUrl) };
+  return { ...row, replyTo, avatarUrl: mediaUrl('avatar', params.userId, sender?.avatarUrl) };
 }
 
 /**
@@ -238,7 +273,18 @@ export async function listRecentChat(
     where: { roomId: room, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     take: limit,
-    select: { id: true, roomId: true, userId: true, handle: true, text: true, createdAt: true },
+    select: {
+      id: true,
+      roomId: true,
+      userId: true,
+      handle: true,
+      tier: true,
+      replyToId: true,
+      replyToHandle: true,
+      replyToText: true,
+      text: true,
+      createdAt: true,
+    },
   });
   // One extra lookup for the distinct senders rather than a per-row join: the
   // backlog is small and capped, and avatars must reflect the CURRENT user row.
@@ -248,5 +294,12 @@ export async function listRecentChat(
       (u) => [u.id, u.avatarUrl] as const,
     ),
   );
-  return rows.reverse().map((r) => ({ ...r, avatarUrl: mediaUrl('avatar', r.userId, avatars.get(r.userId)) }));
+  return rows.reverse().map(({ replyToId, replyToHandle, replyToText, ...r }) => ({
+    ...r,
+    replyTo:
+      replyToId && replyToHandle !== null
+        ? { id: replyToId, handle: replyToHandle, text: replyToText ?? '' }
+        : null,
+    avatarUrl: mediaUrl('avatar', r.userId, avatars.get(r.userId)),
+  }));
 }

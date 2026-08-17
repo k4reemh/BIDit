@@ -55,6 +55,9 @@ export interface ChatSendMessage {
   type: 'CHAT_SEND';
   room: string;
   text: string;
+  /** Reply to an existing message in this room; the server snapshots the
+   *  parent's handle + an excerpt onto the new message. */
+  replyToId?: string;
 }
 /** Seller-only: hide a message in their own room. */
 export interface ChatDeleteMessage {
@@ -281,6 +284,11 @@ export interface ChatLine {
   /** Sender's profile photo, if they have one. Clients fall back to the
    *  generated gradient avatar when absent. */
   avatarUrl?: string | null;
+  /** Points tier at post time ('none'..'legend'): drives name color/glow. */
+  tier?: string | null;
+  /** Quoted parent when this message is a reply (snapshot, so it renders even
+   *  if the parent is later deleted). */
+  replyTo?: { id: string; handle: string; text: string } | null;
   text: string;
   createdAt: number;
 }

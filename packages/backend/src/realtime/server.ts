@@ -501,6 +501,8 @@ export class RealtimeServer {
     userId: string;
     handle: string;
     avatarUrl?: string | null;
+    tier?: string | null;
+    replyTo?: { id: string; handle: string; text: string } | null;
     text: string;
     createdAt: Date;
   }): ChatLine {
@@ -509,6 +511,8 @@ export class RealtimeServer {
       senderId: m.userId,
       handle: m.handle,
       avatarUrl: m.avatarUrl ?? null,
+      tier: m.tier ?? null,
+      replyTo: m.replyTo ?? null,
       text: m.text,
       createdAt: m.createdAt.getTime(),
     };
@@ -517,7 +521,11 @@ export class RealtimeServer {
   private async handleChatSend(conn: Conn, msg: ChatSendMessage): Promise<void> {
     if (!conn.rooms.has(msg.room)) return; // must be watching the room to post in it
     try {
-      const m = await postChatMessage({ room: msg.room, userId: conn.userId, text: msg.text }, this.clock, this.prisma);
+      const m = await postChatMessage(
+        { room: msg.room, userId: conn.userId, text: msg.text, replyToId: msg.replyToId },
+        this.clock,
+        this.prisma,
+      );
       const out: ChatMessageMessage = {
         type: 'CHAT_MESSAGE',
         room: msg.room,

@@ -877,6 +877,14 @@ model ChatMessage {
   roomId    String // seller's userId (the room)
   userId    String // sender
   handle    String // sender handle snapshot
+  /// Points tier at post time ('bronze'..'legend'); null = none. Snapshot,
+  /// like `handle`: a line shows the rank its sender held when they said it.
+  tier      String?
+  /// Reply threading: the parent + a snapshot of its handle/excerpt, so the
+  /// quote still renders if the parent is deleted later.
+  replyToId     String?
+  replyToHandle String?
+  replyToText   String?  @db.VarChar(120)
   text      String    @db.VarChar(300)
   createdAt DateTime  @default(now())
   deletedAt DateTime?

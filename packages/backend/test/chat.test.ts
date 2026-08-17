@@ -123,3 +123,62 @@ describe('history + moderation', () => {
     expect((await listRecentChat(seller.userId, 10, prisma)).length).toBe(0);
   });
 });
+
+describe('tiers + replies', () => {
+  it('snapshots the sender points tier on the message', async () => {
+    const clock = new ManualClock(T0);
+    const room = (await makeUser('seller')).userId;
+    const pleb = await makeUser('buyer');
+    const whale = await makeUser('buyer');
+    await prisma.user.update({ where: { id: whale.userId }, data: { points: 60_000n } });
+
+    const m1 = await postChatMessage({ room, userId: pleb.userId, text: 'gm' }, clock, prisma);
+    expect(m1.tier).toBeNull();
+    const m2 = await postChatMessage({ room, userId: whale.userId, text: 'gm gold' }, clock, prisma);
+    expect(m2.tier).toBe('gold');
+
+    // Snapshot: later point gains do not rewrite old lines.
+    await prisma.user.update({ where: { id: whale.userId }, data: { points: 2_000_000n } });
+    const history = await listRecentChat(room, 10, prisma);
+    expect(history.find((h) => h.id === m2.id)!.tier).toBe('gold');
+    const m3 = await postChatMessage({ room, userId: whale.userId, text: 'gm legend' }, new ManualClock(T0 + 10_000), prisma);
+    expect(m3.tier).toBe('legend');
+  });
+
+  it('replies snapshot the parent and survive its deletion; bad parents degrade', async () => {
+    const clock = new ManualClock(T0);
+    const seller = await makeUser('seller');
+    const room = seller.userId;
+    const a = await makeUser('buyer');
+    const b = await makeUser('buyer');
+
+    const parent = await postChatMessage({ room, userId: a.userId, text: 'W pull or nah?' }, clock, prisma);
+    const reply = await postChatMessage(
+      { room, userId: b.userId, text: 'Huge W', replyToId: parent.id },
+      new ManualClock(T0 + 10_000),
+      prisma,
+    );
+    expect(reply.replyTo).toEqual({ id: parent.id, handle: parent.handle, text: 'W pull or nah?' });
+
+    // The quote survives the parent being moderated away.
+    await deleteChatMessage({ room, messageId: parent.id, byUserId: room }, new ManualClock(T0 + 20_000), prisma);
+    const history = await listRecentChat(room, 10, prisma);
+    const kept = history.find((h) => h.id === reply.id)!;
+    expect(kept.replyTo?.text).toBe('W pull or nah?');
+
+    // Unknown parent / wrong room / already-deleted parent: plain message, no throw.
+    const other = await makeUser('seller');
+    const cross = await postChatMessage(
+      { room: other.userId, userId: b.userId, text: 'hi', replyToId: parent.id },
+      new ManualClock(T0 + 30_000),
+      prisma,
+    );
+    expect(cross.replyTo).toBeNull();
+    const dead = await postChatMessage(
+      { room, userId: a.userId, text: 'late', replyToId: parent.id },
+      new ManualClock(T0 + 40_000),
+      prisma,
+    );
+    expect(dead.replyTo).toBeNull();
+  });
+});

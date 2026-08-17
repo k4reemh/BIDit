@@ -131,6 +131,10 @@ export interface ChatLine {
   handle: string;
   /** Sender's profile photo; null falls back to the generated avatar. */
   avatarUrl?: string | null;
+  /** Points tier at post time ('bronze'..'legend'); drives name color/glow. */
+  tier?: string | null;
+  /** Quoted parent when this message is a reply. */
+  replyTo?: { id: string; handle: string; text: string } | null;
   text: string;
   createdAt: number;
 }
@@ -263,7 +267,7 @@ export interface RoomController {
   bid: (auctionId: string, amount: string) => void;
   enterGiveaway: (giveawayId: string) => void;
   /** Post a chat message to the room. */
-  sendChat: (text: string) => void;
+  sendChat: (text: string, replyToId?: string) => void;
   /** Seller-only: delete a message / block a user in their own room. */
   deleteChat: (messageId: string) => void;
   blockUser: (userId: string) => void;
@@ -340,7 +344,7 @@ export function openRoom(room: string, h: Omit<Handlers, 'room'>): RoomControlle
     bid: (auctionId, amount) =>
       send({ type: 'BID_INTENT', auctionId, amount, clientNonce: Math.random().toString(36).slice(2) }),
     enterGiveaway: (giveawayId) => send({ type: 'GIVEAWAY_ENTER', giveawayId }),
-    sendChat: (text) => send({ type: 'CHAT_SEND', room, text }),
+    sendChat: (text, replyToId) => send({ type: 'CHAT_SEND', room, text, ...(replyToId ? { replyToId } : {}) }),
     deleteChat: (messageId) => send({ type: 'CHAT_DELETE', room, messageId }),
     blockUser: (userId) => send({ type: 'CHAT_BLOCK', room, userId }),
     resync: () => { if (ws && ws.readyState === WebSocket.OPEN) resync(); else open(); },

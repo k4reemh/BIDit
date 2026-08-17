@@ -7,3 +7,4 @@ export * from './giveaway.js';
 export * from './parcels.js';
 export * from './countries.js';
 export * from './protocol.js';
+export * from './tiers.js';
